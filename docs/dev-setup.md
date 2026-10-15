@@ -14,6 +14,20 @@ way kube-auth-proxy would, and the BFF forwards them to the backend.
   locally; in a cluster it uses its ServiceAccount. The BFF asks the same hub whether you
   may patch `ManagedClusters` (`isProviderAdmin`), using your token.
 
+## Run without a cluster
+
+```sh
+make install        # once: frontend dependencies
+make dev-fake       # fake backend on :9090, fake hub on :9091, BFF on :8080, frontend on :9000
+```
+
+No `oc login` is needed. The fake backend (`bff/cmd/fake-backend`) serves the backend's
+gRPC services from `mock/fixtures` and answers the BFF's access review like a hub would;
+`mock/README.md` explains what it simulates and how faithful it is. `AUTH_TOKEN=viewer-token
+make dev-fake` shows the console as a user who is not a provider admin, and
+`AUTH_TOKEN=expired-token` the signed-out path. Edit the fixtures and restart to change the
+fleet.
+
 ## Run against a real cluster
 
 ```sh

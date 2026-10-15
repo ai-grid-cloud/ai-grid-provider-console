@@ -1,5 +1,5 @@
 {
-  "_comment": "ai_grid.v1.ManagedCluster in protojson. Labels are the ones ACM sets on every imported cluster (name, cloud, vendor, clusterID, openshiftVersion*, clusterset, feature addons) plus the console's ai-grid/* conventions. All values are fictional. See mock/README.md.",
+  "_comment": "ai_grid.v1.ManagedCluster in protojson. Labels are the ones ACM sets on every imported cluster (name, cloud, vendor, clusterID, openshiftVersion*, clusterset=default, feature.open-cluster-management.io/addon-* mirroring add-on health) plus the console's ai-grid/* conventions. See mock/research/acm.md section 1. All values are fictional.",
   "clusters": [
     {
       "name": "local-cluster",
@@ -31,7 +31,7 @@
         "openshiftVersion": "4.22.12",
         "openshiftVersion-major": "4",
         "openshiftVersion-major-minor": "4.22",
-        "cluster.open-cluster-management.io/clusterset": "ai-grid",
+        "cluster.open-cluster-management.io/clusterset": "default",
         "feature.open-cluster-management.io/addon-application-manager": "available",
         "feature.open-cluster-management.io/addon-work-manager": "available",
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "available",
@@ -53,7 +53,7 @@
         "openshiftVersion": "4.21.9",
         "openshiftVersion-major": "4",
         "openshiftVersion-major-minor": "4.21",
-        "cluster.open-cluster-management.io/clusterset": "ai-grid",
+        "cluster.open-cluster-management.io/clusterset": "default",
         "feature.open-cluster-management.io/addon-application-manager": "available",
         "feature.open-cluster-management.io/addon-work-manager": "available",
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "available",
@@ -75,7 +75,7 @@
         "openshiftVersion": "4.22.15",
         "openshiftVersion-major": "4",
         "openshiftVersion-major-minor": "4.22",
-        "cluster.open-cluster-management.io/clusterset": "ai-grid",
+        "cluster.open-cluster-management.io/clusterset": "default",
         "feature.open-cluster-management.io/addon-application-manager": "available",
         "feature.open-cluster-management.io/addon-work-manager": "available",
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "available",
