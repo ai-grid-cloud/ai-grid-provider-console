@@ -3,7 +3,7 @@
 # address the BFF dials by default. Clones the backend into .cache/ on first use.
 #
 #   BACKEND_REPO  git URL (default https://github.com/yuvalturg/ai-grid-backend)
-#   BACKEND_REF   git ref to check out (default: the ref pinned in bff/go.mod)
+#   BACKEND_REF   git ref to check out (default: the commit in mock/proto/upstream/COMMIT)
 #   BACKEND_DIR   use an existing checkout instead of cloning
 #   LISTEN        listen address (default 127.0.0.1:9090)
 set -euo pipefail
@@ -12,8 +12,8 @@ REPO="${BACKEND_REPO:-https://github.com/yuvalturg/ai-grid-backend}"
 DIR="${BACKEND_DIR:-${ROOT}/.cache/ai-grid-backend}"
 LISTEN="${LISTEN:-127.0.0.1:9090}"
 if [[ -z "${BACKEND_REF:-}" ]]; then
-  # v0.0.0-<timestamp>-<sha> pseudo-version from the replace directive.
-  BACKEND_REF="$(sed -n 's#^replace .*ai-grid-backend .*=> .*v0\.0\.0-[0-9]*-\([0-9a-f]*\)$#\1#p' "${ROOT}/bff/go.mod")"
+  # The commit whose proto is vendored in mock/proto/upstream (hack/sync-upstream-proto.sh).
+  BACKEND_REF="$(sed -n 's/^commit=//p' "${ROOT}/mock/proto/upstream/COMMIT")"
 fi
 
 if [[ ! -d "${DIR}/.git" ]]; then

@@ -11,7 +11,10 @@ FAKE_HUB_ADDRESS ?= 127.0.0.1:9091
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -X github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/api.Version=$(VERSION)
 
-.PHONY: all fmt vet lint test build run run-fake fake-backend tidy
+BUF := go run github.com/bufbuild/buf/cmd/buf@v1.57.2
+PROTO_DIR := ../mock/proto
+
+.PHONY: all fmt vet lint test build run run-fake fake-backend tidy generate lint-proto check-generated
 
 all: build
 
@@ -42,3 +45,15 @@ run-fake: ## run the BFF against the fake backend and fake hub; no cluster neede
 
 tidy:
 	go mod tidy
+
+generate: ## regenerate gen/ from ../mock/proto (buf and the protoc plugins run through go run; nothing to install)
+	cd $(PROTO_DIR) && $(BUF) generate
+
+lint-proto: ## buf lint on the draft proto
+	cd $(PROTO_DIR) && $(BUF) lint
+
+check-generated: ## fail when gen/ differs from what ../mock/proto generates: stale, missing or left-over files
+	tmp="$$(mktemp -d)" && trap 'rm -rf "$$tmp"' EXIT && \
+	sed "s#\.\./\.\./bff/gen#$$tmp/gen#" $(PROTO_DIR)/buf.gen.yaml > "$$tmp/buf.gen.yaml" && \
+	(cd $(PROTO_DIR) && $(BUF) generate --template "$$tmp/buf.gen.yaml") && \
+	diff -r --exclude=README.md "$$tmp/gen/ai_grid/v1" gen/ai_grid/v1

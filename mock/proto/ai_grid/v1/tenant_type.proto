@@ -1,0 +1,41 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// A consumer organisation. Backed by a Keycloak Organization in the AI Grid realm.
+//
+// Fields 1-3 are the ones the backend ships and must not move. New fields are
+// appended.
+message Tenant {
+  // Keycloak Organization id (UUID). Output only; the identifier for Get/Update/Delete.
+  string id = 1;
+  // Organization name. Required on create, unique within the realm, 1-255 chars.
+  string name = 2;
+  // E-mail domains owned by the tenant; each must be a lowercase DNS hostname,
+  // unique across tenants.
+  repeated string domains = 3;
+  // URL-safe alias. Defaults to `name` on create. Immutable.
+  string alias = 4;
+  // Whether members can log in. Default true on create.
+  bool enabled = 5;
+  // Free-text description shown in the console.
+  string description = 6;
+  // Keycloak Organization attributes. Opaque to the backend.
+  map<string, string> attributes = 7;
+  // Server-assigned, increments on every change; used by `lock` on Update. Output only.
+  int32 version = 8;
+}

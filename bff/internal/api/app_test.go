@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"testing"
 
-	aigridv1 "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1"
 	"google.golang.org/grpc/codes"
 
+	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend/backendtest"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/config"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/hub"

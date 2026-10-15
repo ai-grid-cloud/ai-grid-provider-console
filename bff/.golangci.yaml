@@ -8,6 +8,8 @@ linters:
     - unconvert
   exclusions:
     generated: lax
+    paths:
+      - gen/
     presets:
       - comments
       - common-false-positives
@@ -16,6 +18,9 @@ formatters:
   enable:
     - gofmt
     - goimports
+  exclusions:
+    paths:
+      - gen/
   settings:
     goimports:
       local-prefixes:

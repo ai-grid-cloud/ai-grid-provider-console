@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	aigridv1 "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1"
 	"google.golang.org/protobuf/encoding/protojson"
+
+	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
 
 // Fixtures is the content of a fixtures directory (mock/fixtures by default).

@@ -1,0 +1,91 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+import "ai_grid/v1/managed_cluster_type.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// Read and enrol ManagedClusters on the hub. Every RPC acts with the caller's
+// token; the hub's RBAC decides.
+service ManagedClusters {
+  // Lists ManagedClusters the caller may list.
+  rpc ListManagedClusters(ListManagedClustersRequest) returns (ListManagedClustersResponse);
+  // Returns one ManagedCluster by name. NotFound when absent or not visible.
+  rpc GetManagedCluster(GetManagedClusterRequest) returns (GetManagedClusterResponse);
+  // Updates the mutable fields of a ManagedCluster: `labels`, `annotations`,
+  // `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument.
+  // Requires `patch` on managedclusters for the caller.
+  rpc UpdateManagedCluster(UpdateManagedClusterRequest) returns (UpdateManagedClusterResponse);
+}
+
+// Request of ListManagedClusters. Every field is optional; the shipped backend
+// takes an empty request.
+message ListManagedClustersRequest {
+  // Zero-based index of the first result. Default zero.
+  optional int32 offset = 1;
+  // Maximum number of results. Omitted means all; zero means count only;
+  // negative is InvalidArgument.
+  optional int32 limit = 2;
+  // CEL expression over `this` (a ManagedCluster) selecting the clusters to
+  // return, for example `this.labels["ai-grid/enabled"] == "true"`. Empty
+  // means all. See docs/FILTER.md for the supported subset.
+  optional string filter = 3;
+  // Sort order, `<field> [asc|desc]`, for example `name desc`. Default: by name.
+  optional string order = 4;
+}
+
+// Response of ListManagedClusters.
+message ListManagedClustersResponse {
+  // Clusters returned. Keeps its historical name instead of `items`.
+  repeated ManagedCluster clusters = 1;
+  // Number of clusters returned.
+  int32 size = 2;
+  // Number of clusters matching the filter regardless of paging.
+  int32 total = 3;
+}
+
+// Request of GetManagedCluster.
+message GetManagedClusterRequest {
+  // Name of the ManagedCluster.
+  string name = 1;
+}
+
+// Response of GetManagedCluster.
+message GetManagedClusterResponse {
+  // The cluster.
+  ManagedCluster object = 1;
+}
+
+// Request of UpdateManagedCluster.
+message UpdateManagedClusterRequest {
+  // The cluster with the new values. `name` identifies it.
+  ManagedCluster object = 1;
+  // Paths to update. Supported: `labels`, `annotations`, `hub_accepts_client`.
+  // A map path replaces the whole map; to change one key, send the full map
+  // as returned by Get. (Alternative under discussion: per-key paths such
+  // as `labels.ai-grid/enabled`; see the research's open questions.)
+  google.protobuf.FieldMask update_mask = 2;
+  // When true, the update fails with Aborted unless `object.resource_version`
+  // matches the hub's current value.
+  bool lock = 3;
+}
+
+// Response of UpdateManagedCluster.
+message UpdateManagedClusterResponse {
+  // The cluster after the update, as the hub stored it.
+  ManagedCluster object = 1;
+}

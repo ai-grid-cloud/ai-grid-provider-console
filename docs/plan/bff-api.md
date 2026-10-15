@@ -17,11 +17,17 @@ backend service for cluster access and this BFF for the browser.
 ## The backend
 
 - Repository: https://github.com/yuvalturg/ai-grid-backend (Yuval Turgeman). The Go module
-  path is `github.com/osac-project/ai-grid-backend`, so `bff/go.mod` carries a `replace` to
-  the yuvalturg repository pinned by pseudo-version until it moves. Bump the pseudo-version
-  to pick up new RPCs.
-- Contract: `proto/ai_grid/v1/ai_grid.proto`. The generated Go client in `gen/ai_grid/v1`
-  is what the BFF imports. Nothing else from the backend module is used.
+  path is `github.com/osac-project/ai-grid-backend`; the console does not import the module.
+- Contract: `proto/ai_grid/v1/ai_grid.proto` in the backend repository. The console pins it
+  by a vendored copy, `mock/proto/upstream/ai_grid.proto` with its commit in
+  `mock/proto/upstream/COMMIT` (`hack/sync-upstream-proto.sh <ref>` refreshes both).
+- What the BFF compiles against: the console's draft proto in `mock/proto/ai_grid/v1`,
+  generated into `bff/gen/ai_grid/v1` (`make -C bff generate`). The draft carries the
+  backend's three RPCs unchanged plus the shapes proposed in
+  `mock/research/backend-conventions.md` section 6; `bff/internal/protodrift` fails when it
+  stops being a superset of the vendored backend file. When the backend ships the RPCs the
+  console switches the import back to the backend's `gen/ai_grid/v1` and deletes the draft.
+  See `mock/README.md`, "The draft proto".
 - Runs with its own ServiceAccount (`get/list/watch` on `ManagedCluster`) and Keycloak admin
   credentials. It is aligned with OSAC's fulfillment-service and is the "OSAC-like API
   layer" from the 2026-10-14 thread.
@@ -32,8 +38,8 @@ backend service for cluster access and this BFF for the browser.
 
 | Topic | Decision | Why |
 |---|---|---|
-| Language | Go, standard library `net/http` router, `google.golang.org/grpc` client. No `client-go`. | The BFF reads nothing from the hub; its one Kubernetes call is a `SelfSubjectAccessReview` over plain HTTPS (`internal/hub`). One dependency less to keep in step with the hub. |
-| Identity | kube-auth-proxy authenticates the browser and sets `x-forwarded-user`, `x-forwarded-email`, `x-forwarded-groups` and `x-forwarded-access-token`. The BFF reads them (`internal/identity`) and forwards the token as `authorization: Bearer` plus the user, email and groups as gRPC metadata on every RPC (`internal/backend`). | The backend decides what the caller may do; the BFF has no credential of its own and no authorization logic. The proxy's provider can change (OpenShift OAuth today, a Keycloak realm later) without touching the BFF. |
+| Language | Go, standard library `net/http` router, `google.golang.org/grpc` client against the draft `ai_grid.v1` package generated in `bff/gen` from `mock/proto`. No `client-go`, no backend module dependency. | The BFF reads nothing from the hub; its one Kubernetes call is a `SelfSubjectAccessReview` over plain HTTPS (`internal/hub`). One dependency less to keep in step with the hub. Compiling against the draft lets the BFF, the fake and the UI move ahead of the backend; the drift test keeps the draft honest against the vendored backend proto. |
+| Identity | kube-auth-proxy authenticates the browser and sets `x-forwarded-user`, `x-forwarded-email`, `x-forwarded-groups` and `x-forwarded-access-token`. The BFF reads them (`internal/identity`) and forwards the token as `authorization: Bearer` plus the user, email and groups as gRPC metadata on every RPC (`internal/backend`). The draft proto's `AiGrid/GetCurrentUser` is the RPC that will return the backend's view of the caller. | The backend decides what the caller may do; the BFF has no credential of its own and no authorization logic. The proxy's provider can change (OpenShift OAuth today, a Keycloak realm later) without touching the BFF. |
 | `isProviderAdmin` | The hub's answer to a `SelfSubjectAccessReview` for `patch` on `managedclusters`, asked with the caller's own token (`HUB_API_URL`, in-cluster by default). | The user's RBAC decides, not a console setting, as PR 1 did (review of 2026-10-15). The UI only uses it to show or hide actions; the backend authorizes every call. A `GetCurrentUser` RPC can take this over once the backend acts as the caller. |
 | Login in development | The Vite dev server and `hack/api.sh` set the same headers from `oc whoami` and `oc whoami -t`. The backend runs locally with `--kubeconfig` (`hack/dev-backend.sh`). | Any developer who has run `oc login` works against a real hub. |
 | Deployment | One pod: kube-auth-proxy (:8443), bff on `127.0.0.1:8080`, ai-grid-backend on `127.0.0.1:9090`. The BFF dials the backend in plaintext over loopback; plaintext to any other address is refused unless `BACKEND_INSECURE=true`. The kubelet probes `/readyz` through the proxy (`--skip-auth-route=^/readyz$`); neither the BFF nor the backend has a probe of its own. | Nothing on the pod network can reach the BFF with forged identity headers or the backend at all. When the backend gets its own Deployment, set `BACKEND_ADDRESS` to its Service and `BACKEND_CA_FILE` to its serving CA. |
@@ -52,8 +58,8 @@ bff/
   internal/api          App, routes, middleware, gRPC-to-HTTP error mapping, handlers, SPA
 ```
 
-Adding an endpoint: ask for the RPC in the backend proto first, bump the pseudo-version,
-map it in a handler under `internal/api`, add it to the table below and to
+Adding an endpoint: draft the RPC in `mock/proto/ai_grid/v1` (and propose it to the backend),
+`make -C bff generate`, implement or stub it in the fake, map it in a handler under `internal/api`, add it to the table below and to
 `frontend/src/api/ConsoleService.ts`.
 
 ## Endpoints

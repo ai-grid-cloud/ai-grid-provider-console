@@ -1,0 +1,12 @@
+# Generates bff/gen/ai_grid/v1 from the draft proto. Run from this directory:
+#   go run github.com/bufbuild/buf/cmd/buf@v1.57.2 generate
+# or `make -C bff generate`. The plugins run through `go run` at pinned versions, so
+# nothing needs installing beyond Go. `out` is relative to the working directory.
+version: v2
+plugins:
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10"]
+    out: ../../bff/gen
+    opt: paths=source_relative
+  - local: ["go", "run", "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1"]
+    out: ../../bff/gen
+    opt: paths=source_relative

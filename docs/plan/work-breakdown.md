@@ -42,8 +42,8 @@ Owner: Yuval Turgeman. Everything that touches the hub, Keycloak or metrics.
 
 Owner: console team. A handler per RPC, nothing else.
 
-1. Bump the backend pseudo-version in `bff/go.mod` as RPCs land and map each one in
-   `internal/api`: `UpdateManagedCluster` to `PATCH /clusters/{name}`, `GetOverview` to
+1. As RPCs land in the backend, sync the vendored proto (`hack/sync-upstream-proto.sh`),
+   reconcile the draft in `mock/proto`, and map each one in `internal/api`: `UpdateManagedCluster` to `PATCH /clusters/{name}`, `GetOverview` to
    `GET /grid/overview`, `GetCurrentUser` into `/user`, models, catalog, subscriptions,
    tenant mutations. Keep the error table in `bff-api.md` true.
 2. When the backend moves to its own Deployment: `BACKEND_ADDRESS` to its Service,
@@ -77,7 +77,7 @@ Owner: console team.
 | Auth setup for AI Grid: OpenShift OAuth as deployed here, or a Keycloak realm shared with tenants? | Lindani Phiri, Andrew Ballantyne | Decides the kube-auth-proxy provider; the dev hub already has Keycloak in `grid-sso` |
 | Are Keycloak Organizations the tenant model, or will the tenant layer defined with Swati's team look different? | Swati's team, Yuval Turgeman | The backend's `ListTenants` already assumes Organizations |
 | Which Thanos (ACM observability or user-workload monitoring) and which metric names? | Kevin Howell, Praxis team | Unblocks `GetOverview` with real data; the POC's names are assumptions |
-| Where does the backend's image get published, and does the repository move to `osac-project`? | Yuval Turgeman | Removes the `replace` in `bff/go.mod` and the placeholder image in `manifests/` |
+| Where does the backend's image get published, and does the repository move to `osac-project`? | Yuval Turgeman | Decides the import path the console switches to when it drops the draft proto in `mock/proto`, and replaces the placeholder image in `manifests/` |
 | Is there a cost or spend view for AI Grid at all? | Myriam Fentanes, Jenny Yi, Daniele Zonca | Decides whether `billingUrl` ever points anywhere |
 
 ## Shared rules

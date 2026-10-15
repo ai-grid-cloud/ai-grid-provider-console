@@ -43,8 +43,8 @@ no realm yet).
 
 How the pieces connect:
 
-1. `hack/dev-backend.sh` clones `ai-grid-backend` into `.cache/` at the commit pinned in
-   `bff/go.mod` and runs it with `--kubeconfig` on `127.0.0.1:9090`. Set `BACKEND_DIR` to
+1. `hack/dev-backend.sh` clones `ai-grid-backend` into `.cache/` at the commit recorded in
+   `mock/proto/upstream/COMMIT` and runs it with `--kubeconfig` on `127.0.0.1:9090`. Set `BACKEND_DIR` to
    use your own checkout.
 2. The BFF listens on `127.0.0.1:8080`, dials `BACKEND_ADDRESS` (default `127.0.0.1:9090`,
    plaintext) and forwards the caller's token as `authorization` metadata
@@ -82,12 +82,33 @@ in `bff/` for the flags.
 ## Checks
 
 ```sh
-make lint    # go vet, golangci-lint, tsc
-make test    # go test -race (in-memory gRPC backend), vitest
+make lint    # go vet, golangci-lint, buf lint on mock/proto, tsc
+make test    # go test -race (in-memory gRPC backend, proto drift test), vitest
 make build   # BFF binary and frontend bundle
 ```
 
-CI runs the same plus `kustomize build` and a container image build.
+CI runs the same plus `make -C bff check-generated` (a fresh generation in a temporary
+directory must match `bff/gen`, file for file), `kustomize build` and a container image
+build. A separate nightly workflow (`.github/workflows/drift.yaml`, also runnable by hand)
+refreshes the vendored backend proto from the backend's `main` in the runner's checkout and
+runs the drift test, so a backend proto change is reported the day after it merges.
+
+## The proto the BFF compiles against
+
+The BFF imports `bff/gen/ai_grid/v1`, generated from the console's draft proto in
+`mock/proto/ai_grid/v1` (the backend's three RPCs plus the shapes the console proposes; see
+`mock/README.md`, "The draft proto"). After editing a `.proto` file:
+
+```sh
+make -C bff generate      # buf generate; buf and the protoc plugins run through `go run`, nothing to install
+make -C bff lint-proto    # buf lint
+make -C bff check-generated
+```
+
+`hack/sync-upstream-proto.sh <ref>` refreshes the vendored copy of the backend's real proto
+(it fetches into a temporary directory and only then replaces `mock/proto/upstream`, so a
+failed fetch leaves the previous copy intact); `go test ./internal/protodrift/` then says
+whether the draft still covers it.
 
 ## Deploy to a cluster
 

@@ -1,0 +1,43 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+//
+// Placeholder: the names are agreed now, the fields later. Empty request and
+// response messages are deliberate; adding fields is additive, and the fake can
+// already register the service so the drift test covers it. Every RPC answers
+// Unimplemented until the shape is agreed.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// Fleet-wide views of the grid: metrics overview and network topology.
+service Grid {
+  // Fleet overview: request rate, error rate, latency, GPU utilisation per site
+  // over a range; `metrics_source` tells whether data is live or demo.
+  rpc GetOverview(GetOverviewRequest) returns (GetOverviewResponse);
+  // Grid network topology from the gateway CRDs, when installed.
+  rpc GetNetwork(GetNetworkRequest) returns (GetNetworkResponse);
+}
+
+// Request of GetOverview. To add: range enum, site filter, bool include_metrics.
+message GetOverviewRequest {}
+
+// Response of GetOverview. To add: sites, per-site metrics, MetricsSource metrics_source.
+message GetOverviewResponse {}
+
+// Request of GetNetwork. Fields to be agreed.
+message GetNetworkRequest {}
+
+// Response of GetNetwork. Fields to be agreed.
+message GetNetworkResponse {}

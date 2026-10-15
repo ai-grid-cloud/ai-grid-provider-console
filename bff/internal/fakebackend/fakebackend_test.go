@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	aigridv1 "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -22,6 +21,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+
+	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
 
 // repoFixtures is the directory the console ships; the test proves it loads
@@ -307,17 +310,26 @@ func TestHubAccessReview(t *testing.T) {
 	}
 }
 
-// TestFakeImplementsEveryProtoService fails when the pinned proto gains a
+// TestFakeImplementsEveryProtoService fails when the draft proto gains a
 // service the fake does not register: the signal to extend the fake (or add
-// an explicit Unimplemented registration) the same day the backend changes.
+// an explicit Unimplemented registration) the same day the proto changes. It
+// walks every file of package ai_grid.v1 that is linked into the binary.
 func TestFakeImplementsEveryProtoService(t *testing.T) {
 	s, _ := New(&Fixtures{}, slog.New(slog.DiscardHandler))
 	srv := grpc.NewServer()
 	s.Register(srv)
 	registered := srv.GetServiceInfo()
-	file := aigridv1.File_proto_ai_grid_v1_ai_grid_proto
-	for i := 0; i < file.Services().Len(); i++ {
-		svc := file.Services().Get(i)
+	var services []protoreflect.ServiceDescriptor
+	protoregistry.GlobalFiles.RangeFilesByPackage("ai_grid.v1", func(file protoreflect.FileDescriptor) bool {
+		for i := 0; i < file.Services().Len(); i++ {
+			services = append(services, file.Services().Get(i))
+		}
+		return true
+	})
+	if len(services) < 7 {
+		t.Fatalf("expected the draft proto's seven services to be linked in, found %d", len(services))
+	}
+	for _, svc := range services {
 		info, ok := registered[string(svc.FullName())]
 		if !ok {
 			t.Errorf("proto service %s is not registered by the fake", svc.FullName())

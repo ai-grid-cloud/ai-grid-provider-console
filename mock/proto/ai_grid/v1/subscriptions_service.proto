@@ -1,0 +1,66 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+//
+// Placeholder: the names are agreed now, the fields later. Empty request and
+// response messages are deliberate; adding fields is additive, and the fake can
+// already register the service so the drift test covers it. Every RPC answers
+// Unimplemented until the shape is agreed.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// Tenant subscriptions to catalog items: MaaSSubscription objects on the hub.
+service Subscriptions {
+  // Lists Subscriptions.
+  rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
+  // Returns one Subscription.
+  rpc GetSubscription(GetSubscriptionRequest) returns (GetSubscriptionResponse);
+  // Creates a Subscription.
+  rpc CreateSubscription(CreateSubscriptionRequest) returns (CreateSubscriptionResponse);
+  // Updates a Subscription.
+  rpc UpdateSubscription(UpdateSubscriptionRequest) returns (UpdateSubscriptionResponse);
+  // Deletes a Subscription.
+  rpc DeleteSubscription(DeleteSubscriptionRequest) returns (DeleteSubscriptionResponse);
+}
+
+// Request of ListSubscriptions. Fields to be agreed.
+message ListSubscriptionsRequest {}
+
+// Response of ListSubscriptions. Fields to be agreed.
+message ListSubscriptionsResponse {}
+
+// Request of GetSubscription. Fields to be agreed.
+message GetSubscriptionRequest {}
+
+// Response of GetSubscription. Fields to be agreed.
+message GetSubscriptionResponse {}
+
+// Request of CreateSubscription. Fields to be agreed.
+message CreateSubscriptionRequest {}
+
+// Response of CreateSubscription. Fields to be agreed.
+message CreateSubscriptionResponse {}
+
+// Request of UpdateSubscription. Fields to be agreed.
+message UpdateSubscriptionRequest {}
+
+// Response of UpdateSubscription. Fields to be agreed.
+message UpdateSubscriptionResponse {}
+
+// Request of DeleteSubscription. Fields to be agreed.
+message DeleteSubscriptionRequest {}
+
+// Response of DeleteSubscription. Fields to be agreed.
+message DeleteSubscriptionResponse {}

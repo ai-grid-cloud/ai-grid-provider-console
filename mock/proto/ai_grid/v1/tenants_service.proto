@@ -1,0 +1,110 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+import "ai_grid/v1/tenant_type.proto";
+import "google/protobuf/field_mask.proto";
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// Tenants are Keycloak Organizations in the AI Grid realm. Mutations require
+// the caller to be a provider admin; the backend then uses its own Keycloak
+// service credential.
+service Tenants {
+  // Lists tenants, ordered by name as Keycloak returns them.
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse);
+  // Returns one tenant by id. NotFound when absent.
+  rpc GetTenant(GetTenantRequest) returns (GetTenantResponse);
+  // Creates a tenant. AlreadyExists when the name, alias or a domain is taken;
+  // InvalidArgument with Keycloak's message for a malformed domain.
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  // Updates the fields named in `update_mask`. `alias` is immutable.
+  rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse);
+  // Deletes a tenant and its memberships. NotFound when absent.
+  rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
+}
+
+// Request of ListTenants. Every field is optional; the shipped backend takes
+// an empty request.
+message ListTenantsRequest {
+  // Zero-based index of the first result. Default zero.
+  optional int32 offset = 1;
+  // Maximum number of results. Omitted means all; zero means count only;
+  // negative is InvalidArgument.
+  optional int32 limit = 2;
+  // CEL over `this` (a Tenant), for example `this.name.startsWith("acme")`.
+  optional string filter = 3;
+  // Sort order, `<field> [asc|desc]`. Default: by name.
+  optional string order = 4;
+}
+
+// Response of ListTenants.
+message ListTenantsResponse {
+  // Tenants returned. Keeps its historical name instead of `items`.
+  repeated Tenant tenants = 1;
+  // Number of tenants returned.
+  int32 size = 2;
+  // Number of tenants matching the filter regardless of paging.
+  int32 total = 3;
+}
+
+// Request of GetTenant.
+message GetTenantRequest {
+  // Keycloak Organization id.
+  string id = 1;
+}
+
+// Response of GetTenant.
+message GetTenantResponse {
+  // The tenant.
+  Tenant object = 1;
+}
+
+// Request of CreateTenant.
+message CreateTenantRequest {
+  // `id` and `version` must be empty; `name` is required.
+  Tenant object = 1;
+}
+
+// Response of CreateTenant.
+message CreateTenantResponse {
+  // The tenant as stored, with its server-assigned `id`.
+  Tenant object = 1;
+}
+
+// Request of UpdateTenant.
+message UpdateTenantRequest {
+  // The tenant with the new values. `id` identifies it.
+  Tenant object = 1;
+  // Supported paths: `name`, `domains`, `enabled`, `description`, `attributes`.
+  google.protobuf.FieldMask update_mask = 2;
+  // When true, fails with Aborted unless `object.version` matches.
+  bool lock = 3;
+}
+
+// Response of UpdateTenant.
+message UpdateTenantResponse {
+  // The tenant after the update.
+  Tenant object = 1;
+}
+
+// Request of DeleteTenant.
+message DeleteTenantRequest {
+  // Keycloak Organization id.
+  string id = 1;
+}
+
+// Response of DeleteTenant. Empty.
+message DeleteTenantResponse {}

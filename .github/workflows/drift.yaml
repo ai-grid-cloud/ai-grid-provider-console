@@ -1,0 +1,34 @@
+# Does the console's draft proto still cover the backend's real one? Nightly, and on
+# demand, this refreshes the vendored copy in mock/proto/upstream from the backend's
+# main branch and runs the drift test against it. The refresh happens in the runner's
+# checkout only; nothing is committed. A failure means the backend changed its proto:
+# run hack/sync-upstream-proto.sh main locally, reconcile the draft, and commit both.
+name: Proto drift
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Draft proto covers the backend's main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: bff/go.mod
+          cache-dependency-path: bff/go.sum
+      - name: Refresh the vendored backend proto from main (not committed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: hack/sync-upstream-proto.sh main
+      - name: What changed upstream since the vendored commit
+        run: git --no-pager diff --stat -- mock/proto/upstream
+      - name: Drift test
+        working-directory: bff
+        run: go test -count=1 ./internal/protodrift/

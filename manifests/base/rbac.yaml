@@ -20,8 +20,9 @@ subjects:
 # TODO(backend-as-caller): delete this ClusterRole and its binding once the
 # backend builds its hub client from the forwarded user token (work-breakdown
 # backend item 2). The ServiceAccount then only needs system:auth-delegator
-# for the proxy's TokenReviews. Order matters: pin the new backend commit in
-# bff/go.mod and the backend image first, or the Clusters page stops working.
+# for the proxy's TokenReviews. Order matters: sync the new backend proto
+# (hack/sync-upstream-proto.sh) and the backend image first, or the Clusters page
+# stops working.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

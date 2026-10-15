@@ -27,6 +27,10 @@ jobs:
         run: go vet ./...
       - name: test
         run: go test -race -count=1 ./...
+      - name: lint proto (buf via go run)
+        run: make lint-proto
+      - name: generated code is current
+        run: make check-generated
       - uses: golangci/golangci-lint-action@v8
         with:
           version: latest

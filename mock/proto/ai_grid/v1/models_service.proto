@@ -1,0 +1,66 @@
+// DRAFT: the console's PROPOSAL to ai-grid-backend, not the backend's shipped API.
+//
+// The backend's real proto (vendored unchanged in mock/proto/upstream/ai_grid.proto)
+// has three RPCs. This draft keeps those services, messages, field names, numbers and
+// types byte-for-byte compatible and adds the shapes drafted in
+// mock/research/backend-conventions.md section 6, so the console's fake backend, BFF
+// and UI can be built against them. bff/internal/protodrift proves the draft stays a
+// strict superset of the vendored upstream file.
+//
+// When the backend ships these RPCs the console switches its import back to the
+// backend's generated package and deletes this draft.
+//
+// Placeholder: the names are agreed now, the fields later. Empty request and
+// response messages are deliberate; adding fields is additive, and the fake can
+// already register the service so the drift test covers it. Every RPC answers
+// Unimplemented until the shape is agreed.
+
+syntax = "proto3";
+
+package ai_grid.v1;
+
+option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
+
+// Models deployed on the grid: a Placement plus a ManifestWorkReplicaSet on the hub.
+service Models {
+  // Lists Models.
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+  // Returns one Model.
+  rpc GetModel(GetModelRequest) returns (GetModelResponse);
+  // Creates a Model.
+  rpc CreateModel(CreateModelRequest) returns (CreateModelResponse);
+  // Updates a Model.
+  rpc UpdateModel(UpdateModelRequest) returns (UpdateModelResponse);
+  // Deletes a Model.
+  rpc DeleteModel(DeleteModelRequest) returns (DeleteModelResponse);
+}
+
+// Request of ListModels. Fields to be agreed.
+message ListModelsRequest {}
+
+// Response of ListModels. Fields to be agreed.
+message ListModelsResponse {}
+
+// Request of GetModel. Fields to be agreed.
+message GetModelRequest {}
+
+// Response of GetModel. Fields to be agreed.
+message GetModelResponse {}
+
+// Request of CreateModel. Fields to be agreed.
+message CreateModelRequest {}
+
+// Response of CreateModel. Fields to be agreed.
+message CreateModelResponse {}
+
+// Request of UpdateModel. Fields to be agreed.
+message UpdateModelRequest {}
+
+// Response of UpdateModel. Fields to be agreed.
+message UpdateModelResponse {}
+
+// Request of DeleteModel. Fields to be agreed.
+message DeleteModelRequest {}
+
+// Response of DeleteModel. Fields to be agreed.
+message DeleteModelResponse {}

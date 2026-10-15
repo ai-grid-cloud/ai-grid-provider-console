@@ -22,7 +22,6 @@ import (
 	"sync"
 	"time"
 
-	aigridv1 "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
@@ -30,6 +29,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+
+	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
 
 // Server holds the in-memory state behind the fake RPCs. It is safe for
@@ -38,6 +40,12 @@ type Server struct {
 	aigridv1.UnimplementedAiGridServer
 	aigridv1.UnimplementedManagedClustersServer
 	aigridv1.UnimplementedTenantsServer
+	// Services whose shape is drafted but not agreed answer Unimplemented, as
+	// the real server does for a stub; see mock/proto/ai_grid/v1/*_service.proto.
+	aigridv1.UnimplementedGridServer
+	aigridv1.UnimplementedModelsServer
+	aigridv1.UnimplementedCatalogItemsServer
+	aigridv1.UnimplementedSubscriptionsServer
 
 	mu       sync.RWMutex
 	clusters map[string]*aigridv1.ManagedCluster
@@ -98,12 +106,17 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 	return s, nil
 }
 
-// Register attaches every service, the health service and reflection, the
-// same set the real backend registers.
+// Register attaches every service of the draft proto, the health service and
+// reflection, the same set the real backend registers. Methods the fake does
+// not implement answer Unimplemented from the embedded Unimplemented*Server.
 func (s *Server) Register(srv *grpc.Server) {
 	aigridv1.RegisterAiGridServer(srv, s)
 	aigridv1.RegisterManagedClustersServer(srv, s)
 	aigridv1.RegisterTenantsServer(srv, s)
+	aigridv1.RegisterGridServer(srv, s)
+	aigridv1.RegisterModelsServer(srv, s)
+	aigridv1.RegisterCatalogItemsServer(srv, s)
+	aigridv1.RegisterSubscriptionsServer(srv, s)
 	h := health.NewServer()
 	h.SetServingStatus("", healthv1.HealthCheckResponse_SERVING)
 	healthv1.RegisterHealthServer(srv, h)
@@ -230,14 +243,11 @@ func (s *Server) ListTenants(ctx context.Context, _ *aigridv1.ListTenantsRequest
 	return &aigridv1.ListTenantsResponse{Tenants: out}, nil
 }
 
+// Responses are deep copies so a caller cannot mutate the fixture state.
 func cloneCluster(c *aigridv1.ManagedCluster) *aigridv1.ManagedCluster {
-	labels := make(map[string]string, len(c.GetLabels()))
-	for k, v := range c.GetLabels() {
-		labels[k] = v
-	}
-	return &aigridv1.ManagedCluster{Name: c.GetName(), Labels: labels, HubAcceptsClient: c.GetHubAcceptsClient()}
+	return proto.Clone(c).(*aigridv1.ManagedCluster)
 }
 
 func cloneTenant(t *aigridv1.Tenant) *aigridv1.Tenant {
-	return &aigridv1.Tenant{Id: t.GetId(), Name: t.GetName(), Domains: append([]string(nil), t.GetDomains()...)}
+	return proto.Clone(t).(*aigridv1.Tenant)
 }

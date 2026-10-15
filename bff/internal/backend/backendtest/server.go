@@ -6,23 +6,28 @@ import (
 	"net"
 	"testing"
 
-	aigridv1 "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
+	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend"
 )
 
-// Fake answers the three backend services from fixed data. Set Err to make
+// Fake answers the three shipped backend services from fixed data and the
+// draft-only services with Unimplemented. Set Err to make
 // every RPC fail with that status. Metadata records the incoming metadata of
 // the last call so tests can assert on identity forwarding.
 type Fake struct {
 	aigridv1.UnimplementedAiGridServer
 	aigridv1.UnimplementedManagedClustersServer
 	aigridv1.UnimplementedTenantsServer
+	aigridv1.UnimplementedGridServer
+	aigridv1.UnimplementedModelsServer
+	aigridv1.UnimplementedCatalogItemsServer
+	aigridv1.UnimplementedSubscriptionsServer
 
 	Clusters []*aigridv1.ManagedCluster
 	Tenants  []*aigridv1.Tenant
@@ -72,6 +77,10 @@ func Start(t *testing.T, fake *Fake) *backend.Client {
 	aigridv1.RegisterAiGridServer(srv, fake)
 	aigridv1.RegisterManagedClustersServer(srv, fake)
 	aigridv1.RegisterTenantsServer(srv, fake)
+	aigridv1.RegisterGridServer(srv, fake)
+	aigridv1.RegisterModelsServer(srv, fake)
+	aigridv1.RegisterCatalogItemsServer(srv, fake)
+	aigridv1.RegisterSubscriptionsServer(srv, fake)
 	go func() { _ = srv.Serve(lis) }()
 
 	client, err := backend.Dial(backend.Config{Address: "passthrough:///bufconn", Insecure: true},

@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package ai_grid.v1;
+
+option go_package = "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1;aigridv1";
+
+// A minimal health API for this standalone service.
+service AiGrid {
+  rpc Ping(PingRequest) returns (PingResponse);
+}
+
+// A sample cluster-management API. The response shape is intentionally based
+// on Kubernetes ManagedCluster metadata so the backing store can later be
+// replaced with the ACM/OCM Kubernetes API.
+service ManagedClusters {
+  rpc ListManagedClusters(ListManagedClustersRequest) returns (ListManagedClustersResponse);
+}
+
+// Tenants are represented by Keycloak Organizations in the shared ai-grid realm.
+service Tenants {
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse);
+}
+
+message PingRequest {
+  string name = 1;
+}
+
+message PingResponse {
+  string message = 1;
+}
+
+message ListManagedClustersRequest {}
+
+message ListManagedClustersResponse {
+  repeated ManagedCluster clusters = 1;
+}
+
+message ManagedCluster {
+  string name = 1;
+  map<string, string> labels = 2;
+  bool hub_accepts_client = 3;
+}
+
+message ListTenantsRequest {}
+
+message ListTenantsResponse {
+  repeated Tenant tenants = 1;
+}
+
+message Tenant {
+  string id = 1;
+  string name = 2;
+  repeated string domains = 3;
+}

@@ -51,8 +51,8 @@ install: ## Install frontend dependencies
 
 ##@ Quality
 
-lint: ## Lint the BFF and typecheck the frontend
-	$(MAKE) -C bff vet lint
+lint: ## Lint the BFF (vet, golangci-lint, buf lint on mock/proto) and typecheck the frontend
+	$(MAKE) -C bff vet lint lint-proto
 	cd frontend && pnpm typecheck
 
 test: ## Run all tests
