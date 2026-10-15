@@ -6,7 +6,7 @@ later with minimal change. All names, hosts, ids and UUIDs below are fictional.
 
 Sources used throughout:
 
-- Keycloak Admin REST API (OpenAPI for "latest", 26.8.x): https://www.keycloak.org/docs-api/latest/rest-api/index.html (the `openapi.json` next to it was parsed for the Organizations tag).
+- Keycloak Admin REST API (OpenAPI for "latest"; the document's own `info.version` is `1.0`, so "26.8.x" is not verified from the document, but its content matches 26.8: `identityProvider` list filter, `/invitations`, `membership-type`): https://www.keycloak.org/docs-api/latest/rest-api/index.html (the `openapi.json` next to it was parsed for the Organizations tag).
 - Server Administration Guide, Managing organizations: https://www.keycloak.org/docs/latest/server_admin/index.html#_managing_organizations (asciidoc sources at tag `26.8.0`: `docs/documentation/server_admin/topics/organizations/*.adoc`).
 - Enabled features list: https://www.keycloak.org/server/features
 - Keycloak source at tag `26.8.0` (the deployed version), in particular
@@ -32,7 +32,7 @@ Sources used throughout:
 1. The dev hub's Keycloak (`grid-sso`) runs `quay.io/keycloak/keycloak:26.8.0` with `start --import-realm`; the `organization` feature (`organization:v1`) is GA and on by default in 26.x, nothing disables it, and the master realm's discovery document advertises the `organization` scope. Organizations are available.
 2. The `ai-grid` realm does not exist yet (`GET /realms/ai-grid/.well-known/openid-configuration` returns 404 `{"error":"Realm does not exist"}`). A realm-import ConfigMap seeds three other realms, one of which already has `organizationsEnabled: true` with two sample organizations; see section 2.
 3. Today's backend does one thing: password grant as the bootstrap admin in `master` via `admin-cli`, then `GET /admin/realms/ai-grid/organizations?first=0&max=100` with the default brief representation, and maps `{id,name,domains[].name}` to proto `Tenant{id,name,domains}`. Every failure becomes a plain Go error, i.e. gRPC code `Unknown`, which the BFF turns into a 502.
-4. The Organizations Admin API is a conventional CRUD surface: list (`search`, `exact`, `q`, `first`, `max`, default `max=10`, ordered by name), `POST` 201 + `Location`, `PUT` 204 (full replace of the representation), `DELETE` 204, plus `/members`, `/invitations`, `/identity-providers`, `/groups` and `/count` sub-resources.
+4. The Organizations Admin API is a conventional CRUD surface: list (`search`, `exact`, `q`, `first`, `max`, default `max=10`, ordered by name), `POST` 201 + `Location`, `PUT` 204 (replaces `name`, `enabled`, `description`, `redirectUrl` from the body; `attributes` and `domains` are replaced only when present, see 5.6), `DELETE` 204, plus `/members`, `/invitations`, `/identity-providers`, `/groups` and `/count` sub-resources.
 5. Error bodies come in two shapes: resource-level errors are `{"errorMessage": "..."}` (400/404/409), while framework-level errors are `{"error": "HTTP 401 Unauthorized"}`, `{"error": "HTTP 403 Forbidden"}`, `{"error": "Realm not found."}`.
 6. Uniqueness is enforced on `name` and `alias` (409, message literally "A organization with the same name already exists."), and on domains across the realm (400 "Domain acme.example.com is already linked to organization ..."). Alias defaults to the name and is immutable (400 "Cannot change the alias").
 7. Authorization is by `realm-management` client roles: `query-organizations` alone yields an empty `200 []` on list, `view-organizations` is needed to see anything, `manage-organizations` for create/update/delete, and members additionally need `query-users`/`view-users`/`manage-users`.
@@ -52,11 +52,11 @@ Observed with `oc get` only (no secret values read, no login attempted):
 | Start mode | `args: ["start", "--import-realm"]` (production mode, not `start-dev`). Env: `KC_DB=postgres`, `KC_DB_URL_HOST=keycloak-postgresql`, `KC_PROXY_HEADERS=xforwarded`, `KC_HTTP_ENABLED=true`, `KC_HEALTH_ENABLED=true`. No `KC_FEATURES` / `--features` flag, so the default feature set applies. |
 | Exposure | One OpenShift `Route` with edge TLS and HTTP-to-HTTPS redirect in front of `Service/keycloak:8080`. Call it `https://sso.example.com` below. |
 | Version check | `GET /realms/master/.well-known/openid-configuration` returned 200; `grant_types_supported` includes `password` and `client_credentials`; `scopes_supported` includes `organization` (only present when the organization feature is enabled). |
-| Organizations feature | https://www.keycloak.org/server/features lists `organization:v1` ("Organization support within realms") as enabled by default; GA since Keycloak 26.0. Nothing in the deployment disables it. Per realm it is still an opt-in switch (`organizationsEnabled` in `RealmRepresentation`, "Realm Settings > Organizations" in the admin console). |
+| Organizations feature | https://www.keycloak.org/server/features lists `organization:v1` ("Organization support within realms") as enabled by default (`Profile.java:160`, `Type.DEFAULT`); GA since Keycloak 26.0 (not verified in source). Nothing in the deployment disables it. Per realm it is still an opt-in switch (`organizationsEnabled` in `RealmRepresentation`, "Realm Settings > Organizations" in the admin console). |
 | Realms | `master` exists. `ai-grid` does not: `GET /realms/ai-grid/.well-known/openid-configuration` returned 404 `{"error":"Realm does not exist"}`. |
 | Realm import | ConfigMap `keycloak-realm-import-<hash>` mounted for `--import-realm` holds three realm JSON files: one SaaS-style realm with `organizationsEnabled: true` containing 2 organizations (keys `name, alias, domains, enabled, identityProviders`; each with 1 domain, 1 linked IdP, alias different from name, 0 members, `enabled: true`) and two small per-tenant IdP realms (1 client, 1 user each, no organizations). Only counts and key names were read. Whether these realms were actually imported was not enumerated (out of scope). |
-| Unauthenticated admin call | `GET /admin/realms/master/organizations` without a token returned `401 {"error":"HTTP 401 Unauthorized"}`. |
-| Backend's own dev setup | `deploy/kind/keycloak.yaml` runs `quay.io/keycloak/keycloak:26.3` in `start-dev` with bootstrap admin `admin/admin`, a Job that creates realm `ai-grid` with `organizationsEnabled: true` and two organizations `tenant-a`, `tenant-b` (`alias` = name, one unverified domain each). So the backend was only ever tested against 26.3 dev mode; the hub runs 26.8.0 production mode. The Organizations code paths that matter here are the same in both (verified by diffing `26.8.0` against `main`; see 5.4 for the one alias-validation difference). |
+| Unauthenticated admin call | `GET /admin/realms/master/organizations` without a token returned `401 {"error":"HTTP 401 Unauthorized"}` (observed once by the original author; not re-verified, admin calls were excluded from the verification pass). |
+| Backend's own dev setup | `deploy/kind/keycloak.yaml` runs `quay.io/keycloak/keycloak:26.3` in `start-dev` with bootstrap admin `admin/admin`, a Job that creates realm `ai-grid` with `organizationsEnabled: true` and two organizations `tenant-a`, `tenant-b` (`alias` = name, one unverified domain each). So the backend was only ever tested against 26.3 dev mode; the hub runs 26.8.0 production mode. **The two versions differ materially for this API** (diff of the 26.3.0 and 26.8.0 sources of `OrganizationsResource`, `OrganizationResource`, `OrganizationAdapter`, `ValidateUsername/ValidatePassword`): (a) 26.3 guards list/get/create/update/delete with `auth.realm().requireManageRealm()`, so **only `manage-realm` works**; the `query/view/manage-organizations` role checks of section 6 and the README's `query-organizations` advice do not exist in 26.3. (b) 26.3 `setDomains` throws `"You must provide at least one domain"` on null/empty; 26.8 skips null and accepts `[]`. (c) 26.3 domain errors read `"The specified domain is invalid: X"` and `"Domain X is already linked to another organization in realm Z"`. (d) 26.3 has no `identityProvider` list filter, no `identityProviderAlias`/`autoRedirect` on domains and no `/invitations`. (e) 26.3 returns **401** for `invalid_grant` on the token endpoint, 26.8 returns 400. The mock targets 26.8.0 only; the backend's Kind pin should move to 26.8. |
 
 ---
 
@@ -70,9 +70,9 @@ All paths are under `{base}/admin/realms/{realm}`; auth is `Authorization: Beare
 |---|---|---|---|---|
 | GET | `/organizations` | Query: `search` (name or domain), `exact` (bool), `q` (`key1:value1 key2:value2` attribute query), `identityProvider` (alias; cannot be combined with `q`), `first` (default 0), `max` (default **10**), `briefRepresentation` (default `true`; `false` adds `attributes`) | `200` JSON array of `OrganizationRepresentation`, ordered by `name` ascending | `400 {"errorMessage":"The 'identityProvider' and 'q' parameters cannot be combined."}`, `400 {"errorMessage":"Identity provider 'x' not found."}`; `401 {"error":"HTTP 401 Unauthorized"}`; `403 {"error":"HTTP 403 Forbidden"}` when the caller lacks `query-organizations`/`view-organizations`/`manage-organizations`/`manage-realm`; **`200 []`** when the caller has only `query-organizations`; `404 {"errorMessage":"Organizations not enabled for this realm."}` when the realm has `organizationsEnabled=false` (403 instead if the caller cannot even query); `404 {"error":"Realm not found."}` when the realm does not exist |
 | GET | `/organizations/count` | Same filters minus paging | `200` integer (JSON number) | as list; `0` for query-only callers |
-| POST | `/organizations` | JSON `OrganizationRepresentation` (`name` required; `alias` optional; `domains`, `description`, `redirectUrl`, `attributes`, `enabled` optional) | **`201`**, empty body, `Location: {base}/admin/realms/{realm}/organizations/{new-id}` | `400 {"errorMessage":"Organization cannot be null."}`; `400 {"errorMessage":"Name can not be null"}`; `400 {"errorMessage":"Name cannot be used as alias: ..."}` (name contains whitespace and no alias given); `400 {"errorMessage":"Organization redirect URL is not valid."}`; `400 {"errorMessage":"Domain name cannot be empty"}`; `400 {"errorMessage":"Invalid domain format: not a domain"}`; `400 {"errorMessage":"Domain acme.example.com is already linked to organization acme-robotics in realm ai-grid"}`; **`409 {"errorMessage":"A organization with the same name already exists."}`**; **`409 {"errorMessage":"A organization with the same alias already exists"}`** (sic, no period); `403` without `manage-organizations`; `404 ... not enabled` |
+| POST | `/organizations` | JSON `OrganizationRepresentation` (`name` required; `alias` optional; `domains`, `description`, `redirectUrl`, `attributes`, `enabled` optional) | **`201`**, empty body, `Location: {base}/admin/realms/{realm}/organizations/{new-id}` | `400 {"errorMessage":"Organization cannot be null."}`; `400 {"errorMessage":"Name can not be null"}`; `400 {"errorMessage":"Name cannot be used as alias: Empty Space not allowed."}` / `"Name cannot be used as alias: Character '/' not allowed."` (no alias given and the name contains whitespace **or an RFC 3986 reserved char** `:/?#@!$&()*+,;=[]\`; `JpaOrganizationProvider.create` L107-114 via `ReservedCharValidator.validateNoSpace`); **`400 {"error":"Empty Space not allowed."}`** / `{"error":"Character '/' not allowed."}` when an *explicit* `alias` contains whitespace or a reserved char (`OrganizationsResource.create` L112 calls the validator before anything else; it throws a `BadRequestException`, so the body has the framework `error` shape, not `errorMessage`); `400 {"errorMessage":"Organization redirect URL is not valid."}` (message text not verified); `400 {"errorMessage":"Domain name cannot be empty"}`; `400 {"errorMessage":"Invalid domain format: not a domain"}`; `400 {"errorMessage":"Domain acme.example.com is already linked to organization acme-robotics in realm ai-grid"}`; **`409 {"errorMessage":"A organization with the same name already exists."}`**; **`409 {"errorMessage":"A organization with the same alias already exists"}`** (sic, no period); `403` without `manage-organizations`; `404 ... not enabled` |
 | GET | `/organizations/{org-id}` | | `200` full `OrganizationRepresentation` (always `briefRepresentation=false`, so `attributes` included) | `400 {"errorMessage":"Id cannot be null."}`; **`404 {"errorMessage":"Organization not found."}`** (403 instead if the caller cannot query) |
-| PUT | `/organizations/{org-id}` | JSON `OrganizationRepresentation` (full representation; see 5.6 for replace semantics) | **`204`**, empty body | `409 {"errorMessage":"A organization with the same name already exists."}` when `name` changes to an existing one; `400 {"errorMessage":"Cannot change the alias"}`; `400` redirect URL / domain validation messages as for create; `404 {"errorMessage":"Organization not found."}`; `403` |
+| PUT | `/organizations/{org-id}` | JSON `OrganizationRepresentation` (full representation; see 5.6 for replace semantics) | **`204`**, empty body | `409 {"errorMessage":"A organization with the same name already exists."}` when `name` changes to a value that matches another organization's **name or domain** (the check is `getAllStream(name, exact=true)`, which searches both; `OrganizationResource.update` L123-126); `400 {"errorMessage":"Cannot change the alias"}`; `400` redirect URL / domain validation messages as for create; `404 {"errorMessage":"Organization not found."}`; `403` |
 | DELETE | `/organizations/{org-id}` | | **`204`** | `404 {"errorMessage":"Organization not found."}`; `403`; `400 {"errorMessage":"organization couldn't be deleted"}` (provider returned false; not reachable with the JPA provider) |
 | GET | `/organizations/members/{member-id}/organizations` | `briefRepresentation` | `200` array of orgs the user belongs to | `400 {"errorMessage":"id cannot be null"}`; `404 {"error":"HTTP 404 Not Found"}` when the user does not exist |
 
@@ -80,13 +80,13 @@ All paths are under `{base}/admin/realms/{realm}`; auth is `Authorization: Beare
 
 | Method | Path | Request | Success | Errors |
 |---|---|---|---|---|
-| GET | `/members` | `search` (username, email, first or last name), `exact`, `first` (0), `max` (**10**), `membershipType` (`MANAGED`/`UNMANAGED`), `briefRepresentation` (true) | `200` array of `MemberRepresentation`, ordered by `username` | `403` without `query-users`; **`200 []`** with `query-users` but no `view-users` |
+| GET | `/members` | `search` (username, email, first or last name), `exact`, `first` (0), `max` (**10**), `membershipType` (`MANAGED`/`UNMANAGED`), `briefRepresentation` (true) | `200` array of `MemberRepresentation`, ordered by `username` | `403` without `query-users`; **`200 []`** with `query-users` but no `view-users`; an unknown `membershipType` value hits `MembershipType.valueOf` uncaught (`500`) |
 | GET | `/members/count` | | `200` integer | `0` for query-only callers |
 | POST | `/members` | Body is the **user id as a JSON string** (`"7f0c2a9e-..."`; quotes optional, whitespace trimmed), `Content-Type: application/json` | **`201`**, `Location: .../members/{user-id}` | `404 {"error":"HTTP 404 Not Found"}` user does not exist (403 if the caller cannot query users); **`409 {"errorMessage":"User is already a member of the organization."}`**; `400 {"errorMessage":"User is already a managed member of another organization"}`; `403` without `manage-organizations` **and** `manage-users` |
 | GET | `/members/{member-id}` | | `200` full `MemberRepresentation` (includes `membershipType`) | `400 {"errorMessage":"id cannot be null"}`; `404 {"error":"HTTP 404 Not Found"}` when not a member |
 | DELETE | `/members/{member-id}` | | **`204`** | `404 {"error":"HTTP 404 Not Found"}` when user is not a member; `400 {"errorMessage":"Not a member of the organization"}`; `403` |
 | PUT | `/members/{member-id}/membership-type` | JSON string `"MANAGED"` or `"UNMANAGED"` | `204` | `400 {"errorMessage":"membershipType cannot be null"}`; `404 {"errorMessage":"Not a member of the organization"}` |
-| POST | `/members/invite-user` | `application/x-www-form-urlencoded`: `email` (required), `firstName`, `lastName`; query `client_id` optional | `204` (an email is sent) | `400` invalid email / SMTP not configured; `409` already a member; `500` mail failure |
+| POST | `/members/invite-user` | `application/x-www-form-urlencoded`: `email` (required), `firstName`, `lastName`; query `client_id` optional | `204` (an email is sent) | `400 {"errorMessage":"Organization is disabled"}` / `"Email is required to invite a member"` / `"Invalid email format"`; `409 {"errorMessage":"User already has a pending invitation"}` / **`"User already a member of the organization"`** (note: different wording from the `POST /members` 409); `500 {"errorMessage":"Failed to send invite email"}` (`OrganizationInvitationResource.java` L110-207) |
 | POST | `/members/invite-existing-user` | form `id` | `204` | `400`, `500` |
 | GET | `/members/{member-id}/groups`, `/members/{member-id}/organizations` | paging | `200` arrays | `400`, `404` |
 
@@ -106,15 +106,15 @@ Also present but not needed by the console: `/organizations/{org-id}/groups/**` 
 
 | Method | Path | Request | Success | Errors |
 |---|---|---|---|---|
-| POST | `/admin/realms` | `RealmRepresentation {"realm":"ai-grid","enabled":true,"organizationsEnabled":true}` | `201`, `Location` | `409 {"errorMessage":"Conflict detected. See logs for details"}` when the realm exists; `403` |
+| POST | `/admin/realms` | `RealmRepresentation {"realm":"ai-grid","enabled":true,"organizationsEnabled":true}` | `201`, `Location` | **`409 {"errorMessage":"Realm ai-grid already exists"}`** when the realm exists (`RealmsAdminResource.java` L195-197 throws `ErrorResponse.exists(mde.getMessage())`; the message comes from `RealmManager.java` L605 `"Realm " + name + " already exists"`; "Conflict detected" is only the server log line); `403` |
 | PUT | `/admin/realms/{realm}` | `RealmRepresentation` (partial is fine for this endpoint) | `204` | `404 {"error":"Realm not found."}` |
 
 ### 3.5 Token endpoint (`{base}/realms/{realm}/protocol/openid-connect/token`)
 
 | Grant | Request (form) | Success | Errors |
 |---|---|---|---|
-| `password` (what the backend does today, realm `master`) | `grant_type=password&client_id=admin-cli&username=admin&password=...` | `200 {"access_token":"...","expires_in":60,"refresh_expires_in":1800,"refresh_token":"...","token_type":"Bearer","not-before-policy":0,"session_state":"...","scope":"profile email"}` | wrong password / unknown user: **`400 {"error":"invalid_grant","error_description":"Invalid user credentials"}`** (26.8.0 `ValidatePassword`/`ValidateUsername` use `Status.BAD_REQUEST`; older releases returned 401 for the same body, so a mock should accept either); disabled user: `400 {"error":"invalid_grant","error_description":"Account disabled"}`; user with pending required actions: `400 {"error":"invalid_grant","error_description":"Account is not fully set up"}`; missing `grant_type`: `400 {"error":"invalid_request","error_description":"Missing form parameter: grant_type"}`; unknown realm: `404 {"error":"Realm does not exist"}` |
-| `client_credentials` (proposed, realm `ai-grid`) | `grant_type=client_credentials&client_id=ai-grid-backend&client_secret=...` (or HTTP Basic) | `200 {"access_token":"...","expires_in":300,"refresh_expires_in":0,"token_type":"Bearer","not-before-policy":0,"scope":"profile email"}` (no refresh token by default for service accounts) | wrong or unknown client/secret: **`401 {"error":"invalid_client","error_description":"Invalid client or Invalid client credentials"}`**; service accounts not enabled on the client: `401 {"error":"unauthorized_client","error_description":"Client not enabled to retrieve service account"}`; public client: `401 {"error":"unauthorized_client","error_description":"Public client not allowed to retrieve service account"}`; service-account user disabled: `401 {"error":"invalid_request","error_description":"User 'service-account-ai-grid-backend' disabled"}` |
+| `password` (what the backend does today, realm `master`) | `grant_type=password&client_id=admin-cli&username=admin&password=...` | `200 {"access_token":"...","expires_in":60,"refresh_expires_in":1800,"refresh_token":"...","token_type":"Bearer","not-before-policy":0,"session_state":"...","scope":"profile email"}` | wrong password / unknown user: **`400 {"error":"invalid_grant","error_description":"Invalid user credentials"}`** (26.8.0 `ValidatePassword`/`ValidateUsername` use `Status.BAD_REQUEST`; 26.3.0 returned 401 for the same body, so a client should accept either; the mock emits 400); disabled user: `400 {"error":"invalid_grant","error_description":"Account disabled"}` **only when the submitted password is valid**; a disabled account with a wrong password gets `"Invalid user credentials"` (`ValidateUsername.java` L122-127); missing `username`: `401 {"error":"invalid_request","error_description":"Missing parameter: username"}` (`ValidateUsername.java` L64); user with pending required actions: `400 {"error":"invalid_grant","error_description":"Account is not fully set up"}`; missing `grant_type`: `400 {"error":"invalid_request","error_description":"Missing form parameter: grant_type"}`; unknown realm: `404 {"error":"Realm does not exist"}` |
+| `client_credentials` (proposed, realm `ai-grid`) | `grant_type=client_credentials&client_id=ai-grid-backend&client_secret=...` (or HTTP Basic) | `200 {"access_token":"...","expires_in":300,"refresh_expires_in":0,"token_type":"Bearer","not-before-policy":0,"scope":"profile email"}` (no refresh token by default for service accounts) | unknown or disabled `client_id`: **`401 {"error":"invalid_client","error_description":"Invalid client or Invalid client credentials"}`** (`AuthenticationProcessor.java` L924-927); **wrong or missing `client_secret`: `401 {"error":"unauthorized_client","error_description":"Invalid client or Invalid client credentials"}`** (`ClientIdAndSecretAuthenticator.java` L136, L249); service accounts not enabled on the client: `401 {"error":"unauthorized_client","error_description":"Client not enabled to retrieve service account"}`; public client: `401 {"error":"unauthorized_client","error_description":"Public client not allowed to retrieve service account"}`; service-account user disabled: `401 {"error":"invalid_request","error_description":"User 'service-account-ai-grid-backend' disabled"}` |
 
 Token lifetimes: the master realm is bootstrapped with `accessTokenLifespan = 60` seconds (`ApplianceBootstrap.java`), SSO idle 1800 s, SSO max 36000 s. New realms default to `Constants.DEFAULT_ACCESS_TOKEN_LIFESPAN = 300` seconds. The token is a JWS; `exp` is authoritative, `expires_in` is the hint to cache against.
 
@@ -138,28 +138,25 @@ Token lifetimes: the master realm is bootstrapped with `accessTokenLifespan = 60
   },
   "domains": [
     { "name": "acme.example.com", "verified": true,  "identityProviderAlias": "acme-oidc", "autoRedirect": true },
-    { "name": "*.acme.example.org", "verified": false, "identityProviderAlias": null, "autoRedirect": false }
+    { "name": "*.acme.example.org", "verified": false, "autoRedirect": false }
   ]
 }
 ```
 
-Notes: `members`, `identityProviders` and `groups` exist in the schema but are **never populated by GET**; they are only read on import. Brief representation (the list default) omits `attributes` only; `id`, `name`, `alias`, `enabled`, `description`, `redirectUrl`, `domains` are always present. Keycloak serialises `null` fields as absent or `null` depending on the field (Jackson `NON_NULL` is not applied to this class, so expect `"description": null`).
+Notes: `members`, `identityProviders` and `groups` exist in the schema but are **never populated by GET**; they are only read on import. Brief representation (the list default) omits `attributes` only. **Null fields are omitted, never serialised as `null`**: the admin REST ObjectMapper is `ObjectMapperResolver.createStreamSerializer()`, which sets `JsonInclude.Include.NON_NULL` (`services/src/main/java/org/keycloak/services/util/ObjectMapperResolver.java` L47-60, L76; registered on Quarkus by `QuarkusObjectMapperResolver`). So `id`, `name`, `alias`, `enabled` are always present; `description` and `redirectUrl` appear only when set; the second domain above has no `identityProviderAlias` key because it is unset. `domains` is **absent (not `[]`) when the organization has no domains**, because `OrganizationRepresentation.domains` is only created lazily by `addDomain` (`core/.../OrganizationRepresentation.java` L118-123). Clients must treat a missing `domains` as empty (the backend's `client.go` already does: nil slice -> empty `[]string`).
 
-### 4.2 Disabled organization (brief, as it appears in a list)
+### 4.2 Disabled organization without domains or description (brief, as it appears in a list)
 
 ```json
 {
   "id": "b9d2e4f6-1a3c-4e5f-8b7d-0c1e2f3a4b05",
   "name": "globex-labs",
   "alias": "globex",
-  "enabled": false,
-  "description": null,
-  "redirectUrl": null,
-  "domains": []
+  "enabled": false
 }
 ```
 
-A list call returns disabled organizations like any other; there is no `enabled` filter on the API.
+`description`, `redirectUrl` and `domains` are omitted because they are unset/empty (see the `NON_NULL` note above). A list call returns disabled organizations like any other; there is no `enabled` filter on the API.
 
 ### 4.3 `MemberRepresentation` (brief, from `GET /members`)
 
@@ -173,15 +170,11 @@ A list call returns disabled organizations like any other; there is no `enabled`
   "emailVerified": true,
   "createdTimestamp": 1760000000000,
   "enabled": true,
-  "totp": false,
-  "disableableCredentialTypes": [],
-  "requiredActions": [],
-  "notBefore": 0,
   "membershipType": "UNMANAGED"
 }
 ```
 
-`MemberRepresentation` is `UserRepresentation` plus `membershipType` (`"MANAGED"` or `"UNMANAGED"`). Full representation adds `attributes`, `access`, `federationLink` etc.
+`MemberRepresentation` is `UserRepresentation` plus `membershipType` (`"MANAGED"` or `"UNMANAGED"`). The brief form (`OrganizationMemberResource.toRepresentation(member, brief=true)` -> `ModelToRepresentation.toBriefRepresentation`, L359-400) sets only `id`, `username`, `firstName`, `lastName`, `email`, `enabled`, `emailVerified`, `createdTimestamp`, `federationLink` (when set) and `membershipType`. `totp`, `disableableCredentialTypes`, `requiredActions`, `notBefore`, `attributes`, `access` appear **only with `briefRepresentation=false`** (`ModelToRepresentation.toRepresentation`, L313-340); in the brief form they are null and therefore omitted.
 
 ### 4.4 Error bodies
 
@@ -193,8 +186,10 @@ A list call returns disabled organizations like any other; there is no `enabled`
 {"error": "HTTP 403 Forbidden"}                                          // 403, missing role
 {"error": "Realm not found."}                                            // 404, unknown realm on /admin/realms/{realm}/...
 {"error": "Realm does not exist"}                                        // 404, unknown realm on /realms/{realm}/...
-{"error": "invalid_grant", "error_description": "Invalid user credentials"}            // token endpoint
-{"error": "invalid_client", "error_description": "Invalid client or Invalid client credentials"}
+{"error": "Empty Space not allowed."}                                    // 400, explicit alias with whitespace (BadRequestException, not ErrorResponse)
+{"error": "invalid_grant", "error_description": "Invalid user credentials"}            // token endpoint, password grant
+{"error": "invalid_client", "error_description": "Invalid client or Invalid client credentials"}        // token endpoint, unknown/disabled client
+{"error": "unauthorized_client", "error_description": "Invalid client or Invalid client credentials"}   // token endpoint, wrong/missing client_secret
 ```
 
 `ErrorRepresentation` also has optional `field`, `params`, `errors[]` (used by user-profile validation, not by organizations).
@@ -207,18 +202,18 @@ Sources: `JpaOrganizationProvider.java`, `OrganizationAdapter.java`, `Organizati
 
 1. **Pagination**: `first` and `max` are offset/limit. Defaults `first=0`, `max=10` (not 100; the backend passes `max=100` explicitly). `max=-1` is treated as unlimited by `paginateQuery`. There is no total in the list response; use `GET /organizations/count` with the same filters. Results are ordered by `name` ascending (`orderBy(builder.asc(org.get("name")))`).
 2. **Search**: `search` without `exact` is case-insensitive **contains** on `name` OR on any domain `name` (`LIKE %term%` on lower-cased name; domain names are stored lower-case). With `exact=true` it is case-sensitive equality on name or domain. `q=key1:v1 key2:v2` matches attributes (and the special key `alias`). Blank `search` returns everything.
-3. **Uniqueness**: `name` unique per realm (checked case-sensitively via `getByName`); `alias` unique per realm; domains unique per realm (compared case-insensitively, stored lower-case). Both name and alias conflicts are 409 on create; on update only a name conflict is checked (409) because the alias cannot change.
-4. **Alias**: defaults to `name` when omitted or blank. In 26.8.0 a name containing whitespace cannot be used as alias (400 "Name cannot be used as alias: ...") and an explicit alias with whitespace is rejected (400). The admin guide says the alias "must be URL-friendly" and "cannot be changed afterwards" (update with a different alias gives 400 "Cannot change the alias"; sending the same alias or omitting it is fine).
+3. **Uniqueness**: `name` unique per realm (named query `getByOrgName`, plain `=` comparison, so case-sensitivity is the database collation's: case-sensitive on the hub's PostgreSQL); `alias` unique per realm (`getByOrgAlias`, same rule); domains unique per realm (compared case-insensitively, stored lower-case). Both name and alias conflicts are 409 on create; on update only a name conflict is checked (409) because the alias cannot change.
+4. **Alias**: defaults to `name` when omitted or blank. A name containing whitespace **or an RFC 3986 reserved character** (`ReservedCharValidator`: `:/?#@!$&()*+,;=[]\`) cannot be used as alias (400 `{"errorMessage":"Name cannot be used as alias: Empty Space not allowed."}` / `"... Character '/' not allowed."`), and an explicit alias with such characters is rejected with 400 `{"error":"Empty Space not allowed."}` / `{"error":"Character '/' not allowed."}` (framework `error` shape, see 3.1). The admin guide says the alias "must be URL-friendly" and "cannot be changed afterwards" (update with a different alias gives 400 "Cannot change the alias"; sending the same alias or omitting it is fine).
 5. **`enabled`**: defaults to `true` (`OrganizationRepresentation.enabled = true`, and `create` calls `setEnabled(true)`). Note the Java default means an update body that omits `enabled` re-enables the organization.
-6. **Update is a full replace**, not a merge: `toModel` calls `setName`, `setAlias`, `setEnabled`, `setRedirectUrl`, `setDescription`, `setAttributes` unconditionally with whatever the body has (`null` clears description/redirectUrl/attributes; a missing boolean becomes `true`). Only `domains` is skipped when `null`, but an empty array `[]` removes all domains (`setDomains` deletes entities not in the new set and claims/creates the rest). Clients must therefore GET, modify, PUT the whole representation.
-7. **Domain validation** (`Organizations.validateDomain`): non-blank; valid as the domain part of an email (`user@<domain>`); wildcard form `*.base.tld` only, prefix must be at the start and appear once, base must have at least 2 and at most 10 parts (`*.com` rejected). Messages: "Invalid domain format: X", "Wildcard domain must specify a base domain: X", "Wildcard domain must start with the wildcard", "Multiple wildcards are not allowed: X", "Domain must have at least 2 parts (e.g. 'example.com'): X", "Domain has too many parts (max 10 allowed): X". Cross-organization reuse: "Domain X is already linked to organization Y in realm Z". `verified` is free-form metadata (no verification flow), default `false`.
+6. **Update replaces scalars, but `null` does not clear collections**: `RepresentationToModel.toModel` (L1939-1958) calls `setName`, `setAlias`, `setEnabled`, `setRedirectUrl`, `setDescription`, `setAttributes` unconditionally and `setDomains` only when `domains != null`. Effects: `description`/`redirectUrl` absent or `null` -> cleared; `enabled` absent -> `true`; **`attributes` absent or `null` -> unchanged** (`OrganizationAdapter.setAttributes` returns early on null, L144-147), `attributes: {}` -> all removed; **`domains` absent or `null` -> unchanged** (`setDomains` returns early on null, L184-187), `domains: []` -> all removed (entities not in the new set are deleted, the rest claimed/created). Consequence: a brief list entry (no `attributes` key) PUT back unchanged keeps the attributes, while a full `GET /{id}` representation PUT back replaces them. Clients should still GET (full), modify, PUT the whole representation.
+7. **Domain validation** (`Organizations.validateDomain`): non-blank; valid as the domain part of an email (`user@<domain>`); wildcard form `*.base.tld` only, prefix must be at the start and appear once, and **for wildcards only** the base must have at least 2 and at most 10 parts (`*.com` rejected; plain domains are checked solely by the e-mail rule, `Organizations.validateDomain` L308-344). Messages: "Invalid domain format: X", "Wildcard domain must specify a base domain: X", "Wildcard domain must start with the wildcard", "Multiple wildcards are not allowed: X", "Domain must have at least 2 parts (e.g. 'example.com'): X", "Domain has too many parts (max 10 allowed): X". Cross-organization reuse: "Domain X is already linked to organization Y in realm Z". `verified` is free-form metadata (no verification flow), default `false`.
 8. **Ids** are `KeycloakModelUtils.generateId()` = random UUID v4 strings (36 chars, lower-case). A client may supply `id` on import but not through `POST /organizations` (the resource ignores it; `provider.create(name, alias)` generates one).
 9. **Delete**: removes the organization, its internal group, its IdP links (IdPs themselves stay) and its invitations. Members: **managed** members (federated through an IdP link with `membershipType=MANAGED`) are deleted from the realm; **unmanaged** members (existing realm users added via `POST /members`) remain as realm users. Deleting a member via `DELETE /members/{id}` follows the same rule.
 10. **Disabled org**: still listed and manageable; members cannot authenticate through the organization's IdP links, unmanaged members still log in as realm users but without organization claims.
 11. **`ListTenants` today** includes disabled organizations (no filter), returns at most 100 (one page, no follow-up), never sends `briefRepresentation=false` (so attributes would be absent anyway), and drops `alias`, `enabled`, `description`, `redirectUrl`, `attributes`, `verified`.
 12. **Create response**: 201 with empty body and a `Location` header ending in the new id; the client must parse the id from `Location` or do a follow-up `GET`/search (`search=<name>&exact=true`).
 13. **Permissions quirk**: `query-organizations` without `view-organizations` gives `200 []` and `count=0`, not 403. The backend README's advice to use "a dedicated service account with the `query-organizations` role" is therefore insufficient; see section 7.
-14. **Content type**: all admin responses are `application/json`; a `GET` on a resource that does not exist under `/admin` without a token is 401 before 404 (auth is checked first).
+14. **Content type**: all admin responses are `application/json`; a `GET` on a resource that does not exist under `/admin` without a token is 401 before 404 (auth is checked first; not verified against the hub).
 15. **Admin events**: every create/update/delete/member change emits an admin event (`ResourceType.ORGANIZATION` / `ORGANIZATION_MEMBERSHIP`) if admin events are enabled on the realm; not visible through this API.
 
 ---
@@ -235,7 +230,8 @@ Source: `OrganizationPermissions.java` (26.8.0), `OrganizationMemberResource.jav
 | `GET /organizations/{id}/members[/count]` | `users().requireQuery()`, `canView()` for non-empty | `query-users` + `view-users` (plus `view-organizations` to reach the org: 404/403 otherwise) |
 | `GET /members/{id}` | `users().requireView(user)` | `view-users` + `view-organizations` |
 | `POST /members`, `DELETE /members/{id}`, `PUT .../membership-type` | `orgs().requireManage(org)` **and** `users().requireManage(user)` | `manage-organizations` + `manage-users` |
-| `.../identity-providers` | `requireManage(org)` plus `realm().requireViewIdentityProviders()`/`requireManageIdentityProviders()` | `manage-organizations` + `view-identity-providers` (`manage-identity-providers` to link) |
+| `GET .../identity-providers[/{alias}]` | `orgs().requireView(org)` **and** `realm().requireViewIdentityProviders()` (`OrganizationIdentityProvidersResource.java` L133-134, L152-153) | `view-organizations` + `view-identity-providers` |
+| `POST`, `PUT`, `DELETE .../identity-providers[/{alias}]` | `orgs().requireManage(org)` **and** `realm().requireManageIdentityProviders()` (L102-103, L223-224, L262-263) | `manage-organizations` + `manage-identity-providers` |
 | `/invitations`, `invite-user` | `requireManage(org)`, needs realm SMTP configured | `manage-organizations` |
 
 The admin console's "fine-grained admin permissions v2" (`admin-fine-grained-authz:v2`, enabled by default in 26.8) can scope these further per organization, but with it off (the default for a new realm; it is a realm switch `adminPermissionsEnabled`) the role table above is exact.
@@ -279,69 +275,25 @@ Gaps versus Keycloak and versus `bff-api.md` / `work-breakdown.md` Step 6:
 
 ## 8. Proposal: `Tenants` service
 
-### 8.1 Proto sketch (`ai_grid.v1`)
+### 8.1 Proto: single draft lives in `backend-conventions.md` section 6.6
 
-```proto
-service Tenants {
-  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse);
-  rpc GetTenant(GetTenantRequest) returns (Tenant);
-  rpc CreateTenant(CreateTenantRequest) returns (Tenant);
-  rpc UpdateTenant(UpdateTenantRequest) returns (Tenant);
-  rpc DeleteTenant(DeleteTenantRequest) returns (google.protobuf.Empty);
-  rpc ListTenantMembers(ListTenantMembersRequest) returns (ListTenantMembersResponse);
-  rpc AddTenantMember(AddTenantMemberRequest) returns (TenantMember);
-  rpc RemoveTenantMember(RemoveTenantMemberRequest) returns (google.protobuf.Empty);
-}
+The `Tenants` proto is drafted **once**, in `mock/research/backend-conventions.md` section 6.6 (`tenant_type.proto` + `tenants_service.proto`, OSAC shapes: `offset/limit/filter/order` request, `size/total` + `tenants` response, `object` envelope, `update_mask`). An earlier page-token sketch here was removed because it conflicted with that draft (different paging model, envelope field names and `Tenant` field numbers 7-9) and failed buf STANDARD lint (`ENUM_VALUE_PREFIX`, `RPC_RESPONSE_STANDARD_NAME`, `RPC_REQUEST_RESPONSE_UNIQUE`). Member RPCs are not drafted yet (open question 3).
 
-message Tenant {
-  string id = 1;                 // Keycloak organization id (UUID v4), output only
-  string name = 2;               // unique per realm
-  repeated string domains = 3;   // kept for compatibility: domain names only
-  string alias = 4;              // unique, URL-safe, immutable after create; defaults to name
-  bool enabled = 5;              // default true
-  string description = 6;
-  string redirect_url = 7;
-  map<string, string> attributes = 8;        // first value of each Keycloak attribute (Keycloak stores string lists)
-  repeated TenantDomain domain_details = 9;  // full domain records
-}
+Keycloak-specific notes for whoever implements 6.6 against Keycloak (real backend and fake alike):
 
-message TenantDomain { string name = 1; bool verified = 2; string identity_provider_alias = 3; bool auto_redirect = 4; }
-
-message ListTenantsRequest {
-  int32 page_size = 1;    // -> max; server default 50, cap 200; Keycloak default is 10
-  string page_token = 2;  // opaque; encodes the offset (-> first)
-  string search = 3;      // -> search (contains on name or domain)
-  bool exact = 4;         // -> exact
-}
-message ListTenantsResponse { repeated Tenant tenants = 1; string next_page_token = 2; int64 total_size = 3; /* from /count */ }
-
-message GetTenantRequest    { string id = 1; }
-message CreateTenantRequest { Tenant tenant = 1; }          // id, alias optional; enabled defaults true
-message UpdateTenantRequest { Tenant tenant = 1; google.protobuf.FieldMask update_mask = 2; }  // backend does GET+merge+PUT
-message DeleteTenantRequest { string id = 1; }
-
-message TenantMember {
-  string id = 1; string username = 2; string email = 3; string first_name = 4; string last_name = 5;
-  bool enabled = 6; MembershipType membership_type = 7;
-}
-enum MembershipType { MEMBERSHIP_TYPE_UNSPECIFIED = 0; UNMANAGED = 1; MANAGED = 2; }
-message ListTenantMembersRequest  { string tenant_id = 1; int32 page_size = 2; string page_token = 3; string search = 4; }
-message ListTenantMembersResponse { repeated TenantMember members = 1; string next_page_token = 2; int64 total_size = 3; }
-message AddTenantMemberRequest    { string tenant_id = 1; string user_id = 2; }   // existing realm user
-message RemoveTenantMemberRequest { string tenant_id = 1; string user_id = 2; }
-```
-
-Design notes:
-- Keep `Tenant.id/name/domains` field numbers 1-3 so the current BFF and frontend keep compiling; the new fields are additive.
-- `UpdateTenant` with a field mask lets the backend hide Keycloak's replace semantics (GET, apply mask, PUT), so the UI can toggle `enabled` without resending attributes. The backend must never send `alias` different from the stored one.
-- `CreateTenant` returns the created `Tenant`: the backend reads the id from `Location` and does a follow-up `GET` (one extra call; keeps the API self-contained).
+- **No server-side version exists.** Keycloak Organizations carry no version, etag or `Last-Modified`. `Tenant.version` and `UpdateTenantRequest.lock` therefore cannot be honoured by a Keycloak-backed backend; recommend removing them from the tenant messages or documenting them as unsupported and returning `InvalidArgument` when `lock=true`. (The hub-backed `ManagedCluster` keeps `resource_version` + `lock`.)
+- **Shipped field numbers stay.** `Tenant.id=1`, `name=2`, `repeated string domains=3` are frozen so the current BFF and frontend keep compiling; everything else is additive.
+- **Create** = `POST /organizations` (201, empty body) -> parse the id from `Location` -> follow-up `GET /organizations/{id}` -> return the object. Duplicate name/alias -> `AlreadyExists` with Keycloak's `errorMessage`.
+- **Update** = `GET /organizations/{id}` (full) -> apply `update_mask` to the representation -> `PUT` the whole representation (204) -> return the merged object. Never send an `alias` different from the stored one. Remember 5.6: `attributes`/`domains` must be sent explicitly to change them; omitting them leaves them untouched, `{}`/`[]` clears them.
+- **List** paging is offset/limit mapped to `first`/`max`; `total` comes from a second call to `GET /organizations/count` with the same filters (two Keycloak round trips per list). Results are ordered by name; `filter` (CEL) is evaluated by the backend, with `this.name`/`this.domains` equality and `startsWith/contains` translatable to Keycloak's `search`/`exact` where possible.
+- **Attributes** are `map<string, list<string>>` in Keycloak; `map<string, string>` in the proto keeps the first value (lossy). Decide in open question 4.
 - The BFF route should key tenants by `id` (`/api/v1/tenants/{id}`) rather than `{name}` as `bff-api.md` currently sketches; names can change, ids and aliases cannot.
 
 ### 8.2 gRPC status codes the real backend should return
 
 | Keycloak outcome | gRPC code | BFF HTTP (per `bff-api.md`) |
 |---|---|---|
-| `409 {"errorMessage": "A organization with the same name already exists."}` / alias / `"User is already a member of the organization."` | `AlreadyExists`, message = `errorMessage` | 409 |
+| `409 {"errorMessage": "A organization with the same name already exists."}` / alias / `"User is already a member of the organization."` | `AlreadyExists`, message = `errorMessage` | 409 (the BFF maps `Aborted` to 409 as well, `bff/internal/api/errors.go`) |
 | `404 {"errorMessage": "Organization not found."}`, member `404` | `NotFound` | 404 |
 | `400 {"errorMessage": ...}` (domain, alias, redirect URL, name blank) | `InvalidArgument`, message = `errorMessage` | 422 |
 | Request validation before calling Keycloak (empty name, bad page token) | `InvalidArgument` | 422 |
@@ -355,8 +307,9 @@ Design notes:
 
 - In-memory store keyed by id; generate UUID v4 ids; seed with a handful of tenants including one disabled and one with two domains and attributes.
 - Uniqueness of `name` and `alias` (409 `AlreadyExists` with the exact Keycloak messages), alias defaulting to name, alias immutability (400 `InvalidArgument` "Cannot change the alias"), domain format rules and cross-tenant domain uniqueness (400 messages from 5.7), `enabled` default true.
-- Paging: offset-based under the hood, `total_size` from the count, results sorted by name; `search` as case-insensitive contains on name or domain; `exact` as equality.
-- Full-replace semantics on update when no mask is given (so a client that forgets a field sees the same data loss it would see against Keycloak); mask-based merge when given.
+- Paging: `offset`/`limit` under the hood, `total` from the count, results sorted by name; `search`-style filters as case-insensitive contains on name or domain; exact match as equality.
+- Keycloak's update semantics (5.6) when no mask is given: scalars replaced, `enabled` defaults to true, `attributes`/`domains` unchanged when omitted and cleared only by `{}`/`[]`; mask-based merge when a mask is given.
+- Serialisation like Keycloak: unset `description`/`redirectUrl` and empty `domains` are **omitted**, not `null`/`[]` (4.2), so the BFF/frontend tolerate absent keys.
 - Delete removes the tenant and its memberships; members are "unmanaged" realm users and remain available for re-adding (keep a small fake user list to pick from).
 - Error-injection hooks (as `backendtest.Fake.Err` does today) to return `Unavailable`, `FailedPrecondition` and `Internal`, and an optional latency knob (Keycloak via the route typically answers in 50-300 ms; the real backend does two HTTP round trips per RPC today: token + list).
 - A token-expiry scenario is not visible to the BFF (it is internal to the backend), so the fake does not need one.
@@ -415,11 +368,19 @@ Suitable for a deploy script run once per hub with a one-time admin credential (
 
 ## 10. Open questions
 
-1. **Which Keycloak and realm is authoritative for tenants?** The hub's `grid-sso` already imports a SaaS-style realm with `organizationsEnabled: true` and two organizations linked to per-tenant IdP realms. Is `ai-grid` a new realm, or should the console read that existing realm? (`work-breakdown.md` open question for Lindani Phiri / Andrew Ballantyne / Swati's team.)
+1. **Which Keycloak and realm is authoritative for tenants?** The hub's `grid-sso` already imports a SaaS-style realm with `organizationsEnabled: true` and two organizations linked to per-tenant IdP realms. Is `ai-grid` a new realm, or should the console read that existing realm? (`work-breakdown.md` open question for the identity owners and the tenant-model team.)
 2. **Tenant identity in URLs**: `bff-api.md` plans `/api/v1/tenants/{name}`; Keycloak's stable, URL-safe handle is `alias` (immutable) and the primary key is `id`. Recommend `id` in the API and `alias` for display/links.
 3. **Members**: are AI Grid tenant members realm users of `ai-grid` (unmanaged, added by id), or federated through each tenant's IdP (managed, auto-membership)? This decides whether the console needs `AddTenantMember` or only read access plus `invite-user` (which also needs SMTP on the realm).
 4. **Attribute conventions**: Keycloak attributes are `map<string, list<string>>`. Which keys does AI Grid want (region, billing account, quota)? The proto above flattens to the first value.
 5. **Error detail exposure**: should Keycloak's `errorMessage` text be shown to users verbatim (it is reasonably user-friendly: "A organization with the same name already exists.") or re-worded by the backend?
 6. **Admin permissions v2**: if the realm later enables fine-grained admin permissions, `query-only` callers get per-organization filtered lists instead of `[]`; the mock does not need this, but the role table in section 6 would change.
-7. **Direct-grant status code**: 26.8.0 returns 400 for `invalid_grant` on bad credentials; some docs and older servers return 401. The backend only checks `/100 != 2`, so it does not matter today, but a mock's token endpoint should pick 400 for 26.8.
-8. **Version drift**: the backend's Kind setup pins Keycloak 26.3; the hub runs 26.8.0. The Organizations endpoints used are identical, but the invitation API and domain routing fields (`identityProviderAlias`, `autoRedirect` on domains) are newer and only matter if the console starts using them.
+7. **Direct-grant status code**: 26.8.0 returns 400 for `invalid_grant` on bad credentials; 26.3.0 (and the backend's Kind setup) returns 401. The backend only checks `/100 != 2`, so it does not matter today, but a mock's token endpoint should pick 400 for 26.8.
+8. **Version drift**: the backend's Kind setup pins Keycloak 26.3; the hub runs 26.8.0. The Organizations API is **not** identical between them (see section 2, "Backend's own dev setup"): 26.3 accepts only `manage-realm`, requires at least one domain, uses different domain error strings and returns 401 for `invalid_grant`; the invitation API and the per-domain `identityProviderAlias`/`autoRedirect` fields exist only in 26.8. Everything in this document describes 26.8.0; the backend's Kind pin should be moved to 26.8 before its integration tests are trusted.
+
+---
+
+## 11. Verification (2026-10-15)
+
+Independently re-checked on 2026-10-15 against the Keycloak `26.8.0` source tree (clone at the tag), the `26.3.0` sources of the same files (fetched for comparison), the Admin OpenAPI document, the backend checkout at `fb419b3`, and the hub with `oc get` (names, keys, image, args, env names only) plus two unauthenticated GETs through the route (`/realms/master/.well-known/openid-configuration` -> 200 with `organization` scope; `/realms/ai-grid/...` -> 404 `Realm does not exist`). Corrections applied in this pass: null fields are omitted (`NON_NULL`) and `domains` is absent when empty (4.1, 4.2, 5.6); `attributes`/`domains` are unchanged on `null` and cleared only by `{}`/`[]` (5.6); brief `MemberRepresentation` fields (4.3); 26.3 vs 26.8 differences (2, 10.8); realm 409 body (3.4); `unauthorized_client` for a wrong secret and "Account disabled" only with a valid password (3.5); explicit-alias rejection covers reserved URL chars and uses the `{"error":...}` body (3.1, 5.4); identity-provider permissions split into read/mutate (6); PUT 409 also on name-vs-domain match (3.1); the tenant proto now lives only in `backend-conventions.md` 6.6 (8.1).
+
+Not verified in this pass: the unauthenticated admin call (2, L58) and the 401-before-404 ordering (5.14), because admin endpoints were off limits; the organization counts and key names inside the realm-import ConfigMap (values were not read); the exact `OrganizationsValidation.validateUrl` message; whether the OpenAPI "latest" document is generated from 26.8.x (its content is consistent with 26.8); "GA since 26.0".

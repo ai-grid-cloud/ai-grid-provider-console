@@ -64,7 +64,7 @@ Paths used below:
 - `deploy/kind/ai-grid-backend.yaml`: Namespace `ai-grid`, ServiceAccount, ClusterRole `get/list/watch managedclusters`, ClusterRoleBinding, Deployment (1 replica, tcpSocket readiness on `grpc`), Service `grpc` 8080. `deploy/kind/keycloak.yaml`: Keycloak 26.3 `start-dev` + Postgres + an init Job that creates realm `ai-grid` with `organizationsEnabled` and Organizations `tenant-a`, `tenant-b`. `deploy/kind/sample-managedclusters.yaml`: two sample `ManagedCluster`s.
 - Tests: one unit test (fake dynamic client); `integration/kind_test.go` typed tests gated on `AI_GRID_GRPC_ADDRESS`, driven by `hack/test-kind.sh` (Kind + Podman + `clusteradm init` + port-forward + `go test ./integration`).
 - CI: **none** (no `.github/`).
-- `client/client.go`: a `Builder` (`SetAddress`, `SetPlaintext`, `Build`) that refuses non-plaintext because TLS is not configured; uses deprecated `grpc.DialContext`. This Builder/Set* style is the OSAC Go idiom (compare `auth.NewGrpcAuthnInterceptor().SetLogger(...).Build()` in the monorepo).
+- `client/client.go`: a `Builder` (`SetAddress`, `SetPlaintext`, `Build`) that refuses non-plaintext because TLS is not configured; uses `grpc.DialContext`, which is not deprecated at the backend's pinned `grpc v1.61.0` but carries `Deprecated: use NewClient instead` at the `v1.84.0` the console resolves, so the console build sees the deprecation. This Builder/Set* style is the OSAC Go idiom (compare `auth.NewGrpcAuthnInterceptor().SetLogger(...).Build()` in the monorepo).
 
 ## 3. `origin/main` delta since the pinned commit
 
@@ -100,7 +100,7 @@ message ThingsDeleteRequest { string id = 1; }              // response: empty
 ```
 (`proto/public/osac/public/v1/clusters_service.proto`, `tenants_service.proto`, `users_service.proto`; rules in `API.md`.)
 
-- **Pagination**: offset/limit, not page tokens. `limit` omitted = server default; `limit = 0` = count only; negative rejected. `size` = items returned, `total` = matches regardless of paging (`API.md`, "List"; `GenericServer.List` sets `SetSize/SetTotal`, `fulfillment-service/internal/servers/generic_server.go` ~L408-414).
+- **Pagination**: offset/limit, not page tokens. `limit` omitted = server default, which is a **page of 100** (`internal/database/dao/generic_dao.go` L116 `defaultLimit: 100`, applied in `generic_dao_list.go` L171-172 when the request has no limit; `GenericServer.List` only forwards the limit when `HasLimit()`), not "all"; `limit = 0` = count only; negative rejected. `size` = items returned, `total` = matches regardless of paging (`API.md`, "List"; `GenericServer.List` sets `SetSize/SetTotal`, `fulfillment-service/internal/servers/generic_server.go` ~L408-414).
 - **Filtering**: `filter` is a **CEL** expression over `this` (the object) and `now`; translated to SQL server-side; supported subset documented in `fulfillment-service/docs/FILTER.md` (comparisons, `&& || !`, `in` on lists/arrays/maps, map index on `metadata.labels`, `startsWith/endsWith/contains`, `has()`, timestamps vs `now`/`null`). Invalid filter -> `InvalidArgument`. `order` ("SQL ORDER BY-like") is declared but "not yet implemented".
 - **Field masks**: `Update` takes `object` + `google.protobuf.FieldMask update_mask` + `bool lock`; the REST gateway fills the mask from the PATCH body; validation runs on the merged stored object, not the partial request. `lock=true` compares `metadata.version` and fails with `Aborted` on mismatch (`generic_server.go` ~L707-720; `API.md`, "Update").
 - "No extra request or response fields" beyond these without a cross-service design discussion (`API.md`, "Additional rules").
@@ -122,7 +122,7 @@ Enforced by the custom buf lint rule `OSAC_OBJECT_SHAPE` (`fulfillment-service/c
 - Condition pattern (`API.md`, "Conditions"; `cluster_type.proto`):
 ```protobuf
 message ThingCondition { ThingConditionType type = 1; ConditionStatus status = 2; google.protobuf.Timestamp last_transition_time = 3; optional string reason = 4; optional string message = 5; }
-enum ThingConditionType { THING_CONDITION_TYPE_UNSPECIFIED = 0; ..._PROGRESSING = 1; ..._READY = 2; ..._FAILED = 3; }
+enum ThingConditionType { THING_CONDITION_TYPE_UNSPECIFIED = 0; ..._PROGRESSING = 1; ..._READY = 2; ..._FAILED = 3; /* FAILED not verified in cluster_type.proto */ }
 ```
   Shared `enum ConditionStatus { CONDITION_STATUS_UNSPECIFIED = 0; CONDITION_STATUS_TRUE = 1; CONDITION_STATUS_FALSE = 2; }` (`condition_status_type.proto`); Kubernetes `Unknown` maps to `UNSPECIFIED`. Condition `type` is a typed enum, except `UserCondition.type` which is a free string because it mirrors an external system (`user_type.proto`). No `observed_generation`.
 - Enums: `CamelCase` name, values prefixed with the enum name in `UPPER_SNAKE_CASE`, first value `_UNSPECIFIED = 0`, `[(buf.validate.field).enum.defined_only = true]` where input is accepted (`API.md`, "Enums").
@@ -141,22 +141,22 @@ enum ThingConditionType { THING_CONDITION_TYPE_UNSPECIFIED = 0; ..._PROGRESSING 
 
 ### Authentication and authorization (server side)
 
-- Interceptor chain (`fulfillment-service/internal/cmd/service/start/grpcserver/start_grpc_server_cmd.go` L590-618): `panic -> metrics -> logging -> protovalidate -> db tx -> authn -> authz -> JIT user provisioning` (same for streams minus tx). Then `reflection.RegisterV1`, `health.NewServer()` + `healthv1.RegisterHealthServer`.
+- Interceptor chain (`fulfillment-service/internal/cmd/service/start/grpcserver/start_grpc_server_cmd.go` L599-626): `panic -> metrics -> logging -> protovalidate -> db tx -> authn -> authz -> JIT user provisioning -> reference validation` (`referenceValidator`, which resolves/validates object references after authorization; the stream chain is the same minus tx and also ends with the reference validator). Then `reflection.RegisterV1`, `health.NewServer()` + `healthv1.RegisterHealthServer`.
 - **Authn** (`internal/auth/grpc_authn_interceptor.go`): reads exactly one `authorization` metadata value (`auth.Authorization = "authorization"`, `auth_headers.go`), requires `Bearer <jwt>`, validates the JWT against JWKS of trusted issuers, stores the token in context. Missing/duplicate/invalid -> `Unauthenticated`. Anonymous methods by regex: `^/(osac\.public\.v1\.(Capabilities/|JsonWebKeySet/)|grpc\.(reflection|health)\.).*$` (L909).
-- **Authz** (`internal/auth/grpc_authz_interceptor.go`): builds an `AuthContext` from JWT claims (`preferred_username`/`username`, `organization` claim -> tenants, `realm_access.roles`, groups) plus the request (`id` via `GetId()` or reflection on `object.id`), evaluates an embedded **OPA/Rego** policy (`internal/auth/policies/authz.rego`) per full method name; denial -> `PermissionDenied "permission denied"`; policy errors -> `Internal`. Then a `Subject{User, Tenants}` goes into context and **tenancy logic** filters/assigns `metadata.tenant` (`docs/AUTH.md`, "Tenancy Logic", "Authorization Levels"). Admins get the universal tenant `*`.
+- **Authz** (`internal/auth/grpc_authz_interceptor.go`, with the claim extraction in `internal/auth/auth_context_extraction.go` L46-64 and the policy evaluation in `internal/auth/authorization_evaluator.go`): builds an `AuthContext` from JWT claims (`preferred_username`/`username`, `organization` claim -> tenants, `realm_access.roles`, groups) plus the request (`id` via `GetId()` or reflection on `object.id`, `grpc_authz_interceptor.go` L312-345), evaluates an embedded **OPA/Rego** policy (`internal/auth/policies/authz.rego`) per full method name; denial -> `PermissionDenied "permission denied"` (L283); policy errors -> `Internal` (L246-295). Then a `Subject{User, Tenants}` goes into context and **tenancy logic** filters/assigns `metadata.tenant` (`docs/AUTH.md`, "Tenancy Logic", "Authorization Levels"). Admins get the universal tenant `*`.
 - **Who is the caller**: only the JWT. There is no `x-forwarded-*` convention anywhere in OSAC; the UI proxy (`osac-ui/proxy/middleware/auth.go`) strips the incoming `Authorization` header and re-sets `Authorization: Bearer <token-from-cookie-session>`. The REST gateway forwards headers with `runtime.DefaultHeaderMatcher` plus one custom dry-run header.
 - Permission introspection for UIs: `SelfSubjectAccessReviews/Create` with `spec.service` (`osac.public.v1.Clusters`) and `spec.method` (`Create`), answering `status.allowed` (`self_subject_access_review_type.proto`).
 
 ### Error handling
 
-- Status codes from DAO errors (`fulfillment-service/internal/servers/dao_error_converter.go`): not found -> `NotFound`; duplicate name -> `AlreadyExists`; singleton/"single default" invariant -> `FailedPrecondition`; optimistic-lock conflict and deadlock -> `Aborted`; denied -> `PermissionDenied`; immutable field / validation / invalid filter / bad reference on create -> `InvalidArgument`; bad reference on update/delete, object in use -> `FailedPrecondition`; unknown -> `Internal` with a generic message (details logged). Tenant assignment errors -> `PermissionDenied` (`tenant_errors.go`). Missing `id`/`object` -> `InvalidArgument "identifier is mandatory"` / `"object is mandatory"`. Code histogram across servers: InvalidArgument 541, Internal 236, FailedPrecondition 69, NotFound 55, PermissionDenied 18, Aborted 11, AlreadyExists 7, Unimplemented 2. "Consumers must match on the gRPC status code rather than message text" (`API.md`, "Error responses").
-- Logging interceptor logs method, peer, metadata (debug), duration, and `grpcstatus.Code(err).String()` with `slog` (`internal/logging/logging_interceptor.go`).
+- Status codes from DAO errors (`fulfillment-service/internal/servers/dao_error_converter.go`): not found -> `NotFound`; duplicate name -> `AlreadyExists`; singleton/"single default" invariant -> `FailedPrecondition`; optimistic-lock conflict and deadlock -> `Aborted`; denied -> `PermissionDenied`; immutable field / validation / invalid filter / bad reference on create -> `InvalidArgument`; bad reference on update/delete, object in use -> `FailedPrecondition`; unknown -> `Internal` with a generic message (details logged). Tenant assignment errors -> `PermissionDenied` (`tenant_errors.go`). Missing `id`/`object` -> `InvalidArgument "object identifier is mandatory"` (37 sites; the shorter `"identifier is mandatory"` appears 3 times) / `"object is mandatory"` (46 sites). Code histogram across `internal/servers` excluding `*_test.go` (reproduced 2026-10-15): InvalidArgument 541, Internal 236, FailedPrecondition 69, NotFound 55, PermissionDenied 18, Aborted 11, AlreadyExists 7, Unimplemented 2. "Consumers must match on the gRPC status code rather than message text" (`API.md`, "Error responses").
+- Logging interceptor logs method, peer, metadata (debug), duration, and `grpcstatus.Code(err).String()` with `slog` (`internal/logging/logging_interceptor.go`; field list not verified in the 2026-10-15 pass).
 
 ### Generated code publishing
 
 - `proto/buf.gen.yaml`: `managed.enabled: true`, `go_package_prefix github.com/osac-project/osac/proto/gen`, remote plugins pinned (`buf.build/protocolbuffers/go:v1.36.5` with `default_api_level=API_HYBRID`, `buf.build/grpc/go:v1.5.1`, `buf.build/grpc-ecosystem/gateway:v2.26.1`), `paths=source_relative`, output `gen/`. `proto/Makefile generate` = `dev.py build protos` (private -> public) + `buf generate`; `lint` = `buf lint` with the custom plugin.
 - CI: `.github/workflows/check-generated-code.yaml` re-runs `make generate` and fails on any diff under `proto/` ("Generated proto code is out of date"); `.pre-commit-config.yaml` runs `buf lint` on `proto/**/*.proto`. No `buf breaking` job was found in `.github/workflows`; the `breaking: FILE` config exists for local/manual use.
-- Publishing: `.github/workflows/publish-proto.yaml` does `buf push --label vX.Y.Z` to `buf.build/osac-project/{public-api,private-api}` on each fulfillment-service release (`docs/RELEASING.md`: component tags `<component>/vX.Y.Z`, nightly tags are throwaway). Go consumers inside the monorepo use `go.work` + `replace`; the UI consumes the BSR module at a pinned version (`osac-ui/libs/types/.buf-api-version` = `v0.0.118`, `buf.gen.yaml.template` with `buf.build/bufbuild/es:v2.12.0`), and `.github/workflows/nightly-ui-buf-compatibility.yaml` nightly checks for a newer BSR label, regenerates TS, runs typecheck/lint/test/build, and opens an auto-merged PR.
+- Publishing: `.github/workflows/publish-proto.yaml` is a **`workflow_call`-only** reusable workflow (inputs `version`, `ref`; no trigger of its own) that runs `buf push --label "<version>"` from the `proto/` module root, which pushes **all three** modules declared in `buf.yaml` (`buf.build/osac-project/public-api`, `private-api` and `tests`). It is invoked by `osac-build-and-publish.yaml` in release mode when the fulfillment-service component is bumped (that workflow's `BUF_TOKEN` secret and `publish-fulfillment-service-proto` job). `docs/RELEASING.md` describes per-component versions and throwaway nightly tags (the literal `<component>/vX.Y.Z` tag form was not verified). Go consumers inside the monorepo use `go.work` + `replace`; the UI consumes the BSR module at a pinned version (`osac-ui/libs/types/.buf-api-version` = `v0.0.118`, `buf.gen.yaml.template` with `buf.build/bufbuild/es:v2.12.0`), and `.github/workflows/nightly-ui-buf-compatibility.yaml` nightly checks for a newer BSR label, regenerates TS, runs typecheck/lint/test/build, and opens an auto-merged PR.
 
 ### Kubernetes-backed objects: own model, not CRD mirrors
 
@@ -169,7 +169,7 @@ Applies to both the real backend and the console's fake. Where it differs from O
 ### 5.1 Files, package, options
 
 - Package stays `ai_grid.v1`; `go_package` stays `github.com/osac-project/ai-grid-backend/gen/ai_grid/v1;aigridv1`. Never introduce `v2` for additive work.
-- Split by type like OSAC: `proto/ai_grid/v1/<type>_type.proto` + `<type>s_service.proto`; shared `metadata_type.proto`, `condition_type.proto`. `ai_grid.proto` keeps `AiGrid` (Ping, GetCurrentUser) and nothing else. Moving the existing messages between files changes only the generated `File_*` descriptor variable, not Go type names.
+- Split by type like OSAC: `proto/ai_grid/v1/<type>_type.proto` + `<type>s_service.proto`; shared `metadata_type.proto`, `condition_type.proto`. `ai_grid.proto` keeps `AiGrid` (Ping, GetCurrentUser) and nothing else. Moving the existing messages between files keeps the Go type names but changes the generated `File_*` descriptor variable, the `source:` header, the raw descriptor bytes and the internal `file_<path>_proto_*` symbols, and `buf breaking` with the `FILE` category flags the move (see 5.8).
 - Every service, method, message, field and enum value gets a doc comment written for API consumers (OSAC `API.md`, "Documentation").
 - Add `buf.yaml` (`version: v2`, `lint: use: [STANDARD], except: [SERVICE_SUFFIX]`, `breaking: use: [FILE]`), `buf.gen.yaml` (pinned remote plugins `buf.build/protocolbuffers/go` and `buf.build/grpc/go`, `paths=source_relative`, `out: gen`), and `make generate` / `make lint-proto`. Keep `gen/` committed and add a CI job that fails on diff after `buf generate` (copy of OSAC `check-generated-code.yaml`) plus `buf breaking --against '.git#branch=main'`.
 - Use `buf.validate` annotations for input constraints once a protovalidate interceptor exists; until then document constraints in comments and validate in handlers with `InvalidArgument`.
@@ -183,11 +183,11 @@ Applies to both the real backend and the console's fake. Where it differs from O
 
 ### 5.3 Request and response shapes (OSAC shapes, adapted)
 
-- **List**: request `optional int32 offset = 1; optional int32 limit = 2; optional string filter = 3; optional string order = 4;`. Response `int32 size; int32 total; repeated X items`. The two shipped List responses keep `clusters`/`tenants` (documented exception) and gain `size`/`total` additively; their requests gain the four optional fields. `limit` omitted = all (backend's current behaviour, matches OSAC's "server default"); `limit = 0` = count only; negative -> `InvalidArgument`.
+- **List**: request `optional int32 offset = 1; optional int32 limit = 2; optional string filter = 3; optional string order = 4;`. Response `int32 size; int32 total; repeated X items`. The two shipped List responses keep `clusters`/`tenants` (documented exception) and gain `size`/`total` additively; their requests gain the four optional fields. `limit` omitted: OSAC applies a server default page of **100** (`generic_dao.go` `defaultLimit: 100`); the backend today returns everything. Pick one explicitly: either adopt a default page (recommended, e.g. 100, matching OSAC) or document "omitted = all" as a deliberate deviation; the fake must implement the same choice. `limit = 0` = count only; negative -> `InvalidArgument`.
 - **Filter** is a CEL expression over `this`, same documented subset as OSAC `FILTER.md`, evaluated in memory by the backend (hub lists are small). Phase 1 may support only `this.name`, `this.labels[...]`, `in`, `startsWith/endsWith/contains`, `&& || !`; unsupported constructs -> `InvalidArgument`. Do not add ad-hoc `label_selector` strings (OSAC "No structured strings"); a Kubernetes label selector can be derived from simple CEL equality terms server-side.
 - **Get**: request `string name = 1` for hub-owned, cluster-scoped objects (`ManagedCluster`) because the Kubernetes name is the identity; `string id = 1` for Keycloak-owned objects (`Tenant`, UUID). Response `X object = 1`.
 - **Create**: request `X object = 1`; response `X object = 1`.
-- **Update**: request `X object = 1; google.protobuf.FieldMask update_mask = 2; bool lock = 3;`. The mask names fields of `object` (`labels`, `annotations`, `labels.ai-grid/enabled` is NOT a valid path; map entries are replaced as a whole per OSAC/FieldMask semantics; see open question 5). `lock = true` requires `object.resource_version` (hub) or `object.version` (Keycloak) to match, else `Aborted`. Server applies the mask to the stored object, validates the merged result, and for the hub issues a JSON merge patch (or server-side apply) scoped to the masked fields.
+- **Update**: request `X object = 1; google.protobuf.FieldMask update_mask = 2; bool lock = 3;`. The mask names fields of `object` (`labels`, `annotations`, `labels.ai-grid/enabled` is NOT a valid path; map entries are replaced as a whole per OSAC/FieldMask semantics; see open question 5). `lock = true` requires `object.resource_version` (hub) to match, else `Aborted`. For Keycloak-backed `Tenant` there is **no server-side version** (Organizations have no version, etag or `Last-Modified`), so `lock` cannot be honoured; see 6.6 for the recommendation (remove `version`/`lock` from the tenant messages, or document them as unsupported and return `InvalidArgument` when `lock=true`). Server applies the mask to the stored object, validates the merged result, and for the hub issues a JSON merge patch (or server-side apply) scoped to the masked fields.
 - **Delete**: request `string name|id = 1`; response empty message.
 - No other fields in request/response messages (OSAC rule). Cross-cutting needs (dry-run, etc.) go in metadata or a generic field adopted everywhere.
 
@@ -558,33 +558,42 @@ message UpdateManagedClusterResponse {
 
 ### 6.6 `proto/ai_grid/v1/tenant_type.proto` and `tenants_service.proto`
 
-Keeps the shipped flat `Tenant{id, name, domains}` and grows it additively (OSAC permits flat objects; `Tenant` in OSAC also has no `status` and carries `// buf:lint:ignore OSAC_OBJECT_SHAPE`).
+This is the **single** tenant proto draft (the page-token sketch that used to live in `keycloak.md` 8.1 was removed; `keycloak.md` 8.1 now only lists the Keycloak-specific implementation notes). Keeps the shipped flat `Tenant{id, name, domains}` with field numbers 1-3 frozen and grows it additively (OSAC permits flat objects; `Tenant` in OSAC also has no `status` and carries `// buf:lint:ignore OSAC_OBJECT_SHAPE`).
 
 ```protobuf
 syntax = "proto3";
 package ai_grid.v1;
 option go_package = "github.com/osac-project/ai-grid-backend/gen/ai_grid/v1;aigridv1";
 
-import "google/protobuf/timestamp.proto";
+// (no imports: a `google/protobuf/timestamp.proto` import was removed because it
+// was unused, which fails buf STANDARD lint `IMPORT_USED`)
 
 // A consumer organisation. Backed by a Keycloak Organization in the AI Grid realm.
 message Tenant {
   // Keycloak Organization id (UUID). Output only; the identifier for Get/Update/Delete.
   string id = 1;
-  // Organization name. Required on create, unique within the realm, 1-255 chars.
+  // Organization name. Required on create, unique within the realm (length limit
+  // not verified against Keycloak's schema).
   string name = 2;
-  // E-mail domains owned by the tenant; each must be a lowercase DNS hostname,
-  // unique across tenants.
+  // E-mail domains owned by the tenant, unique across tenants. Keycloak lower-cases
+  // them and also accepts one wildcard form `*.base.tld` (see keycloak.md 5.7).
   repeated string domains = 3;
-  // URL-safe alias. Defaults to `name` on create. Immutable.
+  // URL-safe alias (no whitespace or RFC 3986 reserved chars). Defaults to `name`
+  // on create. Immutable.
   string alias = 4;
   // Whether members can log in. Default true on create.
   bool enabled = 5;
   // Free-text description shown in the console.
   string description = 6;
-  // Keycloak Organization attributes. Opaque to the backend.
+  // Keycloak Organization attributes. Keycloak stores `map<string, list<string>>`;
+  // this field carries the first value of each key (lossy; see keycloak.md
+  // open question 4).
   map<string, string> attributes = 7;
-  // Server-assigned, increments on every change; used by `lock` on Update. Output only.
+  // CAVEAT: Keycloak Organizations have no server-side version, etag or
+  // Last-Modified, so a Keycloak-backed backend cannot populate this or honour
+  // `lock`. Recommended: remove `version` and `UpdateTenantRequest.lock` before
+  // the first tagged release, or keep them documented as unsupported and return
+  // InvalidArgument when `lock = true`.
   int32 version = 8;
 }
 ```
@@ -635,8 +644,11 @@ message CreateTenantResponse { Tenant object = 1; }
 message UpdateTenantRequest {
   Tenant object = 1;
   // Supported paths: `name`, `domains`, `enabled`, `description`, `attributes`.
+  // `alias` is immutable (Keycloak returns 400 "Cannot change the alias").
   google.protobuf.FieldMask update_mask = 2;
-  // When true, fails with Aborted unless `object.version` matches.
+  // CAVEAT: cannot be honoured against Keycloak (no server-side version). Either
+  // remove this field together with `Tenant.version`, or return InvalidArgument
+  // when true. Kept here only so the shape mirrors UpdateManagedClusterRequest.
   bool lock = 3;
 }
 message UpdateTenantResponse { Tenant object = 1; }
@@ -644,6 +656,15 @@ message UpdateTenantResponse { Tenant object = 1; }
 message DeleteTenantRequest  { string id = 1; }
 message DeleteTenantResponse {}
 ```
+
+Keycloak mapping for this service (details and evidence in `keycloak.md` sections 3, 5 and 8.1):
+
+- `ListTenants`: `offset`/`limit` -> `first`/`max` on `GET /organizations`; `total` from a second call to `GET /organizations/count` with the same filters; results ordered by name. `filter` (CEL) is evaluated by the backend; simple name/domain equality or contains terms can be pushed down as `search`/`exact`.
+- `GetTenant`: `GET /organizations/{id}` (full representation). 404 -> `NotFound`.
+- `CreateTenant`: `POST /organizations` (201, empty body), take the id from `Location`, then `GET /organizations/{id}` and return the object. 409 -> `AlreadyExists` with Keycloak's `errorMessage`; 400 -> `InvalidArgument`.
+- `UpdateTenant`: `GET /organizations/{id}`, apply `update_mask` to the full representation, `PUT /organizations/{id}` (204), return the merged object. Never send a different `alias`. Note Keycloak's semantics: omitted `attributes`/`domains` stay unchanged, `{}`/`[]` clear them.
+- `DeleteTenant`: `DELETE /organizations/{id}` (204). Unmanaged members remain realm users.
+- Serialisation: Keycloak omits unset `description`/`redirectUrl` and empty `domains` (`NON_NULL`); the backend must treat absent keys as empty.
 
 ### 6.7 Placeholders (names agreed now, fields later, all `Unimplemented` until agreed)
 
@@ -720,7 +741,7 @@ When filled in, `Model`, `CatalogItem`, `Subscription` use `{ string name = 1; O
 6. **Identifier for `ManagedCluster`.** `name` (proposed; cluster-scoped and immutable) vs a synthetic `id` (OSAC style, would be the UID). The console routes by name today.
 7. **Empty list vs `FailedPrecondition` when the OCM CRD is missing.** Today `IsNotFound` on the list returns an empty list, hiding a misconfigured hub. Proposal: `FailedPrecondition "the hub does not serve managedclusters.cluster.open-cluster-management.io"`.
 8. **Error codes.** Agree the table in section 5.7, in particular `Aborted` for update conflicts and `Unavailable` for both hub and Keycloak outages (with distinguishing messages), and that all errors are `status.Error`.
-9. **Tooling.** Adopt `buf` (lint STANDARD minus `SERVICE_SUFFIX`, breaking FILE, pinned remote plugins) and a `check-generated-code` CI job? The current `gen/` was produced with `protoc 3.13.0` and an older `protoc-gen-go-grpc`; regenerating with pinned plugins will churn `gen/` once.
+9. **Tooling.** Adopt `buf` (lint STANDARD minus `SERVICE_SUFFIX`, breaking FILE, pinned remote plugins) and a `check-generated-code` CI job? The current `gen/` was produced with `protoc 3.13.0` and an older `protoc-gen-go-grpc`; regenerating with pinned plugins will churn `gen/` once. Note that the drafts in section 6 use proto3 `optional`, which `protoc 3.13.0` only accepts with `--experimental_allow_proto3_optional`; buf (or protoc >= 3.15) is required. With the buf module rooted at `proto/`, the generated `source:` header also changes from `proto/ai_grid/v1/...` to `ai_grid/v1/...`.
 10. **Validation.** Add protovalidate (`buf.validate`) now, as OSAC does, or document constraints and validate by hand until the API settles?
 11. **Streaming.** Does the console need a `Watch`? OSAC exposes one `Events/Watch` stream with a CEL filter; the console polls today. Deferring keeps the fake simple.
 12. **Grid overview contract.** Which Thanos (ACM observability or user-workload monitoring) and metric names; is `metrics_source: demo` acceptable in the API so the UI can show a banner?
@@ -736,3 +757,9 @@ Console: `bff/go.mod`, `bff/internal/backend/client.go`, `bff/internal/backend/b
 OSAC monorepo (`github.com/osac-project/osac`): `README.md`, `go.work`, `proto/{AGENTS.md,buf.yaml,buf.gen.yaml,go.mod,Makefile}`, `proto/public/osac/public/v1/{metadata_type,condition_status_type,openapi_options,cluster_type,clusters_service,cluster_common_type,tenant_type,tenants_service,event_type,events_service,self_subject_access_review_type,self_subject_access_review_service,user_type,users_service,field_policy_type,field_definition_type,console_service,capabilities_service,authn_capabilities_type}.proto`, `proto/private/osac/private/v1/{hub_type,hubs_service,metadata_type}.proto`, `fulfillment-service/{go.mod,.golangci.yml,AGENTS.md}`, `fulfillment-service/docs/{API,CLEANAPI,AUTH,FILTER}.md`, `fulfillment-service/internal/auth/{grpc_authn_interceptor,grpc_authz_interceptor,auth_headers}.go`, `fulfillment-service/internal/servers/{dao_error_converter,tenant_errors,generic_server}.go`, `fulfillment-service/internal/cmd/service/start/grpcserver/start_grpc_server_cmd.go`, `fulfillment-service/internal/cmd/service/start/restgateway/start_rest_gateway_cmd.go`, `fulfillment-service/internal/validation/protovalidate_interceptor.go`, `fulfillment-service/internal/logging/logging_interceptor.go`, `fulfillment-service/cmd/buf-plugin-osac-lint/main.go`, `.github/workflows/{check-generated-code,publish-proto,nightly-ui-buf-compatibility}.yaml`, `.github/scripts/check-ui-buf-release.sh`, `.pre-commit-config.yaml`, `docs/{RELEASING,CONVENTIONS}.md`, `docs/architecture/cluster-fulfillment.md`, `osac-operator/api/v1alpha1/clusterorder_types.go`, `osac-ui/libs/types/{buf.gen.yaml.template,.buf-api-version,scripts/gen-types.mjs}`, `osac-ui/proxy/middleware/auth.go`.
 
 Archived: `github.com/osac-project/fulfillment-service` (redirect notice), `github.com/osac-project/fulfillment-api` and `fulfillment-common` (archive notices, 2026-03-04).
+
+## Verification (2026-10-15)
+
+Independently re-checked on 2026-10-15 against the backend checkout at `fb419b3` (and its remote via `gh api`: 0 tags, only `main`, same head), the `osac-project/osac` monorepo at a 2026-10-15 head (all 56 cited OSAC paths and 13 cited console paths exist), the archived repos' metadata via `gh api`, grpc-go `clientconn.go` at `v1.61.0` and `v1.84.0`, and buf's lint rule/category definitions. Corrections applied in this pass: `grpc.DialContext` is deprecated only at the console's grpc version (2); OSAC `limit` omitted = page of 100 (4, 5.3); the interceptor chain ends with the reference validator and the authz claim handling lives in `auth_context_extraction.go`/`authorization_evaluator.go` (4); dominant mandatory-id message and histogram scope (4); `publish-proto` is `workflow_call`-only and pushes three modules (4); `lock`/`version` cannot be honoured for Keycloak tenants (5.3, 6.6); unused timestamp import removed from `tenant_type.proto` and the single tenant draft now lives here, with the Keycloak mapping appended (6.6); proto3 `optional` vs `protoc 3.13.0` (8.9). The drafts in section 6 were checked by reading against buf's STANDARD rules, not by running `buf lint` (`buf`/`protoc` not installed locally).
+
+Not verified in this pass: the logging interceptor's field list (4); the literal `<component>/vX.Y.Z` tag form in `docs/RELEASING.md` (4); `ClusterConditionType` values beyond `READY` (4); Keycloak's `ORG.NAME` length limit (6.6).
