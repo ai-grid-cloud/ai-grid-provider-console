@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
 )
 
 // requireIdentity rejects API calls without a caller token and stores the

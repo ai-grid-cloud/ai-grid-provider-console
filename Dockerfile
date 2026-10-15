@@ -20,7 +20,7 @@ COPY bff/go.mod bff/go.sum ./
 RUN go mod download
 COPY bff/ ./
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
-    go build -ldflags "-s -w -X github.com/cfchase/ai-grid-provider-console/bff/internal/api.Version=${VERSION}" -o /out/bff ./cmd
+    go build -ldflags "-s -w -X github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/api.Version=${VERSION}" -o /out/bff ./cmd
 
 FROM ${RUNTIME_BASE_IMAGE}
 WORKDIR /

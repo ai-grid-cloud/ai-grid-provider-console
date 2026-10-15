@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube/kubetest"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube/kubetest"
 )
 
 // ListKinds registers the ManagedCluster list kind for the dynamic fake.

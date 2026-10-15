@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/config"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/config"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
 )
 
 // Version is set at build time with -ldflags "-X ...api.Version=<v>".

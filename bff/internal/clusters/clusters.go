@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
 )
 
 // ManagedClusterGVR is the ACM ManagedCluster resource (cluster-scoped).

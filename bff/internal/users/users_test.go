@@ -10,8 +10,8 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube/kubetest"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube/kubetest"
 )
 
 func newClient(t *testing.T) (*kube.Client, *kubefake.Clientset) {

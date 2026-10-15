@@ -19,4 +19,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/cfchase/ai-grid-provider-console
+        - github.com/ai-grid-cloud/ai-grid-provider-console

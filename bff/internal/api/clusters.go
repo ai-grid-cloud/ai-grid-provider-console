@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/clusters"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/clusters"
 )
 
 const maxBodyBytes = 1 << 20

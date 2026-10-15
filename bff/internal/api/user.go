@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/users"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/users"
 )
 
 // getUser answers GET /api/v1/user.

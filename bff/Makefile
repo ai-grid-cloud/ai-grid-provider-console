@@ -3,7 +3,7 @@ PORT ?= 8080
 HUB_NAMESPACE ?= ai-grid
 LOG_LEVEL ?= debug
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -X github.com/cfchase/ai-grid-provider-console/bff/internal/api.Version=$(VERSION)
+LDFLAGS := -X github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/api.Version=$(VERSION)
 
 .PHONY: all fmt vet lint test build run tidy
 

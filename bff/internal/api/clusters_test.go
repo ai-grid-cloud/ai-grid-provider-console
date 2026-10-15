@@ -11,9 +11,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/clusters"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/config"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube/kubetest"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/clusters"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/config"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube/kubetest"
 )
 
 func managedCluster(name string, labels map[string]string) *unstructured.Unstructured {

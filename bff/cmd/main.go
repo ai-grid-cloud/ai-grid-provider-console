@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/api"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/config"
-	"github.com/cfchase/ai-grid-provider-console/bff/internal/kube"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/api"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/config"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/kube"
 )
 
 func main() {
