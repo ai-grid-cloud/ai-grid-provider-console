@@ -8,8 +8,10 @@ import type {
   CreateModelRequest,
   GridCluster,
   IdentityProvider,
+  MaaSSubscription,
   ManagedModel,
   Organization,
+  SubscriptionInfoResponse,
 } from './types';
 
 // The one place that turns the BFF's JSON into the types the pages read. It renames
@@ -48,6 +50,31 @@ export const toGridCluster = (json: ApiCluster): GridCluster => ({
   openshiftVersion: json.openshiftVersion,
   resourceVersion: json.resourceVersion,
   labels: json.labels ?? {},
+});
+
+/**
+ * A subscription as the BFF returns it, with its Ready condition picked into the fields the
+ * PoC's pages read (reason, statusMessage, status, conditionType, lastTransitionTime). A
+ * subscription the controller hasn't reconciled has no phase (the controller never writes
+ * Pending); the label shows it as Unknown, as odh-dashboard does.
+ */
+export const toSubscription = (json: MaaSSubscription): MaaSSubscription => {
+  const ready = json.conditions?.find((c) => c.type === 'Ready');
+  const out: MaaSSubscription = { ...json };
+  if (ready) {
+    out.status = ready.status;
+    out.reason = ready.reason;
+    out.statusMessage = ready.message;
+    out.conditionType = ready.type;
+    out.lastTransitionTime = ready.lastTransitionTime;
+  }
+  return out;
+};
+
+/** GET /subscriptions/{name}, with its subscription adapted by toSubscription. */
+export const toSubscriptionInfo = (json: SubscriptionInfoResponse): SubscriptionInfoResponse => ({
+  ...json,
+  subscription: toSubscription(json.subscription),
 });
 
 const toIdentityProvider = (json: NonNullable<ApiTenant['identityProvider']>): IdentityProvider => {

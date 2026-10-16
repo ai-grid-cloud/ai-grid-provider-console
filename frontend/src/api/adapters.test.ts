@@ -1,6 +1,6 @@
 import getModels from '../../../mock/examples/get-models.json';
-import { toGridCluster, toManagedModel, toModelCreate, toOrganization } from './adapters';
-import type { ApiCluster, ApiModel, ApiTenant, CreateModelRequest } from './types';
+import { toGridCluster, toManagedModel, toModelCreate, toOrganization, toSubscription } from './adapters';
+import type { ApiCluster, ApiModel, ApiTenant, CreateModelRequest, MaaSSubscription } from './types';
 
 // The cluster JSON of GET /api/v1/clusters (mock/examples/get-clusters.json), trimmed.
 const apiCluster = (overrides: Partial<ApiCluster> = {}): ApiCluster => ({
@@ -91,6 +91,45 @@ describe('toGridCluster', () => {
 
   it('gives a cluster without labels an empty map', () => {
     expect(toGridCluster(apiCluster({ labels: undefined })).labels).toEqual({});
+  });
+});
+
+const base: MaaSSubscription = {
+  name: 'team-a',
+  resourceVersion: '1',
+  owner: { groups: [{ name: 'team-a' }] },
+  modelRefs: [{ name: 'granite-8b-instruct', tokenRateLimits: [{ limit: 1000, window: '1h' }] }],
+};
+
+describe('toSubscription', () => {
+  it("picks the Ready condition into the subscription's status fields", () => {
+    const json: MaaSSubscription = {
+      ...base,
+      phase: 'Degraded',
+      conditions: [
+        { type: 'SpecPriorityDuplicate', status: 'False', reason: 'NoDuplicatePeers' },
+        {
+          type: 'Ready',
+          status: 'False',
+          reason: 'PartialFailure',
+          message: '1 of 1 TokenRateLimitPolicies not accepted',
+          lastTransitionTime: '2026-10-16T09:00:01Z',
+        },
+      ],
+    };
+    expect(toSubscription(json)).toEqual({
+      ...json,
+      status: 'False',
+      reason: 'PartialFailure',
+      statusMessage: '1 of 1 TokenRateLimitPolicies not accepted',
+      conditionType: 'Ready',
+      lastTransitionTime: '2026-10-16T09:00:01Z',
+    });
+  });
+
+  it('leaves a subscription the controller has not reconciled without a phase', () => {
+    expect(toSubscription({ ...base, conditions: [] }).phase).toBeUndefined();
+    expect(toSubscription(base).phase).toBeUndefined();
   });
 });
 

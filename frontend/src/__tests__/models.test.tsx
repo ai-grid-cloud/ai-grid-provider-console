@@ -4,11 +4,10 @@
 // Rulings and scope:
 // - The Git file assertions (deployment, MaaSModelRef, Placement, ManifestWorkReplicaSet) become
 //   assertions on the saved model; the console's backend owns those resources.
-// - The subscription steps (the new model in the subscription model picker, a subscription that
-//   blocks deletion) need the Subscriptions area; the blocked delete runs on the backend's
-//   FailedPrecondition answer instead.
+// - The new model in the subscription model picker is covered by subscriptions.test.tsx, which
+//   picks models from the same list.
 // - "persists deployment management in mock storage…" keeps only its location and stale-version
-//   assertions (A5, D3); the referenced-model assertion needs subscriptions in the mock.
+//   assertions (A5, D3); a referenced model is the blocked-delete case.
 // - "explains a 200 response from an outdated backend" tests a PoC-only legacy payload and is
 //   not ported.
 import { screen, waitFor, within } from '@testing-library/react';
@@ -108,15 +107,17 @@ it('walks the deployment wizard, selects locations, saves the model and removes 
   expect((await service.listModels()).some((m) => m.name === 'widget')).toBe(false);
 }, 20000);
 
-it('keeps the confirmation dialog and model when the backend blocks deletion', async () => {
+it('keeps the confirmation dialog and model when a subscription blocks deletion', async () => {
   const service = new MockConsoleService();
   const result = await service.createModel(input);
-  service.deleteModel = async () => {
-    throw new ServiceError(
-      412,
-      'Remove this model from its subscriptions and authorization policies before deleting it.',
-    );
-  };
+  await service.createSubscription({
+    name: 'widget-users',
+    owner: { groups: [{ name: 'widget-users' }] },
+    modelRefs: [{ name: 'widget', tokenRateLimits: [{ limit: 1000, window: '1h' }] }],
+    priority: 0,
+    tokenMetadata: { organizationId: '3f1c9a72-5b6e-4d2a-8c01-2d3e4f5a6b7c' },
+    createAuthPolicy: true,
+  });
   const user = userEvent.setup();
   renderAt('/models', service);
   await user.click(await screen.findByTestId('model-actions-widget'));

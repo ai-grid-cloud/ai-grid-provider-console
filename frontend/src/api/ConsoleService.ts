@@ -1,6 +1,7 @@
 import type { ClustersService } from './clusters';
 import type { ModelsService } from './models';
 import type { OrganizationsService } from './organizations';
+import type { SubscriptionsService } from './subscriptions';
 import type { ConsoleConfig, User } from './types';
 
 /** The signed-in user, for pages that show actions only to provider admins. */
@@ -13,7 +14,8 @@ export interface UserService {
  * just the areas it uses. The HTTP implementation is used in the browser; tests
  * use an in-memory one.
  */
-export interface ConsoleService extends ClustersService, OrganizationsService, ModelsService, UserService {
+export interface ConsoleService
+  extends ClustersService, OrganizationsService, ModelsService, SubscriptionsService, UserService {
   getConfig(): Promise<ConsoleConfig>;
 }
 

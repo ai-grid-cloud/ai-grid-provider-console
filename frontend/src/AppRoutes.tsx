@@ -1,14 +1,19 @@
 import { PageSection } from '@patternfly/react-core';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import type { ConsoleService } from './api/ConsoleService';
 import { NotFoundPage } from './components/NotFoundPage';
 import { NotYetPortedPage } from './components/NotYetPortedPage';
+import { MaaSGovernanceProvider } from './context/MaaSGovernanceContext';
 import { ClustersPage } from './pages/ClustersPage';
 import { ModelWizard } from './pages/models/ModelWizard';
 import { ModelsPage } from './pages/models/ModelsPage';
 import { OrganizationDetailsPage } from './pages/organizations/OrganizationDetailsPage';
 import { OrganizationListPage } from './pages/organizations/OrganizationListPage';
 import { OrganizationWizardPage } from './pages/organizations/OrganizationWizardPage';
+import { CreateSubscriptionPage } from './pages/subscriptions/CreateSubscriptionPage';
+import { EditSubscriptionPage } from './pages/subscriptions/EditSubscriptionPage';
+import { SubscriptionsPage } from './pages/subscriptions/SubscriptionsPage';
+import { ViewSubscriptionPage } from './pages/subscriptions/ViewSubscriptionPage';
 
 type Props = { service: ConsoleService };
 
@@ -75,10 +80,19 @@ export const AppRoutes: React.FC<Props> = ({ service }) => (
         </PageSection>
       }
     />
-    <Route path="/subscriptions" element={<NotYetPortedPage title="Subscriptions" />} />
-    <Route path="/subscriptions/create" element={<NotYetPortedPage title="Create subscription" />} />
-    <Route path="/subscriptions/view/:name" element={<NotYetPortedPage title="Subscription" />} />
-    <Route path="/subscriptions/edit/:name" element={<NotYetPortedPage title="Edit subscription" />} />
+    {/* The subscription pages share the PoC's governance context, and only they use it (A25). */}
+    <Route
+      element={
+        <MaaSGovernanceProvider service={service}>
+          <Outlet />
+        </MaaSGovernanceProvider>
+      }
+    >
+      <Route path="/subscriptions" element={<SubscriptionsPage service={service} />} />
+      <Route path="/subscriptions/create" element={<CreateSubscriptionPage service={service} />} />
+      <Route path="/subscriptions/view/:subscriptionName" element={<ViewSubscriptionPage service={service} />} />
+      <Route path="/subscriptions/edit/:subscriptionName" element={<EditSubscriptionPage service={service} />} />
+    </Route>
     <Route path="*" element={<NotFoundPage />} />
   </Routes>
 );
