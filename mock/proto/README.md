@@ -14,8 +14,8 @@ The backend's proto has three RPCs. The console needs more than that, so it carr
 `mock/research/backend-conventions.md` section 5 says (`ai_grid.proto`, `condition_type.proto`,
 `metadata_type.proto`, `managed_cluster_type.proto`, `managed_clusters_service.proto`,
 `tenant_type.proto`, `tenants_service.proto`, `model_type.proto`, `models_service.proto`, and the
-placeholder services `grid_service.proto`, `catalog_items_service.proto`,
-`subscriptions_service.proto`). It is the
+`subscriptions_service.proto`, `subscription_type.proto`, and `grid_service.proto`, whose
+`Grid/GetNetwork` and the whole of `catalog_items_service.proto` are still placeholders). It is the
 console's **proposal** to the backend team, nothing more: the shapes are the ones drafted in
 section 6 of that report, every file says so in its header, and the `go_package` is the
 console's own (`bff/gen/ai_grid/v1`), not the backend's.
@@ -37,8 +37,8 @@ What keeps it honest:
   plus this test name every difference. `TestFakeImplementsEveryProtoMethod` in
   `bff/internal/fakebackend` then calls every method of every draft service and fails on an
   `Unimplemented` answer, except for the methods listed in `intentionallyUnimplemented`
-  (`fakebackend_test.go`), each with its reason: the placeholder `Grid`, `CatalogItems` and
-  `Subscriptions` methods until they are agreed with the backend team, and `GetCurrentUser`,
+  (`fakebackend_test.go`), each with its reason: the placeholder `Grid/GetNetwork` and
+  `CatalogItems` methods until they are agreed with the backend team, and `GetCurrentUser`,
   which the BFF does not need yet (`Models` and `GetHubCapabilities` are implemented and
   probed like every other method). An entry whose
   method starts answering fails the test until the entry is removed, so the allowlist is
@@ -111,6 +111,29 @@ Keycloak's `search`; it is general CEL again, as is `ListModelsRequest.filter`: 
 over `this` (the message, proto field names) and `now` in cel-go's standard library plus its
 strings extension (`ext.Strings()`), which the client writes, the BFF forwards and the backend
 evaluates before paging (the fake in memory, `bff/internal/fakebackend/celfilter`).
+
+## Proposals from the port
+
+The PoC port added the shapes below to the draft. **Each is a proposal for the backend owners**,
+implemented in the fake so the console works today and not agreed with anyone: the owners settle
+each one, field number included, when the backend work on that area starts. A field's header
+comment in the draft says the same. Proposals the port first made and PR 12 later covered
+(the tenant version, the delete preconditions) are PR 12's and are described above.
+
+| Id | Proposal | What the fake implements |
+|---|---|---|
+| P1 | `Tenant.identity_provider = 11`, with the port's `IdentityProvider` and `OidcConfig` messages | Validates the provider with the PoC's rules on create and on an update whose mask names `identity_provider` (`BadRequest` violations under `identityProvider.*`), trims and stores it. An organization without one is accepted. The check runs after the version check, so a stale update is `Aborted` whatever else is wrong |
+| P3 | `Tenant.create_time = 12`, output only | Stamps the time at create and keeps it out of `attributes`, as the backend would in the attribute `ai-grid/create-time`; an organization created some other way has none, and the console shows "—" |
+| P6 | `ModelSubscriptionRef.namespace = 8` | The namespace of the referenced model; empty means the console's models namespace (`ai-grid-models`). Pairing with auth policies, status and the delete guard all use namespace and name |
+| P7 | `Models.ListLocations`, `ListLocationsResponse.locations = 1` | The `location` labels of the clusters that are AI Grid members (`ai-grid/enabled` and `ai-grid/provisioned` both `true`) and Available, unique and sorted: the PoC's eligible locations on PR 12's cluster state |
+| P8 | So far `PlacementStatus.locations = 4` | The `location` labels of the decided clusters, unique and sorted; a decided cluster without the label adds nothing |
+| P11 | The bodies of `subscriptions_service.proto` and `Grid/GetOverview`, which filled the placeholders | Subscriptions: create, read, update and delete with the CRD's rules and `BadRequest` field violations, `If-Match` as `resource_version` (set means checked, `Aborted` when stale). The overview: the PoC's metric contract with a deterministic demo generator, `range` limited to `1h`, `6h` and `24h`, a metric status per series, and the cluster inventory read from PR 12's cluster state |
+| P12 | The MaaS status the research implies (`mock/research/models-maas.md` 8.1). `Subscription.phase = 10` is `Active`, `Degraded`, `Failed` or `Invalid`, and empty until the first reconcile (the controller never writes `Pending`), fields 11 and 12 are `reserved`, and `conditions = 16`, `model_ref_statuses = 17` and `token_rate_limit_statuses = 18` are new. `AuthPolicy` gains `conditions = 7` and `model_refs = 8` (`AuthPolicyModelRef {name, namespace}`, replacing the reserved bare names in 5). New messages `ResourceRefStatus`, `TokenRateLimitStatus` and `ModelRegistration`, and `GetSubscriptionResponse.model_registrations = 4`. All output only | The controller's phases, conditions, reasons and messages, word for word, derived on every read; the timing is in `mock/README.md`, area 4. A model ref with a namespace pairs with a policy that names the same namespace |
+
+P2, P4 and P5 were dropped: PR 12 covers them (`Tenant.resource_version`,
+`DeleteTenantRequest.resource_version` and `DeleteModelRequest.resource_version`). P10 (map-key
+field masks) was dropped: PR 17 settled on whole maps. P9 (cluster `grid` fields) and the rest
+of P8 are not in the draft yet.
 
 ## Working with the backend team
 

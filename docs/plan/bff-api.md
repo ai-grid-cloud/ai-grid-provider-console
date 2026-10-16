@@ -75,7 +75,7 @@ Paths are under `/api/v1`, except `/healthcheck` and `/readyz` at the root.
 | GET | `/healthcheck` | `{status, version}` | none; liveness, no auth |
 | GET | `/readyz` | `{status, version, backend}` | `AiGrid/Ping`; readiness, 503 when the backend does not answer |
 | GET | `/api/v1/user` | `{username, email?, groups, isProviderAdmin}` (`email` omitted when the proxy sends none) | none; the identity from the proxy headers, `isProviderAdmin` from a hub `SelfSubjectAccessReview` |
-| GET | `/api/v1/config` | `{gridEndpoint, mapTileUrl, billingUrl, version}` | none; env `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `BILLING_URL` |
+| GET | `/api/v1/config` | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, modelsNamespace, fakeBackend}`: `modelsNamespace` is the namespace the console creates models in (default `ai-grid-models`) and `fakeBackend` makes the UI show its fake-backend banner | none; env `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION` (the attribution shown with `MAP_TILE_URL`'s tiles; with no `MAP_TILE_URL` the map uses the PoC's Esri basemap), `BILLING_URL`, `MODELS_NAMESPACE`, `FAKE_BACKEND` |
 | GET | `/api/v1/clusters` | `GridCluster[]` sorted by name | `ManagedClusters/ListManagedClusters` |
 | GET | `/api/v1/clusters/{name}` | `GridCluster`, `ETag: "<resourceVersion>"` | `ManagedClusters/GetManagedCluster`; 404 with the backend's message when absent. Against a backend without that RPC (the shipped one answers `Unimplemented`) the BFF filters `ListManagedClusters` by name instead, so the detail works either way |
 | PATCH | `/api/v1/clusters/{name}` | `GridCluster` after the write, with its `ETag` | `UpdateManagedCluster` (no read first) with the present body fields as the object and the mask (`labels`, `annotations`) and `lock: true` on the `If-Match` version; an empty body is 422; 409 when the hub object is not at that version, 428 without `If-Match`, 422 on a bad body or `If-Match`, a coordinate annotation the backend refuses or a change to a key outside the console's (`ai-grid/*`, `location`), 413 over 1 MiB, 415 when the body is not `application/json` |
@@ -88,8 +88,15 @@ Paths are under `/api/v1`, except `/healthcheck` and `/readyz` at the root.
 | GET | `/api/v1/models/{namespace}/{name}` | `Model`, `ETag: "<resourceVersion>"` | `Models/GetModel`; 404 with the backend's message (`object with identifier '<ns>/<name>' not found`) |
 | POST | `/api/v1/models` | 201, `Model` with no conditions yet, `Location: /api/v1/models/{namespace}/{name}`, `ETag` | `Models/CreateModel`; 422 with the API server's or the CRD's message (a name that is not a DNS-1123 subdomain, a negative `replicas`, `replicas` with `scaling`, `scaling` without `maxReplicas`, without a trigger, with `maxReplicas` below 1 or a negative `minReplicas` (`minReplicas: 0` counts as unset and defaults to 1) or with `minReplicas` above `maxReplicas`) or the console's own (URI scheme, Placement operators, rollout fields, `rollout` without `placement`), 409 on a taken name, 412 `ManifestWorkReplicaSet feature gate disabled on hub` when `placement` is set on a hub without the controller |
 | PATCH | `/api/v1/models/{namespace}/{name}` | `Model` after the write, with its `ETag` | `UpdateModel` (no read first) with every present field as the mask (`spec.replicas`, `spec.main.image`, `spec.main.env`, `spec.placement`, `spec.rollout`, `metadata.labels`, `metadata.annotations`) and `lock: true` on the `If-Match` version; an empty body is 422; 409 when the object is not at that version, 428 without `If-Match`, 412 when a placement is added on a gated hub |
-| DELETE | `/api/v1/models/{namespace}/{name}` | 204; the model is gone at once (the MWRS cascades `Background`, its works drain out of sight) | `Models/DeleteModel` with the `If-Match` version as `resource_version`; 404 when absent, 409 on a stale `If-Match`, 428 without `If-Match`, 412 while a catalog entry or a subscription references the model (not reachable on the fake yet: nothing references a model until the catalog and subscriptions exist) |
+| DELETE | `/api/v1/models/{namespace}/{name}` | 204; the model is gone at once (the MWRS cascades `Background`, its works drain out of sight) | `Models/DeleteModel` with the `If-Match` version as `resource_version`; 404 when absent, 409 on a stale `If-Match`, 428 without `If-Match`, 412 while a catalog entry, a subscription or an auth policy references the model (on the fake, subscriptions and auth policies block it; catalog entries don't exist yet) |
 | GET | `/api/v1/capabilities` | `{manifestWorkReplicaSetEnabled, observabilityInstalled, acmVersion}` | `AiGrid/GetHubCapabilities`; 501 against a backend without the RPC, which a client reads as "unknown" |
+| GET | `/api/v1/locations` | `string[]`: the `location` labels a model can be placed on, in the backend's order | `Models/ListLocations` (proposal P7, `mock/proto/README.md`) |
+| GET | `/api/v1/subscriptions` | `Subscription[]` in the backend's order | `Subscriptions/ListSubscriptions` |
+| GET | `/api/v1/subscriptions/{name}` | `{subscription, authPolicies, modelRegistrations, modelRefs}`: the subscription, the authorization policies that cover its models, the status of each referenced model's registration, and the referenced models in the `Model` JSON | `Subscriptions/GetSubscription`; 404 with the backend's message when absent |
+| POST | `/api/v1/subscriptions` | 201, `{subscription, authPolicy?}`, `Location: /api/v1/subscriptions/{name}` | `Subscriptions/CreateSubscription` with `createAuthPolicy` from the body; 422 with `fieldErrors` on a bad body, 409 on a taken name |
+| PUT | `/api/v1/subscriptions/{name}` | `{subscription}` after the write | `Subscriptions/UpdateSubscription`; the `If-Match` version is `object.resource_version` with `lock: true` (below), 409 when stale, 428 without `If-Match`, 422 with `fieldErrors` |
+| DELETE | `/api/v1/subscriptions/{name}` | 204 | `Subscriptions/DeleteSubscription` with the `If-Match` version as `resource_version`; 404 when absent, 409 when stale, 428 without `If-Match` |
+| GET | `/api/v1/grid/overview?range=1h\|6h\|24h&site=&metrics=false` | `GridOverview`: `{updatedAt, inventorySource?, demo, metricsSource?, clusters, metrics}`; `inventorySource` (`acm\|git`) and `metricsSource` (`thanos\|demo`) are omitted when the backend does not say, and each metric's `status` (`ok\|no-data\|unavailable\|not-configured`) likewise | `Grid/GetOverview`; `range` is forwarded as sent (the backend defaults it to `1h` and refuses anything but `1h`, `6h` and `24h` with 422), an empty `site` selects every site and only `metrics=false` leaves the metrics out |
 
 `GridCluster` (fields the shipped backend does not fill are omitted or empty, so a client
 also works against a backend that only returns `name`, `labels`, `hubAcceptsClient`):
@@ -194,7 +201,9 @@ the collections are always present even though Keycloak omits an empty `domains`
     {"name": "acme.example.org", "verified": false, "autoRedirect": false}
   ],
   "attributes": {"ai-grid/region": "europe-west", "billing-account": "ACME-0042"},
-  "resourceVersion": "1"
+  "identityProvider": {"...": "..."},
+  "resourceVersion": "1",
+  "createTime": "2026-10-10T08:00:00Z"
 }
 ```
 
@@ -206,6 +215,13 @@ the collections are always present even though Keycloak omits an empty `domains`
   accepts the domain part of an e-mail address or one wildcard `*.base.tld`.
   `identityProviderAlias` is present only for a domain routed to one of the organization's
   identity providers; the fake realm has none, so the fake never returns it.
+- `identityProvider` is the organization's OIDC identity provider as the console's organization
+  wizard configures it (proposal P1, `Tenant.identity_provider = 11`); omitted for an
+  organization without one. A write that sets it is validated by the backend, whose field
+  violations come back as `fieldErrors` under `identityProvider.*`.
+- `createTime` is when the backend created the organization (proposal P3,
+  `Tenant.create_time = 12`, output only); omitted for an organization created some other way,
+  which the console shows as "—".
 - `resourceVersion` is the version the backend keeps for the tenant (Keycloak has none), also
   sent as the `ETag`; omitted from a backend that keeps none (today's).
 
@@ -247,7 +263,7 @@ no `revision`, `status: Saved`, `hasDeployment`; collections are always present)
   "addresses": [], "conditions": [], "appliedConfigs": [],
   "placement": {
     "clusterSets": ["global"], "matchLabels": {"ai-grid/enabled": "true", "ai-grid/provisioned": "true"},
-    "selectedClusters": ["site-paris-1"], "satisfied": true, "reason": "AllDecisionsScheduled", "message": "All cluster decisions scheduled",
+    "selectedClusters": ["site-paris-1"], "locations": ["paris"], "satisfied": true, "reason": "AllDecisionsScheduled", "message": "All cluster decisions scheduled",
     "conditions": [{"type": "PlacementSatisfied", "status": "True", "reason": "AllDecisionsScheduled", "message": "All cluster decisions scheduled", "lastTransitionTime": "..."}]
   },
   "rollout": {
@@ -288,6 +304,9 @@ no `revision`, `status: Saved`, `hasDeployment`; collections are always present)
   `url` values the agent scraped from the spoke object. `workName` is `model-<name>` plus five
   random characters, no separator (the API server's `generateName` on the MWRS name, cut to 58
   characters).
+- `placement.locations` are the `location` labels of the decided clusters, unique and sorted
+  (proposal P8, `PlacementStatus.locations = 4`); a decided cluster without the label adds
+  nothing. The console shows a model's locations from it, whatever selected the clusters.
 - `rollout.summary` counts the works at the current template; the CRD's `desiredTotal` and
   `updated` are never written by OCM, so the JSON leaves them out. `maxConcurrency` applies to
   `Progressive` only (`All` and `ProgressivePerGroup` have no such field; the backend refuses
@@ -365,8 +384,10 @@ decides.
   | PATCH `/tenants/{id}` | `object.resource_version` (the draft's precondition: set means checked) |
   | DELETE `/tenants/{id}` | `DeleteTenantRequest.resource_version` |
   | DELETE `/models/{namespace}/{name}` | `DeleteModelRequest.resource_version` |
+  | PUT `/subscriptions/{name}` | `object.resource_version` with `lock: true` |
+  | DELETE `/subscriptions/{name}` | `DeleteSubscriptionRequest.resource_version` |
 
-  A PATCH or DELETE without `If-Match` is 428 Precondition Required (RFC 6585) before the body
+  A PATCH, PUT or DELETE without `If-Match` is 428 Precondition Required (RFC 6585) before the body
   is read and before any call: `this write needs an If-Match header: send the ETag that GET
   answered (the object's resourceVersion), for example If-Match: "42"`; `If-Match: *`, which
   names no version, is 428 too (`If-Match: * names no version: ...`). So every write carries the
@@ -429,6 +450,24 @@ decides.
   count is full (`size == limit`), because more may follow. This is compatibility with the
   shipped backend, not a check of the filter: the BFF only notices the missing count.
 
+- **Field errors.** An `InvalidArgument` answer (422) that carries `BadRequest` field violations
+  also carries `error.fieldErrors`, a map from the JSON path of the request body (for example
+  `domains` or `modelRefs.0.tokenRateLimits.0.window`) to the backend's message, so the form
+  can show each next to its field; when a path has several violations the first wins. No other
+  code carries `fieldErrors`, whatever details the backend attached.
+- **Lists.** The console's pages send none of the list parameters (`offset`, `limit`,
+  `filter`): Clusters, Organizations and Models fetch the whole list and filter, sort and page
+  in the browser. The subscriptions list takes no query parameters.
+
+### The BFF is thin
+
+The BFF does transport only (the root `AGENTS.md`), and the port's handlers follow it.
+**`ai-grid-backend` must therefore validate every write RPC before that RPC goes live behind
+the console.** The BFF forwards what it decodes. A write RPC that does not validate stores
+whatever a client sends, and the page's inline messages, which only repeat the PoC's rules
+before submit, are no protection. The fake's `BadRequest` field violations are the reference
+for what to check and which message to send.
+
 ### Waiting on backend RPCs
 
 Each row is a request to the backend repository. The BFF mapping is small once the RPC
@@ -439,10 +478,9 @@ exists; the frontend uses the mock service meanwhile.
 | GET | `/api/v1/user` (`isProviderAdmin`) | Optional: `AiGrid/GetCurrentUser` returning roles, once the backend acts as the caller; today the BFF asks the hub directly | Step 1 |
 | GET/PATCH | `/api/v1/clusters[/{name}]` (implemented against the draft) | The backend has to ship the draft's `GetManagedCluster`, `UpdateManagedCluster` and the richer `ManagedCluster` (`mock/proto/ai_grid/v1/managed_cluster*.proto`), with `status.state` derived server-side; `patch` on managedclusters in its ClusterRole | Steps 2, 10 |
 | GET/POST/PATCH/DELETE | `/api/v1/tenants[/{id}]` (implemented against the draft) | The backend has to ship the draft's `GetTenant`, `CreateTenant`, `UpdateTenant`, `DeleteTenant`, the paged `ListTenants` and the richer `Tenant` (`mock/proto/ai_grid/v1/tenant*.proto`), mapping Keycloak outcomes to the codes in `mock/research/keycloak.md` 8.2 instead of `Unknown`, and gating mutations on the provider-admin check | Step 6 |
-| GET | `/api/v1/grid/overview?range=1h|6h|24h&site=&metrics=false` | `Grid/GetOverview` with the POC's metric contract: requests, errors, latency, gpu from Thanos with a `cluster` label; `metricsSource: thanos|demo` | Steps 5, 10 |
 | GET/POST/PATCH/DELETE | `/api/v1/models[/{namespace}/{name}]`, GET `/api/v1/capabilities` (implemented against the draft) | The backend has to ship the draft's `Models` service and `Model` message (`mock/proto/ai_grid/v1/model*.proto`) over LLMInferenceService, Placement and ManifestWorkReplicaSet with the status derived server-side, and `AiGrid/GetHubCapabilities`; the `ManifestWorkReplicaSet` feature gate on the hub for multi-site models (`FailedPrecondition` otherwise) | Steps 3, 4 |
 | GET/POST/PUT/DELETE | `/api/v1/catalog[/{name}]` | `Catalog/*` on ConfigMaps | Step 9 |
-| GET/POST/PUT/DELETE | `/api/v1/subscriptions[/{name}]` | `Subscriptions/*` over MaaSSubscription | Step 8 |
+| GET/POST/PUT/DELETE | `/api/v1/subscriptions[/{name}]`, GET `/api/v1/grid/overview` (implemented against the draft) | The backend has to ship the draft's `Subscriptions` service and `Grid/GetOverview` (`mock/proto/ai_grid/v1/subscription*.proto`, `grid_service.proto`) with the POC's metric contract (requests, errors, latency, gpu from Thanos with a `cluster` label), and validate every subscription write itself ("The BFF is thin") | Steps 5, 8, 10 |
 | GET/POST/DELETE | `/api/v1/tenants/{id}/members[/{userId}]` | Member RPCs on `Tenants` (not drafted yet; `mock/research/keycloak.md` open question 3) | Step 6 |
 | GET | `/api/v1/grid` | `Grid/GetNetwork` from `grid.praxis.fast/v1alpha1` once the RHOAI AI Gateway component installs the CRDs | Step 10a |
 
@@ -456,12 +494,12 @@ exists; the frontend uses the mock service meanwhile.
 | Backend `Unauthenticated` | 401 |
 | Backend `PermissionDenied` (the hub's RBAC denies the caller, e.g. a PATCH by a user who may not patch ManagedClusters) | 403, backend message kept |
 | Backend `NotFound` | 404, backend message kept (`object with identifier '<name>' not found`) |
-| Invalid POST or PATCH body (unknown field, wrong type, trailing content), bad `offset`/`limit` query, a removed list parameter (`search`, `namespace`, `label`), malformed `If-Match` | 422, BFF message |
-| POST or PATCH body not declared `application/json` | 415, BFF message |
-| PATCH or DELETE without `If-Match`, or with `If-Match: *` | 428, BFF message |
+| Invalid POST, PATCH or PUT body (unknown field, wrong type, trailing content), bad `offset`/`limit` query, a removed list parameter (`search`, `namespace`, `label`), malformed `If-Match` | 422, BFF message |
+| POST, PATCH or PUT body not declared `application/json` | 415, BFF message |
+| PATCH, PUT or DELETE without `If-Match`, or with `If-Match: *` | 428, BFF message |
 | `filter`, `limit` or `offset` against a backend whose list answer has no `total` | 501, BFF message |
 | Request body over 1 MiB | 413 |
-| Backend `InvalidArgument`, `OutOfRange`: Keycloak's validation messages ("Name can not be null", "Invalid domain format: x", "Cannot change the alias", "Domain x is already linked to organization y in realm ai-grid"), the API server's and the CRD's for a model (the DNS-1123 name message, the schema's "spec.replicas: Invalid value: -1: spec.replicas in body should be greater than or equal to 0" and "spec.scaling.maxReplicas: Required value", "replicas and scaling are mutually exclusive; ...", "at least one trigger is required when using direct KEDA scaling", "minReplicas cannot exceed maxReplicas"), and the backend's own checks with the console's proposed wording (URI scheme, Placement operators, rollout fields, `spec.rollout requires spec.placement`, the reserved tenant version attribute, an `ai-grid/latitude` or `ai-grid/longitude` annotation that is not a number in range, a list `filter` that does not compile, is not a bool or fails on an object) | 422, backend message kept |
+| Backend `InvalidArgument`, `OutOfRange`: Keycloak's validation messages ("Name can not be null", "Invalid domain format: x", "Cannot change the alias", "Domain x is already linked to organization y in realm ai-grid"), the API server's and the CRD's for a model (the DNS-1123 name message, the schema's "spec.replicas: Invalid value: -1: spec.replicas in body should be greater than or equal to 0" and "spec.scaling.maxReplicas: Required value", "replicas and scaling are mutually exclusive; ...", "at least one trigger is required when using direct KEDA scaling", "minReplicas cannot exceed maxReplicas"), and the backend's own checks with the console's proposed wording (URI scheme, Placement operators, rollout fields, `spec.rollout requires spec.placement`, the reserved tenant version attribute, an `ai-grid/latitude` or `ai-grid/longitude` annotation that is not a number in range, a list `filter` that does not compile, is not a bool or fails on an object) | 422, backend message kept; with `fieldErrors` for `InvalidArgument` only |
 | Backend `AlreadyExists` (Keycloak: "A organization with the same name already exists.", also for a blank name on update), `Aborted` (the object is not at the `If-Match` version) | 409, backend message kept |
 | Backend `FailedPrecondition` (hub feature gate missing, e.g. "ManifestWorkReplicaSet feature gate disabled on hub"; a model still referenced by a catalog entry or subscription; Keycloak realm missing or organizations disabled) | 412, backend message kept |
 | Backend `ResourceExhausted` | 429 |

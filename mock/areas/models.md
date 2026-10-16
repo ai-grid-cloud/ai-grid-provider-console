@@ -203,8 +203,9 @@ out of the summary, and its cluster is to apply again like a new one.
   deviation, below; the console's MWRS uses the CRD default cascade
   `Background`: the finalize reconciler deletes the works and drops the finalizer in one pass, so
   the MWRS is gone immediately and the works drain in the cluster namespaces out of sight), and
-  answers `FailedPrecondition` through a `referencedBy` hook that the catalog and subscriptions
-  area will wire up (nothing references a model today).
+  answers `FailedPrecondition` through the `referencedBy` hook, which the subscriptions area wires
+  up (`SetReferencedBy`): a subscription or an auth policy that names the model blocks the delete,
+  the fixtures' unmanaged policies included, and the message names each referrer.
 
 Phase (a console derivation, see `ModelPhase` in `model_type.proto`): a hub deployment is READY
 when `Ready` is True, FAILED when it is False with a reason that does not recover on its own
@@ -314,15 +315,16 @@ it as `DeleteModelRequest.resource_version`, which the fake checks like a Kubern
 delete precondition (`Aborted` with the update's wording when stale); GET, POST and PATCH send
 the `resourceVersion` as the `ETag`.
 
-UI: not built yet; main has no Models page.
+UI: the Models page and deploy wizard are the port's; a delete blocked
+by a subscription or auth policy shows the 412 message.
 
 ## Remaining
 
 Multi-node and prefill specs, decision groups (several groups for `ProgressivePerGroup`,
 mandatory groups), the Balance prioritizer, the agent's poll lag, a rolling update that keeps
 `Ready` True, the `apierror` failure mode, `status.router` in the proto, removing
-`RolloutSummary.updated` (field 6) from the proposal, and the catalog reference check once the
-catalog and subscriptions area exists.
+`RolloutSummary.updated` (field 6) from the proposal, and the catalog reference check (subscriptions and auth policies already
+block a delete; catalog entries do not exist yet).
 
 Backend ask: the `Models` service and `Model` message as drafted in
 `mock/proto/ai_grid/v1/model*.proto`, with the phase derived server-side;
