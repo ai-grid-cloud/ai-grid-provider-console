@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -33,6 +34,78 @@ type Tenant struct {
 	// ResourceVersion is the version the backend keeps for the tenant (also
 	// the ETag of GET /tenants/{id}); absent from a backend that keeps none.
 	ResourceVersion string `json:"resourceVersion,omitempty"`
+	// CreateTime is when the backend created the organization (P3); omitted
+	// for one it has no creation time for.
+	CreateTime *time.Time `json:"createTime,omitempty"`
+	// IdentityProvider is the organization's OIDC identity provider (P1);
+	// omitted when it has none.
+	IdentityProvider *IdentityProvider `json:"identityProvider,omitempty"`
+}
+
+// IdentityProvider is an organization's OIDC identity provider in the PoC's
+// shape (krisv/ai-grid-cloud-provider-poc src/app/types/tenants.ts at
+// 62319b8). The backend validates, trims and defaults it; the BFF only
+// translates it.
+type IdentityProvider struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	// Enabled is omitted on input for the backend's default (true).
+	Enabled *bool       `json:"enabled,omitempty"`
+	Config  *OidcConfig `json:"config,omitempty"`
+}
+
+// OidcConfig is the identity provider's OIDC client configuration. It names
+// the Secret holding the client secret and has no field for the secret
+// itself, so strict decoding refuses one.
+type OidcConfig struct {
+	ClientID           string    `json:"clientId"`
+	ClientSecretSecret SecretRef `json:"clientSecretSecret"`
+	Issuer             string    `json:"issuer"`
+	AuthorizationURL   string    `json:"authorizationUrl"`
+	TokenURL           string    `json:"tokenUrl"`
+	DefaultScopes      string    `json:"defaultScopes"`
+	UserInfoURL        string    `json:"userInfoUrl"`
+	JwksURL            string    `json:"jwksUrl"`
+	LogoutURL          string    `json:"logoutUrl"`
+	// ValidateSignature is omitted on input for the backend's default (true).
+	ValidateSignature *bool `json:"validateSignature,omitempty"`
+}
+
+// SecretRef names the Secret that holds the OIDC client secret.
+type SecretRef struct {
+	Name string `json:"name"`
+}
+
+func toIdentityProvider(p *aigridv1.IdentityProvider) *IdentityProvider {
+	if p == nil {
+		return nil
+	}
+	out := &IdentityProvider{Title: p.GetTitle(), Description: p.GetDescription(), Enabled: p.Enabled}
+	if c := p.GetConfig(); c != nil {
+		out.Config = &OidcConfig{
+			ClientID: c.GetClientId(), ClientSecretSecret: SecretRef{Name: c.GetClientSecretSecretName()},
+			Issuer: c.GetIssuer(), AuthorizationURL: c.GetAuthorizationUrl(), TokenURL: c.GetTokenUrl(),
+			DefaultScopes: c.GetDefaultScopes(), UserInfoURL: c.GetUserInfoUrl(), JwksURL: c.GetJwksUrl(),
+			LogoutURL: c.GetLogoutUrl(), ValidateSignature: c.ValidateSignature,
+		}
+	}
+	return out
+}
+
+func fromIdentityProvider(p *IdentityProvider) *aigridv1.IdentityProvider {
+	if p == nil {
+		return nil
+	}
+	out := &aigridv1.IdentityProvider{Title: p.Title, Description: p.Description, Enabled: p.Enabled}
+	if c := p.Config; c != nil {
+		out.Config = &aigridv1.OidcConfig{
+			ClientId: c.ClientID, ClientSecretSecretName: c.ClientSecretSecret.Name,
+			Issuer: c.Issuer, AuthorizationUrl: c.AuthorizationURL, TokenUrl: c.TokenURL,
+			DefaultScopes: c.DefaultScopes, UserInfoUrl: c.UserInfoURL, JwksUrl: c.JwksURL,
+			LogoutUrl: c.LogoutURL, ValidateSignature: c.ValidateSignature,
+		}
+	}
+	return out
 }
 
 // TenantDomain is one organization domain with Keycloak's metadata.
@@ -54,6 +127,8 @@ const (
 	maskEnabled     = "enabled"
 	maskDescription = "description"
 	maskAttributes  = "attributes"
+	// maskIdentityProvider is the mask path of `identityProvider` (P1).
+	maskIdentityProvider = "identity_provider"
 )
 
 func toTenant(t *aigridv1.Tenant) Tenant {
@@ -83,10 +158,16 @@ func toTenant(t *aigridv1.Tenant) Tenant {
 	// read as enabled: Keycloak's default, and the only value under which
 	// every organization is usable.
 	enabled := t.Enabled == nil || t.GetEnabled()
-	return Tenant{
+	out := Tenant{
 		ID: t.GetId(), Name: t.GetName(), Alias: alias, Enabled: enabled, Description: t.GetDescription(),
 		Domains: domains, DomainDetails: details, Attributes: attributes, ResourceVersion: t.GetResourceVersion(),
+		IdentityProvider: toIdentityProvider(t.GetIdentityProvider()),
 	}
+	if ts := t.GetCreateTime(); ts != nil {
+		created := ts.AsTime().UTC()
+		out.CreateTime = &created
+	}
+	return out
 }
 
 // queryInt reads an optional non-negative integer query parameter. The
@@ -209,6 +290,8 @@ type TenantCreate struct {
 	Enabled     *bool             `json:"enabled"`
 	Domains     []string          `json:"domains"`
 	Attributes  map[string]string `json:"attributes"`
+	// IdentityProvider is optional; the backend validates it (P1).
+	IdentityProvider *IdentityProvider `json:"identityProvider"`
 }
 
 // createTenant answers POST /api/v1/tenants: 201 with the created tenant and
@@ -222,7 +305,8 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 	}
 	// `enabled` is passed through as given; absent stays absent and the
 	// backend applies Keycloak's default (true).
-	obj := &aigridv1.Tenant{Name: body.Name, Alias: body.Alias, Description: body.Description, Enabled: body.Enabled, Domains: body.Domains, Attributes: body.Attributes}
+	obj := &aigridv1.Tenant{Name: body.Name, Alias: body.Alias, Description: body.Description, Enabled: body.Enabled, Domains: body.Domains, Attributes: body.Attributes,
+		IdentityProvider: fromIdentityProvider(body.IdentityProvider)}
 	ctx, cancel := a.backend.Context(r.Context())
 	defer cancel()
 	resp, err := a.backend.Tenants.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: obj})
@@ -249,6 +333,8 @@ type TenantPatch struct {
 	Enabled     *bool              `json:"enabled"`
 	Domains     *[]string          `json:"domains"`
 	Attributes  *map[string]string `json:"attributes"`
+	// IdentityProvider replaces the stored one as a whole (P1).
+	IdentityProvider *IdentityProvider `json:"identityProvider"`
 }
 
 // patchTenant answers PATCH /api/v1/tenants/{id}: the present fields become
@@ -305,6 +391,10 @@ func (a *App) patchTenant(w http.ResponseWriter, r *http.Request) {
 			obj.Attributes = map[string]string{}
 		}
 		paths = append(paths, maskAttributes)
+	}
+	if patch.IdentityProvider != nil {
+		obj.IdentityProvider = fromIdentityProvider(patch.IdentityProvider)
+		paths = append(paths, maskIdentityProvider)
 	}
 	if len(paths) == 0 {
 		a.respondError(w, r, Errorf(http.StatusUnprocessableEntity, "the request body names no field to change"))

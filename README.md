@@ -24,6 +24,7 @@ the caller's own token: may this user patch ManagedClusters? That answer is `isP
 | `docs/dev-setup.md` | Running against a real cluster, checks, deploying |
 | `docs/plan/bff-api.md` | API decisions, endpoint list, RPCs still needed from the backend |
 | `docs/plan/work-breakdown.md` | Work split across backend, BFF and frontend |
+| `NOTICE` | Attributions for the code and screens ported from the cloud provider PoC |
 
 ## Quick start
 
@@ -35,8 +36,19 @@ make dev          # backend :9090, BFF :8080, frontend :9000
 
 Then open http://127.0.0.1:9000. See `docs/dev-setup.md` for details.
 
+## Pages
+
+The console has pages for clusters (`/clusters`), organizations (`/organizations`), models
+(`/models`), subscriptions (`/subscriptions`), and the AI Grid map and Monitoring
+(`/ai-grid`, `/monitoring`). They are ported from the cloud provider PoC; `NOTICE` lists
+the attributions. Run them all against the fake backend with `make dev-fake`, as
+`docs/dev-setup.md` describes.
+
 ## Status
 
-Implemented: login, user, config, clusters (list, get), tenants (list), readiness tied to
-the backend. Next: whatever RPC the backend adds next; see the "Waiting on backend RPCs"
-table in `docs/plan/bff-api.md`.
+Implemented in the BFF and the fake backend: login, user, config, clusters (list, get,
+enroll), organizations, models, subscriptions, locations and the grid overview, with readiness
+tied to the backend. The shipped `ai-grid-backend` answers only the cluster and tenant lists:
+against it, `/user` and `/config` still work (neither calls the backend), a single cluster is
+found in the list, and every other endpoint is 501, which the pages show as not available on
+this backend yet. See the "Waiting on backend RPCs" table in `docs/plan/bff-api.md`.

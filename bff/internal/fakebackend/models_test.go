@@ -126,12 +126,22 @@ func TestRepoModelFixturesUseOnlyKnownStrings(t *testing.T) {
 	if len(fx.Models) != 5 || fx.Presets == nil || fx.Presets.Namespace != PresetsNamespace {
 		t.Fatalf("expected five models and the presets file, got %d models, presets %+v", len(fx.Models), fx.Presets)
 	}
+	checkModelsUseOnlyKnownStrings(t, fx, map[string]string{"llama-3-70b": "v3-6-0-kserve-config-llm-template-tpu"})
+	if fx.Models[2].GetName() != "mistral-7b-instruct" || fx.Models[2].GetMetadata().GetCreationTimestamp() != nil {
+		t.Error("the mid-rollout fixture must omit creationTimestamp so it rolls out live")
+	}
+}
+
+// checkModelsUseOnlyKnownStrings checks the models in fx against the strings
+// the research verified; unknownRefs names the one baseRef per model that is
+// deliberately not installed. It runs on every shipped fixture directory.
+func checkModelsUseOnlyKnownStrings(t *testing.T, fx *Fixtures, unknownRefs map[string]string) {
+	t.Helper()
 	for _, want := range []string{PresetTemplate, PresetScheduler, PresetRouterRoute} {
 		if !slices.Contains(fx.Presets.Names, want) {
 			t.Errorf("presets.json lacks the implicit preset %s", want)
 		}
 	}
-	unknownRefs := map[string]string{"llama-3-70b": "v3-6-0-kserve-config-llm-template-tpu"}
 	for _, m := range fx.Models {
 		name := m.GetName()
 		if m.GetStatus() != nil {
@@ -170,9 +180,6 @@ func TestRepoModelFixturesUseOnlyKnownStrings(t *testing.T) {
 				t.Errorf("bindings[%s]: unknown set %s", ns, set)
 			}
 		}
-	}
-	if fx.Models[2].GetName() != "mistral-7b-instruct" || fx.Models[2].GetMetadata().GetCreationTimestamp() != nil {
-		t.Error("the mid-rollout fixture must omit creationTimestamp so it rolls out live")
 	}
 }
 

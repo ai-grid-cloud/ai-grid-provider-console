@@ -402,7 +402,8 @@ type UpdateTenantRequest struct {
 	// one that changes nothing keeps it.
 	Object *Tenant `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
 	// Supported paths: `name`, `alias`, `domains`, `enabled`, `description`,
-	// `attributes`, `domain_details`. `alias` writes nothing, because the
+	// `attributes`, `domain_details`, and `identity_provider` (P1; it must
+	// come with a value). `alias` writes nothing, because the
 	// alias is immutable: it lets a client send back the alias it loaded, and
 	// a different non-blank `object.alias` is InvalidArgument "Cannot change
 	// the alias" (Keycloak's text) with or without the path. The backend reads the full Keycloak
@@ -418,8 +419,8 @@ type UpdateTenantRequest struct {
 	// with names only; `domain_details` replaces names and metadata). Without
 	// a mask `name`, `enabled` (true when omitted, as Keycloak defaults it)
 	// and `description` are taken from the request and everything else,
-	// `alias`, `attributes` and the domains included, is kept; an omitted
-	// `name` is then a blank name, AlreadyExists.
+	// `alias`, `attributes`, the domains and the identity provider included,
+	// is kept; an omitted `name` is then a blank name, AlreadyExists.
 	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

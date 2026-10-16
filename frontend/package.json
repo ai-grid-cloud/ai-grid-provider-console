@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit -p tsconfig.build.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings=0",
@@ -22,13 +23,19 @@
     "@patternfly/react-core": "~6.6.1",
     "@patternfly/react-icons": "~6.6.1",
     "@patternfly/react-table": "~6.6.1",
+    "leaflet": "^1.9.4",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "react-router-dom": "^7.18.4",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "14.6.1",
+    "@types/leaflet": "^1.9.22",
     "@types/node": "^22.15.0",
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",

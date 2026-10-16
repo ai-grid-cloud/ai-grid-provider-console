@@ -1,6 +1,7 @@
 import '@patternfly/react-core/dist/styles/base.css';
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { HttpConsoleService } from './api/HttpConsoleService';
 
@@ -10,6 +11,8 @@ if (!container) {
 }
 createRoot(container).render(
   <React.StrictMode>
-    <App service={new HttpConsoleService()} />
+    <BrowserRouter>
+      <App service={new HttpConsoleService()} />
+    </BrowserRouter>
   </React.StrictMode>,
 );

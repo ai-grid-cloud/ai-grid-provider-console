@@ -202,6 +202,9 @@ type ModelPlacement struct {
 	PlacementSpec
 	// SelectedClusters are the PlacementDecision's clusters, in name order.
 	SelectedClusters []string `json:"selectedClusters"`
+	// Locations are the decided clusters' `location` labels (P8), as the
+	// backend reports them.
+	Locations []string `json:"locations"`
 	// Satisfied is `PlacementSatisfied`; Reason and Message are its reason and message.
 	Satisfied  bool               `json:"satisfied"`
 	Reason     string             `json:"reason,omitempty"`
@@ -367,7 +370,7 @@ func toModel(m *aigridv1.Model) Model {
 	if out.ModelName == "" {
 		out.ModelName = out.Name // the KServe default
 	}
-	if spec.Replicas != nil {
+	if spec != nil && spec.Replicas != nil {
 		out.Replicas = proto.Int32(spec.GetReplicas())
 	}
 	if sc := spec.GetScaling(); sc != nil {
@@ -402,7 +405,7 @@ func toModel(m *aigridv1.Model) Model {
 	}
 	if p := spec.GetPlacement(); p != nil {
 		ps := st.GetPlacement()
-		placement := &ModelPlacement{PlacementSpec: toPlacementSpec(p), SelectedClusters: []string{}, Conditions: toConditions(ps.GetConditions())}
+		placement := &ModelPlacement{PlacementSpec: toPlacementSpec(p), SelectedClusters: []string{}, Locations: append([]string{}, ps.GetLocations()...), Conditions: toConditions(ps.GetConditions())}
 		for _, d := range ps.GetDecisions() {
 			placement.SelectedClusters = append(placement.SelectedClusters, d.GetClusterName())
 		}

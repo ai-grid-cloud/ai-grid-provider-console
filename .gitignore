@@ -20,3 +20,7 @@ frontend/.vite/
 
 .local/
 frontend/.pnpm-store/
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

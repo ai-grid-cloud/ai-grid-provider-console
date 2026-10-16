@@ -3,15 +3,18 @@ package fakebackend
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
@@ -61,8 +64,11 @@ func TestRepoTenantFixturesLookLikeKeycloak(t *testing.T) {
 	if len(fx.Tenants) < 5 {
 		t.Fatalf("expected at least five organizations, got %d", len(fx.Tenants))
 	}
-	var disabled, wildcard, noDomains, aliasDiffers, twoDomainsWithAttrs int
+	var disabled, wildcard, noDomains, aliasDiffers, twoDomainsWithAttrs, withIdP int
 	for _, tn := range fx.Tenants {
+		if tn.GetIdentityProvider() != nil {
+			withIdP++
+		}
 		if !uuidPattern.MatchString(tn.GetId()) {
 			t.Errorf("%s: id %q is not a UUID", tn.GetName(), tn.GetId())
 		}
@@ -95,6 +101,9 @@ func TestRepoTenantFixturesLookLikeKeycloak(t *testing.T) {
 	}
 	if disabled == 0 || wildcard == 0 || noDomains == 0 || aliasDiffers == 0 || twoDomainsWithAttrs == 0 {
 		t.Errorf("fixtures must seed a disabled org, a wildcard domain, an org without domains, an alias different from the name and an org with two domains and attributes: %d %d %d %d %d", disabled, wildcard, noDomains, aliasDiffers, twoDomainsWithAttrs)
+	}
+	if withIdP == 0 || withIdP == len(fx.Tenants) {
+		t.Errorf("fixtures must seed organizations with and without an identity provider (P1): %d of %d have one", withIdP, len(fx.Tenants))
 	}
 	if _, err := New(fx, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
@@ -643,6 +652,40 @@ func TestUpdateTenant(t *testing.T) {
 	})
 }
 
+// TestTenantCreateTime: the backend stamps a tenant's creation time on
+// create (P3) and keeps it through updates; a client can't set it, neither
+// as the field nor as the attribute the backend keeps it in, and a seeded
+// organization without one has none.
+func TestTenantCreateTime(t *testing.T) {
+	s := tenantServer(t)
+	now := time.Date(2026, 10, 16, 9, 30, 0, 0, time.UTC)
+	s.SetClock(func() time.Time { return now })
+	ctx := authed(context.Background())
+	created, err := s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "hooli",
+		CreateTime: timestamppb.New(time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)), Attributes: map[string]string{"tier": "gold"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := created.GetObject()
+	if !c.GetCreateTime().AsTime().Equal(now) || len(c.GetAttributes()) != 1 {
+		t.Fatalf("created %v", c)
+	}
+	resp, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{
+		Object:     &aigridv1.Tenant{Id: c.GetId(), Attributes: map[string]string{}},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathAttributes}},
+	})
+	if err != nil || !resp.GetObject().GetCreateTime().AsTime().Equal(now) {
+		t.Fatalf("attributes replaced: %v %v", resp, err)
+	}
+	_, err = s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "sneaky",
+		Attributes: map[string]string{TenantCreateTimeAttribute: "2001-01-01T00:00:00Z"}}})
+	mustCode(t, err, codes.InvalidArgument, `attribute "ai-grid/create-time" is reserved for the tenant's creation time; it cannot be set`)
+	got, err := s.GetTenant(ctx, &aigridv1.GetTenantRequest{Id: idGlobex})
+	if err != nil || got.GetObject().GetCreateTime() != nil {
+		t.Fatalf("a seeded organization without a creation time: %v %v", got, err)
+	}
+}
+
 func TestDeleteTenant(t *testing.T) {
 	s := tenantServer(t)
 	ctx := authed(context.Background())
@@ -883,4 +926,233 @@ func TestListTenantsFilterErrorsAfterTheKeycloakGate(t *testing.T) {
 	mustCode(t, err, codes.InvalidArgument, "")
 	_, err = s.ListTenants(ctx, &aigridv1.ListTenantsRequest{Filter: proto.String(`this.attributes["x"] == "y"`)})
 	mustCode(t, err, codes.Unavailable, "")
+}
+
+// validIdP is an identity provider the PoC's rules accept.
+func validIdP() *aigridv1.IdentityProvider {
+	return &aigridv1.IdentityProvider{
+		Title: "Acme SSO", Description: "Acme employees sign in here.", Enabled: proto.Bool(true),
+		Config: &aigridv1.OidcConfig{
+			ClientId: "ai-grid", ClientSecretSecretName: "acme-oidc-client",
+			Issuer: "https://sso.example.com/realms/acme", AuthorizationUrl: "https://sso.example.com/realms/acme/auth",
+			TokenUrl: "https://sso.example.com/realms/acme/token", DefaultScopes: "openid profile email",
+			ValidateSignature: proto.Bool(true),
+		},
+	}
+}
+
+// TestTenantIdentityProviderRoundTrips: the identity provider (P1) is stored
+// on create, returned by Get, replaced by a patch that names only
+// identity_provider, and the domains stay.
+func TestTenantIdentityProviderRoundTrips(t *testing.T) {
+	ctx := authed(context.Background())
+	s := tenantServer(t)
+	created, err := s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "wayne-aerospace", Domains: []string{"wayne-aero.example.com"}, IdentityProvider: validIdP()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.GetObject().GetId()
+	got, err := s.GetTenant(ctx, &aigridv1.GetTenantRequest{Id: id})
+	if err != nil || !proto.Equal(got.GetObject().GetIdentityProvider(), validIdP()) {
+		t.Fatalf("stored identity provider = %v, %v", got.GetObject().GetIdentityProvider(), err)
+	}
+	next := validIdP()
+	next.Title = "Wayne SSO"
+	updated, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{Object: &aigridv1.Tenant{Id: id, IdentityProvider: next}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathIdentityProvider}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.GetObject().GetIdentityProvider().GetTitle() != "Wayne SSO" || len(updated.GetObject().GetDomains()) != 1 || updated.GetObject().GetDomains()[0] != "wayne-aero.example.com" || updated.GetObject().GetResourceVersion() != "2" {
+		t.Errorf("updated = %v", updated.GetObject())
+	}
+	_, err = s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{Object: &aigridv1.Tenant{Id: id}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathIdentityProvider}}})
+	if fieldViolations(err)["identityProvider"] != "Required" {
+		t.Errorf("identity_provider in the mask without a value: %v", err)
+	}
+	if created, err := s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "no-idp"}}); err != nil || created.GetObject().GetIdentityProvider() != nil {
+		t.Errorf("an organization without an identity provider, as Keycloak and other clients create them: %v, %v", created, err)
+	}
+}
+
+// TestStaleUpdateIsAbortedBeforeItsIdentityProviderIsValidated: a stale
+// version is Aborted whatever else the request says, the invalid identity
+// provider included; with the current version the same request is
+// InvalidArgument with the field violations.
+func TestStaleUpdateIsAbortedBeforeItsIdentityProviderIsValidated(t *testing.T) {
+	ctx := authed(context.Background())
+	s := tenantServer(t)
+	created, err := s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "wayne-aerospace", IdentityProvider: validIdP()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, version := created.GetObject().GetId(), created.GetObject().GetResourceVersion()
+	update := func(rv string) error {
+		_, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{
+			Object:     &aigridv1.Tenant{Id: id, ResourceVersion: rv, IdentityProvider: &aigridv1.IdentityProvider{}},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathIdentityProvider}},
+		})
+		return err
+	}
+	if err := update(version + "9"); status.Code(err) != codes.Aborted {
+		t.Errorf("stale and invalid identity provider: %v, want Aborted", err)
+	}
+	err = update(version)
+	if status.Code(err) != codes.InvalidArgument || len(fieldViolations(err)) == 0 {
+		t.Errorf("current version, invalid identity provider: %v, want InvalidArgument with field violations", err)
+	}
+}
+
+// TestPatchWithoutIdentityProviderKeepsIt: a patch of other fields, or an
+// update without a mask, leaves the identity provider alone.
+func TestPatchWithoutIdentityProviderKeepsIt(t *testing.T) {
+	ctx := authed(context.Background())
+	acme := seedOrgs()[1]
+	acme.IdentityProvider = validIdP()
+	s := tenantServer(t, acme)
+	for _, m := range []*fieldmaskpb.FieldMask{{Paths: []string{PathDomains}}, nil} {
+		resp, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{Object: &aigridv1.Tenant{Id: idAcme, Name: "acme-robotics", Domains: []string{"acme.example.com"}}, UpdateMask: m})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !proto.Equal(resp.GetObject().GetIdentityProvider(), validIdP()) {
+			t.Errorf("mask %v: identity provider = %v", m.GetPaths(), resp.GetObject().GetIdentityProvider())
+		}
+	}
+}
+
+// TestIdentityProviderIsValidatedAndTrimmed: the PoC's identity-provider
+// rules (shared/tenant-validation.mjs identityProviderSchema at 62319b8), its
+// messages as BadRequest field violations under identityProvider.*, and the
+// values trimmed as zod's .trim() outputs them.
+func TestIdentityProviderIsValidatedAndTrimmed(t *testing.T) {
+	ctx := authed(context.Background())
+	create := func(idp *aigridv1.IdentityProvider) (*aigridv1.Tenant, error) {
+		s := tenantServer(t)
+		resp, err := s.CreateTenant(ctx, &aigridv1.CreateTenantRequest{Object: &aigridv1.Tenant{Name: "wayne-aerospace", IdentityProvider: idp}})
+		return resp.GetObject(), err
+	}
+	with := func(edit func(*aigridv1.IdentityProvider)) *aigridv1.IdentityProvider {
+		idp := validIdP()
+		edit(idp)
+		return idp
+	}
+	for name, tc := range map[string]struct {
+		idp  *aigridv1.IdentityProvider
+		want map[string]string
+	}{
+		"missing client ID": {with(func(p *aigridv1.IdentityProvider) { p.Config.ClientId = "  " }),
+			map[string]string{"identityProvider.config.clientId": "Client ID is required."}},
+		"ftp issuer": {with(func(p *aigridv1.IdentityProvider) { p.Config.Issuer = "ftp://sso.example.com" }),
+			map[string]string{"identityProvider.config.issuer": "Use HTTP or HTTPS."}},
+		"issuer that is not a URL": {with(func(p *aigridv1.IdentityProvider) { p.Config.Issuer = "sso.example.com" }),
+			map[string]string{"identityProvider.config.issuer": "Use HTTP or HTTPS."}},
+		"URL without a host": {with(func(p *aigridv1.IdentityProvider) { p.Config.AuthorizationUrl = "https://" }),
+			map[string]string{"identityProvider.config.authorizationUrl": "Enter a valid HTTP or HTTPS URL."}},
+		"empty token URL": {with(func(p *aigridv1.IdentityProvider) { p.Config.TokenUrl = "" }),
+			map[string]string{"identityProvider.config.tokenUrl": "Use HTTP or HTTPS."}},
+		"blank optional URL": {with(func(p *aigridv1.IdentityProvider) { p.Config.LogoutUrl = "   " }),
+			map[string]string{"identityProvider.config.logoutUrl": "Use HTTP or HTTPS."}},
+		"invalid secret reference name": {with(func(p *aigridv1.IdentityProvider) { p.Config.ClientSecretSecretName = "Acme_Secret" }),
+			map[string]string{"identityProvider.config.clientSecretSecret.name": "Enter a valid secret reference name."}},
+		"empty secret reference": {with(func(p *aigridv1.IdentityProvider) { p.Config.ClientSecretSecretName = "" }),
+			map[string]string{"identityProvider.config.clientSecretSecret.name": "Enter a valid secret reference name."}},
+		"disabled identity provider": {with(func(p *aigridv1.IdentityProvider) { p.Enabled = proto.Bool(false) }),
+			map[string]string{"identityProvider.enabled": "Invalid literal value, expected true"}},
+		"long title and description": {with(func(p *aigridv1.IdentityProvider) {
+			p.Title, p.Description = strings.Repeat("t", 254), strings.Repeat("d", 4001)
+		}), map[string]string{
+			"identityProvider.title":       "String must contain at most 253 character(s)",
+			"identityProvider.description": "String must contain at most 4000 character(s)",
+		}},
+		"long scopes": {with(func(p *aigridv1.IdentityProvider) { p.Config.DefaultScopes = strings.Repeat("s", 2049) }),
+			map[string]string{"identityProvider.config.defaultScopes": "String must contain at most 2048 character(s)"}},
+		"no config": {with(func(p *aigridv1.IdentityProvider) { p.Config = nil }),
+			map[string]string{"identityProvider.config": "Required"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := create(tc.idp)
+			mustCode(t, err, codes.InvalidArgument, "")
+			if got := fieldViolations(err); !maps.Equal(got, tc.want) {
+				t.Errorf("violations = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	t.Run("trimmed and defaulted", func(t *testing.T) {
+		got, err := create(&aigridv1.IdentityProvider{
+			Title: "  Acme SSO  ", Description: "  kept as typed  ",
+			Config: &aigridv1.OidcConfig{
+				ClientId: " ai-grid ", ClientSecretSecretName: " acme-oidc-client ",
+				Issuer: " https://sso.example.com ", AuthorizationUrl: "https://sso.example.com/auth\n", TokenUrl: "\thttps://sso.example.com/token",
+				DefaultScopes: " openid ", UserInfoUrl: " https://sso.example.com/userinfo ",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := &aigridv1.IdentityProvider{
+			Title: "Acme SSO", Description: "  kept as typed  ", Enabled: proto.Bool(true),
+			Config: &aigridv1.OidcConfig{
+				ClientId: "ai-grid", ClientSecretSecretName: "acme-oidc-client",
+				Issuer: "https://sso.example.com", AuthorizationUrl: "https://sso.example.com/auth", TokenUrl: "https://sso.example.com/token",
+				DefaultScopes: "openid", UserInfoUrl: "https://sso.example.com/userinfo", ValidateSignature: proto.Bool(true),
+			},
+		}
+		if !proto.Equal(got.GetIdentityProvider(), want) {
+			t.Errorf("stored = %v, want %v", got.GetIdentityProvider(), want)
+		}
+	})
+
+	t.Run("update is checked too", func(t *testing.T) {
+		s := tenantServer(t)
+		_, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{
+			Object:     &aigridv1.Tenant{Id: idAcme, IdentityProvider: with(func(p *aigridv1.IdentityProvider) { p.Config.ClientId = "" })},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathIdentityProvider}},
+		})
+		if fieldViolations(err)["identityProvider.config.clientId"] != "Client ID is required." {
+			t.Errorf("update = %v", err)
+		}
+	})
+}
+
+// TestTwoTabsOnAnUnversionedOrganization: an organization stored without a
+// version (initech-labs in the shipped fixtures has no resourceVersion, as an
+// organization the backend never wrote) still gets one, "1", so two tabs that
+// read it at once can't overwrite each other: the first save wins, the second
+// is Aborted (the BFF's 409) and changes nothing, and so is a delete with the
+// version the second tab read.
+func TestTwoTabsOnAnUnversionedOrganization(t *testing.T) {
+	s := newRepoServer(t)
+	ctx := authed(context.Background())
+	const idInitech = "c5a4d3e2-f1b0-4987-a6c5-d4e3f2a1b0c9"
+	read := func() *aigridv1.Tenant {
+		t.Helper()
+		resp, err := s.GetTenant(ctx, &aigridv1.GetTenantRequest{Id: idInitech})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resp.GetObject()
+	}
+	tabA, tabB := read(), read()
+	if tabA.GetName() != "initech-labs" || tabA.GetResourceVersion() != "1" || tabB.GetResourceVersion() != "1" {
+		t.Fatalf("an unversioned organization reads %q (%s), want version 1", tabA.GetResourceVersion(), tabA.GetName())
+	}
+	save := func(tab *aigridv1.Tenant, domain string) error {
+		_, err := s.UpdateTenant(ctx, &aigridv1.UpdateTenantRequest{
+			Object:     &aigridv1.Tenant{Id: idInitech, Domains: []string{domain}, ResourceVersion: tab.GetResourceVersion()},
+			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{PathDomains}},
+		})
+		return err
+	}
+	if err := save(tabA, "initech-a.example.com"); err != nil {
+		t.Fatalf("first tab: %v", err)
+	}
+	err := save(tabB, "initech-b.example.com")
+	mustCode(t, err, codes.Aborted, "object with identifier '"+idInitech+"' has resource version 2, the request carries \"1\"; fetch it again and retry")
+	if cur := read(); cur.GetResourceVersion() != "2" || len(cur.GetDomains()) != 1 || cur.GetDomains()[0] != "initech-a.example.com" {
+		t.Fatalf("the second tab's stale save landed: %v", cur)
+	}
+	_, err = s.DeleteTenant(ctx, &aigridv1.DeleteTenantRequest{Id: idInitech, ResourceVersion: tabB.GetResourceVersion()})
+	mustCode(t, err, codes.Aborted, "")
+	read()
 }

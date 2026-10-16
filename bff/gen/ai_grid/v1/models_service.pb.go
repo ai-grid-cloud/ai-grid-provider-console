@@ -599,6 +599,89 @@ func (*DeleteModelResponse) Descriptor() ([]byte, []int) {
 	return file_ai_grid_v1_models_service_proto_rawDescGZIP(), []int{9}
 }
 
+// Request of ListLocations (P7). Empty.
+type ListLocationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLocationsRequest) Reset() {
+	*x = ListLocationsRequest{}
+	mi := &file_ai_grid_v1_models_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLocationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLocationsRequest) ProtoMessage() {}
+
+func (x *ListLocationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_models_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLocationsRequest.ProtoReflect.Descriptor instead.
+func (*ListLocationsRequest) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_models_service_proto_rawDescGZIP(), []int{10}
+}
+
+// Response of ListLocations (P7).
+type ListLocationsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Location label values, unique and sorted.
+	Locations     []string `protobuf:"bytes,1,rep,name=locations,proto3" json:"locations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLocationsResponse) Reset() {
+	*x = ListLocationsResponse{}
+	mi := &file_ai_grid_v1_models_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLocationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLocationsResponse) ProtoMessage() {}
+
+func (x *ListLocationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_models_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLocationsResponse.ProtoReflect.Descriptor instead.
+func (*ListLocationsResponse) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_models_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListLocationsResponse) GetLocations() []string {
+	if x != nil {
+		return x.Locations
+	}
+	return nil
+}
+
 var File_ai_grid_v1_models_service_proto protoreflect.FileDescriptor
 
 const file_ai_grid_v1_models_service_proto_rawDesc = "" +
@@ -639,14 +722,18 @@ const file_ai_grid_v1_models_service_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
 	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12)\n" +
 	"\x10resource_version\x18\x03 \x01(\tR\x0fresourceVersion\"\x15\n" +
-	"\x13DeleteModelResponse2\x8c\x03\n" +
+	"\x13DeleteModelResponse\"\x16\n" +
+	"\x14ListLocationsRequest\"5\n" +
+	"\x15ListLocationsResponse\x12\x1c\n" +
+	"\tlocations\x18\x01 \x03(\tR\tlocations2\xe2\x03\n" +
 	"\x06Models\x12K\n" +
 	"\n" +
 	"ListModels\x12\x1d.ai_grid.v1.ListModelsRequest\x1a\x1e.ai_grid.v1.ListModelsResponse\x12E\n" +
 	"\bGetModel\x12\x1b.ai_grid.v1.GetModelRequest\x1a\x1c.ai_grid.v1.GetModelResponse\x12N\n" +
 	"\vCreateModel\x12\x1e.ai_grid.v1.CreateModelRequest\x1a\x1f.ai_grid.v1.CreateModelResponse\x12N\n" +
 	"\vUpdateModel\x12\x1e.ai_grid.v1.UpdateModelRequest\x1a\x1f.ai_grid.v1.UpdateModelResponse\x12N\n" +
-	"\vDeleteModel\x12\x1e.ai_grid.v1.DeleteModelRequest\x1a\x1f.ai_grid.v1.DeleteModelResponseBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
+	"\vDeleteModel\x12\x1e.ai_grid.v1.DeleteModelRequest\x1a\x1f.ai_grid.v1.DeleteModelResponse\x12T\n" +
+	"\rListLocations\x12 .ai_grid.v1.ListLocationsRequest\x1a!.ai_grid.v1.ListLocationsResponseBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
 
 var (
 	file_ai_grid_v1_models_service_proto_rawDescOnce sync.Once
@@ -660,7 +747,7 @@ func file_ai_grid_v1_models_service_proto_rawDescGZIP() []byte {
 	return file_ai_grid_v1_models_service_proto_rawDescData
 }
 
-var file_ai_grid_v1_models_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_ai_grid_v1_models_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_ai_grid_v1_models_service_proto_goTypes = []any{
 	(*ListModelsRequest)(nil),     // 0: ai_grid.v1.ListModelsRequest
 	(*ListModelsResponse)(nil),    // 1: ai_grid.v1.ListModelsResponse
@@ -672,29 +759,33 @@ var file_ai_grid_v1_models_service_proto_goTypes = []any{
 	(*UpdateModelResponse)(nil),   // 7: ai_grid.v1.UpdateModelResponse
 	(*DeleteModelRequest)(nil),    // 8: ai_grid.v1.DeleteModelRequest
 	(*DeleteModelResponse)(nil),   // 9: ai_grid.v1.DeleteModelResponse
-	(*Model)(nil),                 // 10: ai_grid.v1.Model
-	(*fieldmaskpb.FieldMask)(nil), // 11: google.protobuf.FieldMask
+	(*ListLocationsRequest)(nil),  // 10: ai_grid.v1.ListLocationsRequest
+	(*ListLocationsResponse)(nil), // 11: ai_grid.v1.ListLocationsResponse
+	(*Model)(nil),                 // 12: ai_grid.v1.Model
+	(*fieldmaskpb.FieldMask)(nil), // 13: google.protobuf.FieldMask
 }
 var file_ai_grid_v1_models_service_proto_depIdxs = []int32{
-	10, // 0: ai_grid.v1.ListModelsResponse.items:type_name -> ai_grid.v1.Model
-	10, // 1: ai_grid.v1.GetModelResponse.object:type_name -> ai_grid.v1.Model
-	10, // 2: ai_grid.v1.CreateModelRequest.object:type_name -> ai_grid.v1.Model
-	10, // 3: ai_grid.v1.CreateModelResponse.object:type_name -> ai_grid.v1.Model
-	10, // 4: ai_grid.v1.UpdateModelRequest.object:type_name -> ai_grid.v1.Model
-	11, // 5: ai_grid.v1.UpdateModelRequest.update_mask:type_name -> google.protobuf.FieldMask
-	10, // 6: ai_grid.v1.UpdateModelResponse.object:type_name -> ai_grid.v1.Model
+	12, // 0: ai_grid.v1.ListModelsResponse.items:type_name -> ai_grid.v1.Model
+	12, // 1: ai_grid.v1.GetModelResponse.object:type_name -> ai_grid.v1.Model
+	12, // 2: ai_grid.v1.CreateModelRequest.object:type_name -> ai_grid.v1.Model
+	12, // 3: ai_grid.v1.CreateModelResponse.object:type_name -> ai_grid.v1.Model
+	12, // 4: ai_grid.v1.UpdateModelRequest.object:type_name -> ai_grid.v1.Model
+	13, // 5: ai_grid.v1.UpdateModelRequest.update_mask:type_name -> google.protobuf.FieldMask
+	12, // 6: ai_grid.v1.UpdateModelResponse.object:type_name -> ai_grid.v1.Model
 	0,  // 7: ai_grid.v1.Models.ListModels:input_type -> ai_grid.v1.ListModelsRequest
 	2,  // 8: ai_grid.v1.Models.GetModel:input_type -> ai_grid.v1.GetModelRequest
 	4,  // 9: ai_grid.v1.Models.CreateModel:input_type -> ai_grid.v1.CreateModelRequest
 	6,  // 10: ai_grid.v1.Models.UpdateModel:input_type -> ai_grid.v1.UpdateModelRequest
 	8,  // 11: ai_grid.v1.Models.DeleteModel:input_type -> ai_grid.v1.DeleteModelRequest
-	1,  // 12: ai_grid.v1.Models.ListModels:output_type -> ai_grid.v1.ListModelsResponse
-	3,  // 13: ai_grid.v1.Models.GetModel:output_type -> ai_grid.v1.GetModelResponse
-	5,  // 14: ai_grid.v1.Models.CreateModel:output_type -> ai_grid.v1.CreateModelResponse
-	7,  // 15: ai_grid.v1.Models.UpdateModel:output_type -> ai_grid.v1.UpdateModelResponse
-	9,  // 16: ai_grid.v1.Models.DeleteModel:output_type -> ai_grid.v1.DeleteModelResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
+	10, // 12: ai_grid.v1.Models.ListLocations:input_type -> ai_grid.v1.ListLocationsRequest
+	1,  // 13: ai_grid.v1.Models.ListModels:output_type -> ai_grid.v1.ListModelsResponse
+	3,  // 14: ai_grid.v1.Models.GetModel:output_type -> ai_grid.v1.GetModelResponse
+	5,  // 15: ai_grid.v1.Models.CreateModel:output_type -> ai_grid.v1.CreateModelResponse
+	7,  // 16: ai_grid.v1.Models.UpdateModel:output_type -> ai_grid.v1.UpdateModelResponse
+	9,  // 17: ai_grid.v1.Models.DeleteModel:output_type -> ai_grid.v1.DeleteModelResponse
+	11, // 18: ai_grid.v1.Models.ListLocations:output_type -> ai_grid.v1.ListLocationsResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -714,7 +805,7 @@ func file_ai_grid_v1_models_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_grid_v1_models_service_proto_rawDesc), len(file_ai_grid_v1_models_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -1,0 +1,15 @@
+AI Grid provider console
+
+Screens, behavior, and validation rules are ported from krisv/ai-grid-cloud-provider-poc
+at 62319b8, licensed under the Apache License, Version 2.0. That project includes code
+adapted from:
+
+- Open Data Hub Dashboard, https://github.com/opendatahub-io/odh-dashboard,
+  commit 8051fbbea117457b4da4074fb2856b732e6677a4, Apache License 2.0.
+- OSAC, https://github.com/osac-project/osac,
+  commit 8cb0a227e45cc9b17421b6e79ce493ed370ebd5d, Apache License 2.0.
+
+The AI Grid map and monitoring layouts in frontend/src/pages/grid are adapted, through
+the PoC, from an internal "ai-grid-prototype"; its license is unconfirmed.
+
+Per-file provenance is recorded in source comments.

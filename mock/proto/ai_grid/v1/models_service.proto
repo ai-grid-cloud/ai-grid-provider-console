@@ -62,6 +62,12 @@ service Models {
   // references the model; Aborted when `resource_version` is set and is not
   // the stored version.
   rpc DeleteModel(DeleteModelRequest) returns (DeleteModelResponse);
+  // Proposal for the ai-grid-backend owners; implemented in the fake (P7).
+  // The locations a model can be placed on: the `location` labels of the
+  // ManagedClusters that are AI Grid members (`ai-grid/enabled` and
+  // `ai-grid/provisioned` "true") and Available, unique and sorted, read from
+  // the hub as ListManagedClusters reads it (the PoC's eligibleLocations).
+  rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse);
 }
 
 // Request of ListModels. Every field is optional.
@@ -164,3 +170,12 @@ message DeleteModelRequest {
 
 // Response of DeleteModel. Empty.
 message DeleteModelResponse {}
+
+// Request of ListLocations (P7). Empty.
+message ListLocationsRequest {}
+
+// Response of ListLocations (P7).
+message ListLocationsResponse {
+  // Location label values, unique and sorted.
+  repeated string locations = 1;
+}

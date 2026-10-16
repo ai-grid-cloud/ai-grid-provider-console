@@ -7,10 +7,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/fakebackend/celfilter"
@@ -33,10 +35,21 @@ import (
 // InvalidArgument.
 const TenantVersionAttribute = "ai-grid/resource-version"
 
-// checkReservedAttributes refuses the attribute the backend owns.
+// TenantCreateTimeAttribute is the organization attribute the backend keeps
+// a tenant's creation time in (proposal P3), in RFC 3339: Keycloak keeps
+// none, so the backend stamps it on create and maps it to
+// `Tenant.create_time` instead of `attributes`. Like the version, the fake
+// keeps the value in the stored Tenant's `create_time`, and a request that
+// sets the attribute is InvalidArgument.
+const TenantCreateTimeAttribute = "ai-grid/create-time"
+
+// checkReservedAttributes refuses the attributes the backend owns.
 func checkReservedAttributes(attrs map[string]string) error {
 	if _, ok := attrs[TenantVersionAttribute]; ok {
 		return status.Errorf(codes.InvalidArgument, "attribute %q is reserved for the tenant's version; it cannot be set", TenantVersionAttribute)
+	}
+	if _, ok := attrs[TenantCreateTimeAttribute]; ok {
+		return status.Errorf(codes.InvalidArgument, "attribute %q is reserved for the tenant's creation time; it cannot be set", TenantCreateTimeAttribute)
 	}
 	return nil
 }
@@ -220,6 +233,16 @@ func (s *Server) CreateTenant(ctx context.Context, req *aigridv1.CreateTenantReq
 	if err := checkReservedAttributes(obj.GetAttributes()); err != nil {
 		return nil, err
 	}
+	// The identity provider (P1) is the console's rule, checked before
+	// Keycloak is called; an organization may have none.
+	var idp *aigridv1.IdentityProvider
+	if obj.GetIdentityProvider() != nil {
+		var fields map[string]string
+		idp, fields = checkIdentityProvider(obj.GetIdentityProvider())
+		if err := identityProviderError(fields); err != nil {
+			return nil, err
+		}
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -238,6 +261,7 @@ func (s *Server) CreateTenant(ctx context.Context, req *aigridv1.CreateTenantReq
 		return nil, status.Error(codes.InvalidArgument, MsgNameRequired)
 	}
 	t := cloneTenant(obj)
+	t.IdentityProvider = idp
 	if javaIsBlank(t.GetAlias()) { // JpaOrganizationProvider.java L107-113
 		t.Alias = t.GetName()
 		if err := validateAlias(t.GetAlias()); err != nil {
@@ -269,6 +293,7 @@ func (s *Server) CreateTenant(ctx context.Context, req *aigridv1.CreateTenantReq
 	if t.Attributes == nil {
 		t.Attributes = map[string]string{}
 	}
+	t.CreateTime = timestamppb.New(s.clock().UTC().Truncate(time.Second)) // output only; stamped here
 	t.Id = s.newID()
 	t.ResourceVersion = "" // output only; the first write makes it 1
 	bumpTenantVersion(t)
@@ -357,7 +382,6 @@ func (s *Server) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantReq
 		}
 	}
 	has := func(p string) bool { return len(paths) == 0 || slices.Contains(paths, p) }
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.beginTenants(); err != nil {
@@ -371,6 +395,17 @@ func (s *Server) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantReq
 	// checks: a stale version is Aborted whatever else the request says.
 	if err := checkTenantVersion(cur, obj.GetResourceVersion()); err != nil {
 		return nil, err
+	}
+	// The identity provider (P1) moves only when its path is in the mask,
+	// and must then come with a value that passes the console's rules. The
+	// check is the console's own, so it runs after the version precondition.
+	var idp *aigridv1.IdentityProvider
+	if slices.Contains(paths, PathIdentityProvider) {
+		var fields map[string]string
+		idp, fields = checkIdentityProvider(obj.GetIdentityProvider())
+		if err := identityProviderError(fields); err != nil {
+			return nil, err
+		}
 	}
 	next := cloneTenant(cur)
 	if has(PathName) {
@@ -436,6 +471,9 @@ func (s *Server) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantReq
 				next.DomainDetails = append(next.DomainDetails, &aigridv1.TenantDomain{Name: name})
 			}
 		}
+	}
+	if idp != nil {
+		next.IdentityProvider = idp
 	}
 	if err := normalizeDomains(next); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -519,11 +557,21 @@ func (s *Server) seedTenant(t *aigridv1.Tenant) error {
 	if _, ok := t.GetAttributes()[TenantVersionAttribute]; ok {
 		return fmt.Errorf("fixture tenant %q: attribute %q is the backend's version; set resourceVersion instead", t.GetName(), TenantVersionAttribute)
 	}
+	if _, ok := t.GetAttributes()[TenantCreateTimeAttribute]; ok {
+		return fmt.Errorf("fixture tenant %q: attribute %q is the backend's creation time; set createTime instead", t.GetName(), TenantCreateTimeAttribute)
+	}
 	switch n, err := strconv.ParseInt(t.GetResourceVersion(), 10, 64); {
 	case t.GetResourceVersion() == "":
 		t.ResourceVersion = "1" // the backend wrote the attribute when it created the organization
 	case err != nil || n < 1:
 		return fmt.Errorf("fixture tenant %q: resourceVersion %q is not a positive integer", t.GetName(), t.GetResourceVersion())
+	}
+	if t.GetIdentityProvider() != nil {
+		idp, fields := checkIdentityProvider(t.GetIdentityProvider())
+		if len(fields) > 0 {
+			return fmt.Errorf("fixture tenant %q: identity provider: %s", t.GetName(), joinMessages(fields))
+		}
+		t.IdentityProvider = idp
 	}
 	if t.Attributes == nil {
 		t.Attributes = map[string]string{}

@@ -88,6 +88,15 @@ the masthead:
 | `AUTH_TOKEN=viewer-token AUTH_USER=viewer make dev-fake` | A signed-in user who isn't a provider admin |
 | `AUTH_TOKEN=expired-token AUTH_USER=expired make dev-fake` | A rejected token: `/api/v1/user` returns `401` |
 
+To compare the console with the PoC screen by screen, run `make dev-fake-poc`. It
+starts the same stack on `fixtures-poc/` instead of `fixtures/`: the PoC's four sites
+(`site1` San Francisco, `site2` New York, `site3` Brussels and the unenrolled `site4` Sydney),
+its three models, three organizations and three subscriptions, with no scenario events, so
+nothing changes over time. Organizations that a fixture lists without a version are loaded at
+version "1" (PR 12's loader), so a stale save is refused on every seeded organization.
+`fixtures-poc/README.md` lists the files. The browser tests run on
+this preset.
+
 To run the pieces separately, use `make dev-fake-backend`, `make dev-bff-fake` and
 `make dev-frontend-fake`. `bff/cmd/fake-backend` reads `mock/fixtures` and serves:
 
@@ -262,6 +271,40 @@ accepted, flips to `Active` once they all are, and optionally creates its `<name
 policy with the same description annotation the hub uses. Whether the console creates the auth
 policy together with the subscription or leaves it to be managed separately is a product
 decision the research does not settle, so the fake should make the pairing a mode switch.
+
+The port implements this area from the research (`research/models-maas.md` 3.4 to 3.6, 8.1
+and 8.2), not from the PoC, whose `Saved` phase does not exist on the hub. What the fake does:
+
+- **Subscription lifecycle.** No phase is stored; it is derived on every read from the
+  scenario clock (`speed` in `settings.json` scales it). The controller never writes a
+  `Pending` phase: `status.phase` has no default, so a new subscription has none until its
+  first reconcile, which maas-api treats as unreconciled. After that it is `Degraded`
+  (`Ready=False`, `PartialFailure`, "1 of 1 TokenRateLimitPolicies not accepted"; the count
+  is the number of models with limits) only while its generated `TokenRateLimitPolicy` is not
+  `Accepted`, and then `Active`. Nothing checks that the policy is enforced, so an accepted
+  policy reads `Active`. The console shows `Active` as "Ready", as odh-dashboard does. A subscription whose models are all
+  missing is `Failed`, and one with some missing is `Degraded` with "N of M model references
+  are invalid or unavailable". A reference to an unlimited model creates no policy, so only
+  limited references count. One timer runs from create; an update does not restart it. A fixture
+  subscription without `createTime` plays the same lifecycle from the fake's start, and one
+  with a past `createTime` reads as settled. The fake never derives `Invalid`, and it models
+  only the `Ready` condition.
+- **Auth policies and registrations.** A managed policy (`<name>-policy`) goes `Pending`, then
+  `Active`. Every model counts as registered through a `MaaSModelRef` of the same name, whose
+  status is returned with a subscription: `Pending` until a subscription and an auth policy
+  both name it, `Ready` when its model is ready and `Unhealthy` when the model has failed.
+- **CRD messages, unverified.** The token rate limit rules (the window pattern
+  `^[1-9]\d{0,3}(s|m|h)$`, so `1d` is refused, and the limit range) use the wording of the
+  Kubernetes schema validator, because the research gives none. The two CEL messages
+  ("tokenRateLimits is required unless unlimited is true" and "tokenRateLimits must not be set
+  when unlimited is true") are the CRD's. **The window and limit messages are unverified
+  against a hub**: check them with a server-side dry run once one is at hand.
+- **Models are undeletable while referenced.** `DeleteModel` is `FailedPrecondition` while a
+  subscription or an auth policy references the model, including the fixtures' unmanaged
+  policies, which are never deleted with a subscription. The message names each referrer, for
+  example "auth policy engineering-policy, subscription engineering". A policy's bare model
+  names, and a reference without a namespace, count as the console's models namespace.
+
 Frontend: subscriptions table keyed on phase, create and edit with per-model quotas,
 tenant linkage through `tokenMetadata.organizationId`, a visible consistency check between a
 subscription's owners and the auth policies that cover its models.

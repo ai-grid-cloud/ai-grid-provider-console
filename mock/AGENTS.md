@@ -41,7 +41,9 @@ curl -s -H 'x-forwarded-access-token: dev-token' -H 'x-forwarded-user: dev-user'
   http://127.0.0.1:8080/api/v1/clusters
 ```
 
-Run the pieces separately with `make dev-fake-backend`, `make dev-bff-fake` and
+`make dev-fake-poc` is the same stack on the PoC preset `fixtures-poc/` (the PoC's four sites, three
+models, three organizations and three subscriptions, no scenario events), for comparing screens with
+the PoC; the browser tests use it. Run the pieces separately with `make dev-fake-backend`, `make dev-bff-fake` and
 `make dev-frontend-fake`.
 
 The fake backend (`bff/cmd/fake-backend`) serves the backend's gRPC services from
@@ -68,14 +70,14 @@ adds `"meta": {"size", "total", "offset", "limit"}` (`limit` only when the reque
 | Method | Path | Request body | Response `data` |
 |---|---|---|---|
 | GET | `/api/v1/user` | | `{username, email?, groups, isProviderAdmin}` |
-| GET | `/api/v1/config` | | `{gridEndpoint, mapTileUrl, billingUrl, version}` |
+| GET | `/api/v1/config` | | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, modelsNamespace, fakeBackend}` |
 | GET | `/api/v1/clusters` | | `GridCluster[]` by name |
 | GET | `/api/v1/clusters/{name}` | | `GridCluster`, `ETag` |
 | PATCH | `/api/v1/clusters/{name}` | `{labels?, annotations?}` (whole maps; only `ai-grid/*` keys and the `location` label may change) | `GridCluster` after the write, `ETag` |
 | GET | `/api/v1/tenants?offset=&limit=&filter=` | | `Tenant[]` by name, plus `meta` |
 | GET | `/api/v1/tenants/{id}` | | `Tenant`, `ETag` |
-| POST | `/api/v1/tenants` | `{name, alias?, description?, enabled?, domains?, attributes?}` | 201, `Tenant`, `Location` and `ETag` headers |
-| PATCH | `/api/v1/tenants/{id}` | `{name?, description?, enabled?, domains?, attributes?, alias?}` (the backend refuses a changed alias) | `Tenant` after the write, `ETag` |
+| POST | `/api/v1/tenants` | `{name, alias?, description?, enabled?, domains?, attributes?, identityProvider?}` | 201, `Tenant`, `Location` and `ETag` headers |
+| PATCH | `/api/v1/tenants/{id}` | `{name?, description?, enabled?, domains?, attributes?, identityProvider?, alias?}` (the backend refuses a changed alias) | `Tenant` after the write, `ETag` |
 | DELETE | `/api/v1/tenants/{id}` | | 204 |
 | GET | `/api/v1/models?offset=&limit=&filter=` | | `Model[]` by namespace and name, plus `meta` |
 | GET | `/api/v1/models/{namespace}/{name}` | | `Model`, `ETag` |
@@ -83,9 +85,16 @@ adds `"meta": {"size", "total", "offset", "limit"}` (`limit` only when the reque
 | PATCH | `/api/v1/models/{namespace}/{name}` | `{replicas?, runtimeImage?, env?, placement? (null removes it), rollout?, labels?, annotations?}` (whole maps) | `Model` after the write, `ETag` |
 | DELETE | `/api/v1/models/{namespace}/{name}` | | 204 |
 | GET | `/api/v1/capabilities` | | `{manifestWorkReplicaSetEnabled, observabilityInstalled, acmVersion}` |
+| GET | `/api/v1/locations` | | `string[]`: the `location` labels of the provisioned, Available AI Grid members, sorted |
+| GET | `/api/v1/subscriptions` | | `Subscription[]` by name |
+| GET | `/api/v1/subscriptions/{name}` | | `{subscription, modelRefs, authPolicies, meteringMetadata?, modelRegistrations}` |
+| POST | `/api/v1/subscriptions` | `{name, displayName?, description?, priority, owner, modelRefs, tokenMetadata?, inferencePriority?, guardrails?, createAuthPolicy?}` | 201, `{subscription, authPolicy?}`, `Location` header |
+| PUT | `/api/v1/subscriptions/{name}` | the POST body without `name` and `createAuthPolicy` | `{subscription}` after the write |
+| DELETE | `/api/v1/subscriptions/{name}` | | 204 |
+| GET | `/api/v1/grid/overview?range=&site=&metrics=false` | | `{clusters, metrics, metricsSource?, inventorySource?, demo, updatedAt?}` |
 
 Request bodies must be sent with `Content-Type: application/json` (charset allowed), or the
-POST or PATCH is 415 `request body must be JSON: send Content-Type: application/json`. They
+POST, PUT or PATCH is 415 `request body must be JSON: send Content-Type: application/json`. They
 are exactly one JSON object of at most 1 MiB: `null`, an array or a scalar is 422 (`invalid
 request body: must be a JSON object`), so are unknown fields, wrong types and anything after
 the object, and a larger body is 413. The BFF checks the body before it calls the hub or the
@@ -118,13 +127,13 @@ before any call. The fake decides what an update changes: one that leaves the ob
 `resourceVersion`, like the API server.
 
 Stale tabs (`ETag`, `If-Match`). `GET` of one cluster, tenant or model and the answer to its
-POST or PATCH carry `ETag: "<resourceVersion>"`. Every PATCH and DELETE must send it back as
-`If-Match`: a write against an object that changed since is 409 (the backend's `Aborted`)
-instead of overwriting it, and a PATCH or DELETE without `If-Match` (or with `If-Match: *`,
-which names no version) is 428 before anything is called. The BFF checks a write in this
-order: 415 for a body that is not JSON, 428, then the body (422, 413). Anything but one quoted
-tag is 422. A tenant's `resourceVersion` is kept by the backend (Keycloak has none); every
-tenant starts at `"1"` in the fixtures. Details in `bff-api.md`, "Writes, versions and lists".
+POST or PATCH carry `ETag: "<resourceVersion>"`; a subscription carries it as `resourceVersion` in
+its JSON. Every PATCH, PUT and DELETE must send it back as `If-Match`: a write against an object
+that changed since is 409 (the backend's `Aborted`) instead of overwriting it, and a PATCH, PUT
+or DELETE without `If-Match` (or with `If-Match: *`, which names no version) is 428 before
+anything is called. The BFF checks a write in this order: 415 for a body that is not JSON, 428,
+then the body (422, 413). Anything but one quoted tag is 422. A tenant's `resourceVersion` is
+kept by the backend (Keycloak has none); every tenant starts at `"1"` in the fixtures. Details in `bff-api.md`, "Writes, versions and lists".
 
 ## Golden responses (`examples/`)
 
@@ -274,8 +283,8 @@ is in the gRPC status only).
 | 409 | a taken tenant name or alias, or model name; a blank `name` in a tenant PATCH (Keycloak's own answer); an `If-Match` older than the object (also for an update that would change nothing) | `A organization with the same name already exists.`, `... same alias already exists`, the API server's `... already exists` for a model, `object with identifier '<id>' has resource version <v>, the request carries "<v>"; fetch it again and retry` |
 | 412 | `manifestWorkReplicaSetEnabled: false` in `settings.json`, then a model with `placement` (a POST, or a PATCH that adds one); `{"realmMissing": true}` or `{"organizationsDisabled": true}` in `tenants.json` | `ManifestWorkReplicaSet feature gate disabled on hub`; `Keycloak realm "ai-grid": Realm not found.`, `Keycloak realm "ai-grid": Organizations not enabled for this realm.` |
 | 413 | a body over 1 MiB | `request body must not exceed 1048576 bytes` |
-| 415 | a POST or PATCH without `Content-Type: application/json` (an HTML form, `text/plain`) | `request body must be JSON: send Content-Type: application/json` |
-| 428 | a PATCH or DELETE without `If-Match`, or with `If-Match: *` | `this write needs an If-Match header: send the ETag that GET answered (the object's resourceVersion), for example If-Match: "42"`, `If-Match: * names no version: ...`: send the `ETag` of the GET the page showed |
+| 415 | a POST, PUT or PATCH without `Content-Type: application/json` (an HTML form, `text/plain`) | `request body must be JSON: send Content-Type: application/json` |
+| 428 | a PATCH, PUT or DELETE without `If-Match`, or with `If-Match: *` | `this write needs an If-Match header: send the ETag that GET answered (the object's resourceVersion), for example If-Match: "42"`, `If-Match: * names no version: ...`: send the `ETag` of the GET the page showed |
 | 422 | a body the BFF rejects (unknown field, such as the removed `aiGridEnabled` or `hubAcceptsClient` or a model's `displayName`, wrong type, trailing content) or that names no field (`the request body names no field to change`), a cluster PATCH that changes a label or annotation outside the console's keys (`label "cluster.open-cluster-management.io/clusterset" cannot be changed through the console; only ai-grid/* labels and annotations and the location label can`), a repeated `filter`, an `ai-grid/latitude` or `ai-grid/longitude` annotation that is not a number in range (`annotation "ai-grid/latitude" must be a number between -90 and 90, got "91"`), a malformed `If-Match`, a list query with the removed `search`, `namespace` or `label`, a `filter` the backend cannot evaluate (`GET /api/v1/models?filter=this.metadata.labels[%22x%22]==%22y%22`: no model has `x`, and the index is not guarded), or a value the backend rejects | `query parameter "search" is not supported; send a CEL filter in "filter"`, `filter <f> is not a valid CEL expression: ...`, `filter <f> failed on '<id>': no such key: <k>`, Keycloak's texts (`Name can not be null`, `Invalid domain format: <d>`, `Cannot change the alias`, `Domain <d> is already linked to organization <o> in realm ai-grid`), the CRD's (`replicas and scaling are mutually exclusive; ...`) and the console's own checks (`spec.rollout requires spec.placement`, `attribute "ai-grid/resource-version" is reserved ...`); Keycloak's `Identity provider with alias '<a>' does not exist in realm ai-grid` exists in the fake but no BFF body can send a domain's identity provider |
 | 501 | not reachable through today's endpoints on the fake. The shipped backend answers it for every RPC it lacks: `PATCH /clusters/{name}`, `GET /tenants/{id}`, every tenant write, every `/models` endpoint and `/capabilities` (`GET /clusters/{name}` falls back to the list); and the BFF answers it for `GET /tenants` with `filter`, `limit` or an `offset` above 0 there, because that backend ignores them | `the AI Grid backend does not support this operation yet`, or `the AI Grid backend does not support filtering or paging tenants yet; ...`: show "not available on this backend yet", not an error page |
 | 503 | `{"unavailable": "..."}` in `tenants.json`, then any tenants endpoint as a provider admin (a viewer's write stays 403, an expired token 401: the token checks come first) | `the AI Grid backend is unavailable; try again` |
@@ -288,10 +297,10 @@ The fake answers `Unimplemented` for exactly the methods in `intentionallyUnimpl
 (`bff/internal/fakebackend/fakebackend_test.go`); the test fails when the list and the fake
 disagree ([proto/README.md](proto/README.md) explains the allowlist). Today:
 `AiGrid/GetCurrentUser` (the BFF derives `isProviderAdmin` from a hub access review instead),
-`Grid/GetOverview` and `Grid/GetNetwork`, and every method of `CatalogItems` and
-`Subscriptions`. They are placeholders until the shapes are agreed with the backend team; the
-BFF has no endpoint for them yet, so the overview, map, catalog and subscriptions pages have
-nothing to call.
+`Grid/GetNetwork`, and every method of `CatalogItems`. They are placeholders until the shapes
+are agreed with the backend team; the BFF has no endpoint for them yet. `Subscriptions` and
+`Grid/GetOverview` are implemented (`/api/v1/subscriptions`, `/api/v1/grid/overview`); their
+proto is a proposal for the backend owners (`proto/README.md`, "Proposals from the port").
 
 ## Rules
 

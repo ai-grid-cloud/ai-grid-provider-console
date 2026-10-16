@@ -21,6 +21,7 @@ package aigridv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -86,8 +87,25 @@ type Tenant struct {
 	// in Keycloak directly, past the backend, does not bump it. Output only;
 	// empty from a backend that does not keep one (the shipped one).
 	ResourceVersion string `protobuf:"bytes,10,opt,name=resource_version,json=resourceVersion,proto3" json:"resource_version,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Proposal for the ai-grid-backend owners; implemented in the fake (P1,
+	// field 11). The organization's OIDC identity provider, as the console's
+	// organization wizard (ported from the PoC) configures it; unset for an
+	// organization without one. On create and on an update whose mask names
+	// `identity_provider`, the backend validates it with the PoC's rules
+	// (BadRequest field violations under `identityProvider.*`), trims it and
+	// stores it. Keycloak keeps an organization's identity providers as realm
+	// identity providers linked to the organization, not as a field;
+	// `TenantDomain.identity_provider_alias` already names one, so a backend
+	// that maps this field onto Keycloak needs the owners' agreement first.
+	IdentityProvider *IdentityProvider `protobuf:"bytes,11,opt,name=identity_provider,json=identityProvider,proto3" json:"identity_provider,omitempty"`
+	// Proposal for the ai-grid-backend owners; implemented in the fake (P3,
+	// field 12). When the backend created the organization. Output only. The
+	// backend stamps the organization attribute `ai-grid/create-time` (RFC 3339)
+	// on create and leaves that key out of `attributes`; unset for an
+	// organization created some other way (Keycloak keeps no creation time).
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Tenant) Reset() {
@@ -183,6 +201,20 @@ func (x *Tenant) GetResourceVersion() string {
 	return ""
 }
 
+func (x *Tenant) GetIdentityProvider() *IdentityProvider {
+	if x != nil {
+		return x.IdentityProvider
+	}
+	return nil
+}
+
+func (x *Tenant) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
 // One organization domain, as Keycloak 26.8 represents it
 // (`OrganizationDomainRepresentation`).
 type TenantDomain struct {
@@ -263,12 +295,213 @@ func (x *TenantDomain) GetAutoRedirect() bool {
 	return false
 }
 
+// Proposal for the ai-grid-backend owners (P1). An organization's OIDC
+// identity provider: the PoC's TenantInput identityProvider
+// (krisv/ai-grid-cloud-provider-poc src/app/types/tenants.ts at 62319b8).
+type IdentityProvider struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Display title. At most 253 characters after trimming.
+	Title string `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	// Free text, kept as typed. At most 4000 characters.
+	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	// Must be true when set (the PoC can't save a disabled identity provider);
+	// unset means true. Always set on output.
+	Enabled *bool `protobuf:"varint,3,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
+	// The OIDC client configuration. Required.
+	Config        *OidcConfig `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdentityProvider) Reset() {
+	*x = IdentityProvider{}
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdentityProvider) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdentityProvider) ProtoMessage() {}
+
+func (x *IdentityProvider) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdentityProvider.ProtoReflect.Descriptor instead.
+func (*IdentityProvider) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_tenant_type_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IdentityProvider) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *IdentityProvider) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *IdentityProvider) GetEnabled() bool {
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
+	}
+	return false
+}
+
+func (x *IdentityProvider) GetConfig() *OidcConfig {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+// The OIDC client configuration of an IdentityProvider. Only the name of the
+// Secret that holds the client secret is stored, never the secret itself.
+type OidcConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required; at most 253 characters after trimming.
+	ClientId string `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	// Name of the Secret holding the client secret: required, a DNS subdomain
+	// name (lower-case letters, digits, `-` and `.`), at most 253 characters.
+	ClientSecretSecretName string `protobuf:"bytes,2,opt,name=client_secret_secret_name,json=clientSecretSecretName,proto3" json:"client_secret_secret_name,omitempty"`
+	// Required HTTP or HTTPS URLs, at most 2048 characters after trimming.
+	Issuer           string `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	AuthorizationUrl string `protobuf:"bytes,4,opt,name=authorization_url,json=authorizationUrl,proto3" json:"authorization_url,omitempty"`
+	TokenUrl         string `protobuf:"bytes,5,opt,name=token_url,json=tokenUrl,proto3" json:"token_url,omitempty"`
+	// Space-separated scopes, at most 2048 characters after trimming.
+	DefaultScopes string `protobuf:"bytes,6,opt,name=default_scopes,json=defaultScopes,proto3" json:"default_scopes,omitempty"`
+	// Optional HTTP or HTTPS URLs; empty when unset.
+	UserInfoUrl string `protobuf:"bytes,7,opt,name=user_info_url,json=userInfoUrl,proto3" json:"user_info_url,omitempty"`
+	JwksUrl     string `protobuf:"bytes,8,opt,name=jwks_url,json=jwksUrl,proto3" json:"jwks_url,omitempty"`
+	LogoutUrl   string `protobuf:"bytes,9,opt,name=logout_url,json=logoutUrl,proto3" json:"logout_url,omitempty"`
+	// Unset means true. Always set on output.
+	ValidateSignature *bool `protobuf:"varint,10,opt,name=validate_signature,json=validateSignature,proto3,oneof" json:"validate_signature,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *OidcConfig) Reset() {
+	*x = OidcConfig{}
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OidcConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OidcConfig) ProtoMessage() {}
+
+func (x *OidcConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OidcConfig.ProtoReflect.Descriptor instead.
+func (*OidcConfig) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_tenant_type_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *OidcConfig) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetClientSecretSecretName() string {
+	if x != nil {
+		return x.ClientSecretSecretName
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetAuthorizationUrl() string {
+	if x != nil {
+		return x.AuthorizationUrl
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetTokenUrl() string {
+	if x != nil {
+		return x.TokenUrl
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetDefaultScopes() string {
+	if x != nil {
+		return x.DefaultScopes
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetUserInfoUrl() string {
+	if x != nil {
+		return x.UserInfoUrl
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetJwksUrl() string {
+	if x != nil {
+		return x.JwksUrl
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetLogoutUrl() string {
+	if x != nil {
+		return x.LogoutUrl
+	}
+	return ""
+}
+
+func (x *OidcConfig) GetValidateSignature() bool {
+	if x != nil && x.ValidateSignature != nil {
+		return *x.ValidateSignature
+	}
+	return false
+}
+
 var File_ai_grid_v1_tenant_type_proto protoreflect.FileDescriptor
 
 const file_ai_grid_v1_tenant_type_proto_rawDesc = "" +
 	"\n" +
 	"\x1cai_grid/v1/tenant_type.proto\x12\n" +
-	"ai_grid.v1\"\xa7\x03\n" +
+	"ai_grid.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xaf\x04\n" +
 	"\x06Tenant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
@@ -281,7 +514,10 @@ const file_ai_grid_v1_tenant_type_proto_rawDesc = "" +
 	"attributes\x12?\n" +
 	"\x0edomain_details\x18\t \x03(\v2\x18.ai_grid.v1.TenantDomainR\rdomainDetails\x12)\n" +
 	"\x10resource_version\x18\n" +
-	" \x01(\tR\x0fresourceVersion\x1a=\n" +
+	" \x01(\tR\x0fresourceVersion\x12I\n" +
+	"\x11identity_provider\x18\v \x01(\v2\x1c.ai_grid.v1.IdentityProviderR\x10identityProvider\x12;\n" +
+	"\vcreate_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
@@ -291,7 +527,29 @@ const file_ai_grid_v1_tenant_type_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bverified\x18\x02 \x01(\bR\bverified\x126\n" +
 	"\x17identity_provider_alias\x18\x03 \x01(\tR\x15identityProviderAlias\x12#\n" +
-	"\rauto_redirect\x18\x04 \x01(\bR\fautoRedirectBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
+	"\rauto_redirect\x18\x04 \x01(\bR\fautoRedirect\"\xa5\x01\n" +
+	"\x10IdentityProvider\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1d\n" +
+	"\aenabled\x18\x03 \x01(\bH\x00R\aenabled\x88\x01\x01\x12.\n" +
+	"\x06config\x18\x04 \x01(\v2\x16.ai_grid.v1.OidcConfigR\x06configB\n" +
+	"\n" +
+	"\b_enabled\"\x96\x03\n" +
+	"\n" +
+	"OidcConfig\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x129\n" +
+	"\x19client_secret_secret_name\x18\x02 \x01(\tR\x16clientSecretSecretName\x12\x16\n" +
+	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12+\n" +
+	"\x11authorization_url\x18\x04 \x01(\tR\x10authorizationUrl\x12\x1b\n" +
+	"\ttoken_url\x18\x05 \x01(\tR\btokenUrl\x12%\n" +
+	"\x0edefault_scopes\x18\x06 \x01(\tR\rdefaultScopes\x12\"\n" +
+	"\ruser_info_url\x18\a \x01(\tR\vuserInfoUrl\x12\x19\n" +
+	"\bjwks_url\x18\b \x01(\tR\ajwksUrl\x12\x1d\n" +
+	"\n" +
+	"logout_url\x18\t \x01(\tR\tlogoutUrl\x122\n" +
+	"\x12validate_signature\x18\n" +
+	" \x01(\bH\x00R\x11validateSignature\x88\x01\x01B\x15\n" +
+	"\x13_validate_signatureBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
 
 var (
 	file_ai_grid_v1_tenant_type_proto_rawDescOnce sync.Once
@@ -305,20 +563,26 @@ func file_ai_grid_v1_tenant_type_proto_rawDescGZIP() []byte {
 	return file_ai_grid_v1_tenant_type_proto_rawDescData
 }
 
-var file_ai_grid_v1_tenant_type_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_ai_grid_v1_tenant_type_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_ai_grid_v1_tenant_type_proto_goTypes = []any{
-	(*Tenant)(nil),       // 0: ai_grid.v1.Tenant
-	(*TenantDomain)(nil), // 1: ai_grid.v1.TenantDomain
-	nil,                  // 2: ai_grid.v1.Tenant.AttributesEntry
+	(*Tenant)(nil),                // 0: ai_grid.v1.Tenant
+	(*TenantDomain)(nil),          // 1: ai_grid.v1.TenantDomain
+	(*IdentityProvider)(nil),      // 2: ai_grid.v1.IdentityProvider
+	(*OidcConfig)(nil),            // 3: ai_grid.v1.OidcConfig
+	nil,                           // 4: ai_grid.v1.Tenant.AttributesEntry
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_ai_grid_v1_tenant_type_proto_depIdxs = []int32{
-	2, // 0: ai_grid.v1.Tenant.attributes:type_name -> ai_grid.v1.Tenant.AttributesEntry
+	4, // 0: ai_grid.v1.Tenant.attributes:type_name -> ai_grid.v1.Tenant.AttributesEntry
 	1, // 1: ai_grid.v1.Tenant.domain_details:type_name -> ai_grid.v1.TenantDomain
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2, // 2: ai_grid.v1.Tenant.identity_provider:type_name -> ai_grid.v1.IdentityProvider
+	5, // 3: ai_grid.v1.Tenant.create_time:type_name -> google.protobuf.Timestamp
+	3, // 4: ai_grid.v1.IdentityProvider.config:type_name -> ai_grid.v1.OidcConfig
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_ai_grid_v1_tenant_type_proto_init() }
@@ -327,13 +591,15 @@ func file_ai_grid_v1_tenant_type_proto_init() {
 		return
 	}
 	file_ai_grid_v1_tenant_type_proto_msgTypes[0].OneofWrappers = []any{}
+	file_ai_grid_v1_tenant_type_proto_msgTypes[2].OneofWrappers = []any{}
+	file_ai_grid_v1_tenant_type_proto_msgTypes[3].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_grid_v1_tenant_type_proto_rawDesc), len(file_ai_grid_v1_tenant_type_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

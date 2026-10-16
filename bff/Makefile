@@ -49,7 +49,7 @@ fake-backend: ## run the fake ai-grid-backend (:9090) and fake hub API (:9091) f
 	go run ./cmd/fake-backend --fixtures=$(FIXTURES) --listen-address=$(BACKEND_ADDRESS) --hub-address=$(FAKE_HUB_ADDRESS) --log-level=$(LOG_LEVEL)
 
 run-fake: ## run the BFF against the fake backend and fake hub; no cluster needed
-	go run -ldflags "$(LDFLAGS)" ./cmd --port=$(PORT) --backend-address=$(BACKEND_ADDRESS) --hub-api-url=http://$(FAKE_HUB_ADDRESS) --log-level=$(LOG_LEVEL)
+	go run -ldflags "$(LDFLAGS)" ./cmd --port=$(PORT) --backend-address=$(BACKEND_ADDRESS) --hub-api-url=http://$(FAKE_HUB_ADDRESS) --fake-backend --log-level=$(LOG_LEVEL)
 
 tidy:
 	go mod tidy

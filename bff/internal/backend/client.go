@@ -47,12 +47,14 @@ type Config struct {
 
 // Client wraps the generated service clients.
 type Client struct {
-	conn     *grpc.ClientConn
-	timeout  time.Duration
-	Health   aigridv1.AiGridClient
-	Clusters aigridv1.ManagedClustersClient
-	Tenants  aigridv1.TenantsClient
-	Models   aigridv1.ModelsClient
+	conn          *grpc.ClientConn
+	timeout       time.Duration
+	Health        aigridv1.AiGridClient
+	Clusters      aigridv1.ManagedClustersClient
+	Tenants       aigridv1.TenantsClient
+	Models        aigridv1.ModelsClient
+	Subscriptions aigridv1.SubscriptionsClient
+	Grid          aigridv1.GridClient
 }
 
 // Dial creates the connection. It does not connect until the first RPC, so a
@@ -85,12 +87,14 @@ func Dial(cfg Config, extra ...grpc.DialOption) (*Client, error) {
 		timeout = 10 * time.Second
 	}
 	return &Client{
-		conn:     conn,
-		timeout:  timeout,
-		Health:   aigridv1.NewAiGridClient(conn),
-		Clusters: aigridv1.NewManagedClustersClient(conn),
-		Tenants:  aigridv1.NewTenantsClient(conn),
-		Models:   aigridv1.NewModelsClient(conn),
+		conn:          conn,
+		timeout:       timeout,
+		Health:        aigridv1.NewAiGridClient(conn),
+		Clusters:      aigridv1.NewManagedClustersClient(conn),
+		Tenants:       aigridv1.NewTenantsClient(conn),
+		Models:        aigridv1.NewModelsClient(conn),
+		Subscriptions: aigridv1.NewSubscriptionsClient(conn),
+		Grid:          aigridv1.NewGridClient(conn),
 	}, nil
 }
 

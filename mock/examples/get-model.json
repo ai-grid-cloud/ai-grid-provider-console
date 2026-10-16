@@ -59,6 +59,9 @@
           "site-frankfurt-1",
           "site-paris-1"
         ],
+        "locations": [
+          "paris"
+        ],
         "satisfied": true,
         "reason": "AllDecisionsScheduled",
         "message": "All cluster decisions scheduled",

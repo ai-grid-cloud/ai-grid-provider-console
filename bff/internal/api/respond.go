@@ -112,6 +112,9 @@ type errorBody struct {
 type errorPayload struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// FieldErrors holds per-field messages keyed by the JSON path of the
+	// request body, for the form to show next to each field.
+	FieldErrors map[string]string `json:"fieldErrors,omitempty"`
 }
 
 // writeJSON encodes v before it commits the status, so an encoding failure
@@ -138,5 +141,9 @@ func writeList(w http.ResponseWriter, status int, v any, meta ListMeta) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, errorBody{Error: errorPayload{Code: strconv.Itoa(status), Message: message}})
+	writeErrorFields(w, status, message, nil)
+}
+
+func writeErrorFields(w http.ResponseWriter, status int, message string, fields map[string]string) {
+	writeJSON(w, status, errorBody{Error: errorPayload{Code: strconv.Itoa(status), Message: message, FieldErrors: fields}})
 }

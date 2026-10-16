@@ -1,0 +1,8 @@
+// The production build type-checks the app without its tests: tests import
+// ../mock, which the image's frontend stage doesn't copy. `pnpm typecheck`
+// still checks everything with tsconfig.json.
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "vite.config.ts"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/__tests__"]
+}

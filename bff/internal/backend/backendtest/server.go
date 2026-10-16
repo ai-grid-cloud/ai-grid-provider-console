@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend"
@@ -79,9 +80,23 @@ type Fake struct {
 	LastCreateModel *aigridv1.CreateModelRequest
 	LastUpdateModel *aigridv1.UpdateModelRequest
 	LastDeleteModel *aigridv1.DeleteModelRequest
+	// Locations is what ListLocations answers.
+	Locations []string
 
 	// ShippedLists serves the lists without paging, filtering or counts.
 	ShippedLists bool
+
+	Subscriptions          []*aigridv1.Subscription
+	AuthPolicies           []*aigridv1.AuthPolicy
+	ModelRegistrations     []*aigridv1.ModelRegistration
+	LastSubscriptionCreate *aigridv1.CreateSubscriptionRequest
+	LastSubscriptionUpdate *aigridv1.UpdateSubscriptionRequest
+	LastSubscriptionDelete *aigridv1.DeleteSubscriptionRequest
+
+	// Metrics and OverviewTime are GetOverview's metrics and updated_at.
+	Metrics      []*aigridv1.Metric
+	OverviewTime *timestamppb.Timestamp
+	LastOverview *aigridv1.GetOverviewRequest
 }
 
 // stale is the Aborted answer to an expected version that is not the stored one.
@@ -326,6 +341,8 @@ func (f *Fake) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantReque
 			for _, d := range t.Domains {
 				t.DomainDetails = append(t.DomainDetails, &aigridv1.TenantDomain{Name: d})
 			}
+		case "identity_provider":
+			t.IdentityProvider = obj.GetIdentityProvider()
 		case "domain_details":
 			t.DomainDetails = obj.GetDomainDetails()
 			t.Domains = nil
@@ -544,6 +561,14 @@ func (f *Fake) DeleteModel(ctx context.Context, req *aigridv1.DeleteModelRequest
 	return nil, status.Errorf(codes.NotFound, "object with identifier '%s/%s' not found", req.GetNamespace(), req.GetName())
 }
 
+// ListLocations implements Models: it answers Locations.
+func (f *Fake) ListLocations(ctx context.Context, _ *aigridv1.ListLocationsRequest) (*aigridv1.ListLocationsResponse, error) {
+	if err := f.begin(ctx, "ListLocations"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.ListLocationsResponse{Locations: f.Locations}, nil
+}
+
 func (f *Fake) findModel(namespace, name string) *aigridv1.Model {
 	for _, m := range f.Models {
 		if m.GetMetadata().GetNamespace() == namespace && m.GetName() == name {
@@ -551,6 +576,87 @@ func (f *Fake) findModel(namespace, name string) *aigridv1.Model {
 		}
 	}
 	return nil
+}
+
+// ListSubscriptions implements Subscriptions.
+func (f *Fake) ListSubscriptions(ctx context.Context, _ *aigridv1.ListSubscriptionsRequest) (*aigridv1.ListSubscriptionsResponse, error) {
+	if err := f.begin(ctx, "ListSubscriptions"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.ListSubscriptionsResponse{Subscriptions: f.Subscriptions}, nil
+}
+
+// GetSubscription implements Subscriptions: it finds the subscription by name
+// and answers with every model and policy.
+func (f *Fake) GetSubscription(ctx context.Context, req *aigridv1.GetSubscriptionRequest) (*aigridv1.GetSubscriptionResponse, error) {
+	if err := f.begin(ctx, "GetSubscription"); err != nil {
+		return nil, err
+	}
+	for _, s := range f.Subscriptions {
+		if s.GetName() == req.GetName() {
+			return &aigridv1.GetSubscriptionResponse{Subscription: s, ModelRefs: f.Models, AuthPolicies: f.AuthPolicies, ModelRegistrations: f.ModelRegistrations}, nil
+		}
+	}
+	return nil, status.Errorf(codes.NotFound, "object with identifier '%s' not found", req.GetName())
+}
+
+// CreateSubscription implements Subscriptions: it records the request and
+// returns its object with version "1", and with create_auth_policy a
+// <name>-policy.
+func (f *Fake) CreateSubscription(ctx context.Context, req *aigridv1.CreateSubscriptionRequest) (*aigridv1.CreateSubscriptionResponse, error) {
+	f.LastSubscriptionCreate = req
+	if err := f.begin(ctx, "CreateSubscription"); err != nil {
+		return nil, err
+	}
+	out := proto.Clone(req.GetObject()).(*aigridv1.Subscription)
+	out.ResourceVersion = "1"
+	resp := &aigridv1.CreateSubscriptionResponse{Subscription: out}
+	if req.GetCreateAuthPolicy() {
+		resp.AuthPolicy = &aigridv1.AuthPolicy{Name: out.GetName() + "-policy"}
+	}
+	return resp, nil
+}
+
+// UpdateSubscription implements Subscriptions: it records the request and returns its object.
+func (f *Fake) UpdateSubscription(ctx context.Context, req *aigridv1.UpdateSubscriptionRequest) (*aigridv1.UpdateSubscriptionResponse, error) {
+	f.LastSubscriptionUpdate = req
+	if err := f.begin(ctx, "UpdateSubscription"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.UpdateSubscriptionResponse{Subscription: req.GetObject()}, nil
+}
+
+// DeleteSubscription implements Subscriptions: it records the request.
+func (f *Fake) DeleteSubscription(ctx context.Context, req *aigridv1.DeleteSubscriptionRequest) (*aigridv1.DeleteSubscriptionResponse, error) {
+	f.LastSubscriptionDelete = req
+	if err := f.begin(ctx, "DeleteSubscription"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.DeleteSubscriptionResponse{}, nil
+}
+
+// GetOverview implements Grid: it records the request and answers with the
+// clusters labelled ai-grid/enabled=true (and ai-grid/site=site when set), and
+// Metrics when include_metrics is set.
+func (f *Fake) GetOverview(ctx context.Context, req *aigridv1.GetOverviewRequest) (*aigridv1.GetOverviewResponse, error) {
+	f.LastOverview = req
+	if err := f.begin(ctx, "GetOverview"); err != nil {
+		return nil, err
+	}
+	resp := &aigridv1.GetOverviewResponse{
+		UpdatedAt:       f.OverviewTime,
+		InventorySource: aigridv1.InventorySource_INVENTORY_SOURCE_ACM,
+		MetricsSource:   aigridv1.MetricsSource_METRICS_SOURCE_DEMO,
+	}
+	for _, c := range f.Clusters {
+		if c.GetLabels()["ai-grid/enabled"] == "true" && (req.Site == nil || c.GetLabels()["ai-grid/site"] == req.GetSite()) {
+			resp.Clusters = append(resp.Clusters, c)
+		}
+	}
+	if req.GetIncludeMetrics() {
+		resp.Metrics = f.Metrics
+	}
+	return resp, nil
 }
 
 // Status is a shorthand for a gRPC error.
@@ -569,6 +675,46 @@ func Start(t *testing.T, fake *Fake) *backend.Client {
 	aigridv1.RegisterModelsServer(srv, fake)
 	aigridv1.RegisterCatalogItemsServer(srv, fake)
 	aigridv1.RegisterSubscriptionsServer(srv, fake)
+	return serve(t, srv, lis)
+}
+
+// realShape is ai-grid-backend as it ships today: Ping, ListManagedClusters
+// and ListTenants, every other method of those services Unimplemented, and
+// no other service.
+type realShape struct {
+	aigridv1.UnimplementedAiGridServer
+	aigridv1.UnimplementedManagedClustersServer
+	aigridv1.UnimplementedTenantsServer
+	fake *Fake
+}
+
+func (r realShape) Ping(ctx context.Context, req *aigridv1.PingRequest) (*aigridv1.PingResponse, error) {
+	return r.fake.Ping(ctx, req)
+}
+
+func (r realShape) ListManagedClusters(ctx context.Context, req *aigridv1.ListManagedClustersRequest) (*aigridv1.ListManagedClustersResponse, error) {
+	return r.fake.ListManagedClusters(ctx, req)
+}
+
+func (r realShape) ListTenants(ctx context.Context, req *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
+	return r.fake.ListTenants(ctx, req)
+}
+
+// StartRealShape serves fake the way the real backend would: only Ping,
+// ListManagedClusters and ListTenants answer; everything else is Unimplemented.
+func StartRealShape(t *testing.T, fake *Fake) *backend.Client {
+	t.Helper()
+	lis := bufconn.Listen(1 << 20)
+	srv := grpc.NewServer()
+	real := realShape{fake: fake}
+	aigridv1.RegisterAiGridServer(srv, real)
+	aigridv1.RegisterManagedClustersServer(srv, real)
+	aigridv1.RegisterTenantsServer(srv, real)
+	return serve(t, srv, lis)
+}
+
+func serve(t *testing.T, srv *grpc.Server, lis *bufconn.Listener) *backend.Client {
+	t.Helper()
 	go func() { _ = srv.Serve(lis) }()
 
 	client, err := backend.Dial(backend.Config{Address: "passthrough:///bufconn", Insecure: true},

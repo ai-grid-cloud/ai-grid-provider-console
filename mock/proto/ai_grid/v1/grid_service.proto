@@ -10,14 +10,17 @@
 // When the backend ships these RPCs the console switches its import back to the
 // backend's generated package and deletes this draft.
 //
-// Placeholder: the names are agreed now, the fields later. Empty request and
-// response messages are deliberate; adding fields is additive, and the fake can
-// already register the service so the drift test covers it. Every RPC answers
-// Unimplemented until the shape is agreed.
+// GetNetwork is a placeholder: the names are agreed now, the fields later. Empty
+// request and response messages are deliberate; adding fields is additive, and
+// the fake can already register the service so the drift test covers it. It
+// answers Unimplemented until the shape is agreed.
 
 syntax = "proto3";
 
 package ai_grid.v1;
+
+import "ai_grid/v1/managed_cluster_type.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
 
@@ -30,11 +33,62 @@ service Grid {
   rpc GetNetwork(GetNetworkRequest) returns (GetNetworkResponse);
 }
 
-// Request of GetOverview. To add: range enum, site filter, bool include_metrics.
-message GetOverviewRequest {}
+message GetOverviewRequest {
+  // One of 1h, 6h, 24h; anything else is InvalidArgument "Choose a time range of 1h, 6h, or 24h."
+  string range = 1;
+  // When set, only the clusters whose `ai-grid/site` label equals it.
+  optional string site = 2;
+  bool include_metrics = 3;
+}
 
-// Response of GetOverview. To add: sites, per-site metrics, MetricsSource metrics_source.
-message GetOverviewResponse {}
+// Where the cluster inventory came from.
+enum InventorySource {
+  INVENTORY_SOURCE_UNSPECIFIED = 0;
+  INVENTORY_SOURCE_ACM = 1;
+  INVENTORY_SOURCE_GIT = 2;
+}
+
+// Where the metrics came from: Thanos, or the simulation used when Thanos is not configured.
+enum MetricsSource {
+  METRICS_SOURCE_UNSPECIFIED = 0;
+  METRICS_SOURCE_THANOS = 1;
+  METRICS_SOURCE_DEMO = 2;
+}
+
+// Whether a metric has points, and why not.
+enum MetricStatus {
+  METRIC_STATUS_UNSPECIFIED = 0;
+  METRIC_STATUS_OK = 1;
+  METRIC_STATUS_UNAVAILABLE = 2;
+  METRIC_STATUS_NOT_CONFIGURED = 3;
+  METRIC_STATUS_NO_DATA = 4;
+}
+
+// One sample: Unix seconds and the value.
+message MetricPoint {
+  int64 timestamp = 1;
+  double value = 2;
+}
+
+// One fleet-wide series, such as `requests` in req/s.
+message Metric {
+  string key = 1;
+  string label = 2;
+  string unit = 3;
+  MetricStatus status = 4;
+  // Why there are no points, when status is not OK.
+  optional string message = 5;
+  repeated MetricPoint points = 6;
+}
+
+message GetOverviewResponse {
+  // The end of the time range.
+  google.protobuf.Timestamp updated_at = 1;
+  InventorySource inventory_source = 2;
+  MetricsSource metrics_source = 3;
+  repeated ManagedCluster clusters = 4;
+  repeated Metric metrics = 5;
+}
 
 // Request of GetNetwork. Fields to be agreed.
 message GetNetworkRequest {}

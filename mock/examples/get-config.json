@@ -7,8 +7,11 @@
     "data": {
       "gridEndpoint": "",
       "mapTileUrl": "",
+      "mapTileAttribution": "",
       "billingUrl": "",
-      "version": "dev"
+      "version": "dev",
+      "modelsNamespace": "ai-grid-models",
+      "fakeBackend": false
     }
   }
 }

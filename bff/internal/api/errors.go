@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -33,7 +34,31 @@ func (a *App) respondError(w http.ResponseWriter, r *http.Request, err error) {
 	} else {
 		a.logger.Debug("request rejected", "method", r.Method, "path", r.URL.Path, "status", code, "error", err)
 	}
-	writeError(w, code, message)
+	writeErrorFields(w, code, message, fieldErrors(err))
+}
+
+// fieldErrors returns the per-field messages in a BadRequest detail, keyed by
+// the JSON path the frontend form uses. Only InvalidArgument (HTTP 422) carries
+// them; on any other code the details stay out of the response.
+func fieldErrors(err error) map[string]string {
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		return nil
+	}
+	var out map[string]string
+	for _, d := range st.Details() {
+		if br, ok := d.(*errdetails.BadRequest); ok {
+			for _, v := range br.GetFieldViolations() {
+				if out == nil {
+					out = map[string]string{}
+				}
+				if _, dup := out[v.GetField()]; !dup {
+					out[v.GetField()] = v.GetDescription()
+				}
+			}
+		}
+	}
+	return out
 }
 
 // classify maps handler and gRPC errors to HTTP. The backend's message is kept
