@@ -1,10 +1,10 @@
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ClusterPatch, ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type { ClusterPatch, ConsoleConfig, GridCluster, ListMeta, ListTenantsParams, Tenant, TenantCreate, TenantPage, TenantPatch, User } from './types';
 
 const API_PREFIX = '/api/v1';
 
-type Envelope<T> = { data: T };
+type Envelope<T> = { data: T; meta?: ListMeta };
 type ErrorBody = { error?: { code?: string; message?: string } };
 
 export class HttpConsoleService implements ConsoleService {
@@ -30,11 +30,46 @@ export class HttpConsoleService implements ConsoleService {
     return this.request<GridCluster>('PATCH', `/clusters/${encodeURIComponent(name)}`, patch);
   }
 
-  listTenants(): Promise<Tenant[]> {
-    return this.request<Tenant[]>('GET', '/tenants');
+  async listTenants(params: ListTenantsParams = {}): Promise<TenantPage> {
+    const query = new URLSearchParams();
+    if (params.offset !== undefined) {
+      query.set('offset', String(params.offset));
+    }
+    if (params.limit !== undefined) {
+      query.set('limit', String(params.limit));
+    }
+    const search = params.search?.trim();
+    if (search) {
+      query.set('search', search);
+    }
+    const qs = query.toString();
+    const envelope = await this.send<Tenant[]>('GET', `/tenants${qs ? `?${qs}` : ''}`);
+    const items = envelope.data;
+    return { items, meta: envelope.meta ?? { size: items.length, total: items.length, offset: params.offset ?? 0, limit: params.limit } };
+  }
+
+  getTenant(id: string): Promise<Tenant> {
+    return this.request<Tenant>('GET', `/tenants/${encodeURIComponent(id)}`);
+  }
+
+  createTenant(body: TenantCreate): Promise<Tenant> {
+    return this.request<Tenant>('POST', '/tenants', body);
+  }
+
+  updateTenant(id: string, patch: TenantPatch): Promise<Tenant> {
+    return this.request<Tenant>('PATCH', `/tenants/${encodeURIComponent(id)}`, patch);
+  }
+
+  async deleteTenant(id: string): Promise<void> {
+    await this.send<undefined>('DELETE', `/tenants/${encodeURIComponent(id)}`);
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    return (await this.send<T>(method, path, body)).data;
+  }
+
+  /** Performs the call and returns the whole envelope; a 204 yields an empty one. */
+  private async send<T>(method: string, path: string, body?: unknown): Promise<Envelope<T>> {
     let response: Response;
     try {
       response = await this.fetchFn(`${API_PREFIX}${path}`, {
@@ -58,7 +93,9 @@ export class HttpConsoleService implements ConsoleService {
       }
       throw new ServiceError(response.status, message);
     }
-    const payload = (await response.json()) as Envelope<T>;
-    return payload.data;
+    if (response.status === 204) {
+      return { data: undefined as T };
+    }
+    return (await response.json()) as Envelope<T>;
   }
 }

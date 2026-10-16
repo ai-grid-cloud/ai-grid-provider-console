@@ -43,9 +43,20 @@ type ListTenantsRequest struct {
 	// Maximum number of results. Omitted means all; zero means count only;
 	// negative is InvalidArgument.
 	Limit *int32 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
-	// CEL over `this` (a Tenant), for example `this.name.startsWith("acme")`.
+	// CEL over `this` (a Tenant). The only form supported today is the one
+	// that means what Keycloak's `search` parameter does, a case-insensitive
+	// contains on the name or on any domain:
+	//   this.name.contains("<term>") || this.domains.exists(d, d.contains("<term>"))
+	// with the same string literal in both places (CEL escapes `"` and `\`).
+	// The term is a literal substring: `%` and `_` match themselves, never act
+	// as wildcards. The backend may evaluate the expression in memory or push
+	// the term down to Keycloak's `search` parameter, which is a SQL LIKE
+	// built without escaping, so it MUST escape `%`, `_` and `\` in the term
+	// first; the fake's literal match is the reference behaviour. Any other
+	// expression is InvalidArgument naming it.
 	Filter *string `protobuf:"bytes,3,opt,name=filter,proto3,oneof" json:"filter,omitempty"`
-	// Sort order, `<field> [asc|desc]`. Default: by name.
+	// Sort order, `<field> [asc|desc]`. Keycloak only orders by name
+	// ascending, so a non-empty value is InvalidArgument today.
 	Order         *string `protobuf:"bytes,4,opt,name=order,proto3,oneof" json:"order,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -268,7 +279,12 @@ func (x *GetTenantResponse) GetObject() *Tenant {
 // Request of CreateTenant.
 type CreateTenantRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// `id` and `version` must be empty; `name` is required.
+	// `id` must be empty (Keycloak itself ignores a client id on POST; the
+	// console's draft rejects it so a mistaken PUT-as-POST is noticed);
+	// `name` is required. `alias` defaults to `name`; an omitted `enabled` is
+	// true. Domains come from `domain_details`, or from `domains` with default
+	// metadata when `domain_details` is empty; when both are set they must name
+	// the same domains in the same order.
 	Object        *Tenant `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -360,12 +376,18 @@ func (x *CreateTenantResponse) GetObject() *Tenant {
 // Request of UpdateTenant.
 type UpdateTenantRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The tenant with the new values. `id` identifies it.
+	// The tenant with the new values. `id` identifies it. `alias`, when set,
+	// must equal the stored alias.
 	Object *Tenant `protobuf:"bytes,1,opt,name=object,proto3" json:"object,omitempty"`
-	// Supported paths: `name`, `domains`, `enabled`, `description`, `attributes`.
-	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
-	// When true, fails with Aborted unless `object.version` matches.
-	Lock          bool `protobuf:"varint,3,opt,name=lock,proto3" json:"lock,omitempty"`
+	// Supported paths: `name`, `domains`, `enabled`, `description`,
+	// `attributes`, `domain_details`. A path replaces that field as a whole
+	// (`domains` replaces the set of names and keeps the metadata of a domain
+	// that stays; `domain_details` replaces names and metadata). Without a
+	// mask the request is Keycloak's PUT of a body without the `attributes` and
+	// `domains` keys: `name`, `enabled` (true when omitted, as Keycloak
+	// defaults it) and `description` are replaced, `attributes` and the
+	// domains are left unchanged.
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -412,13 +434,6 @@ func (x *UpdateTenantRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
 		return x.UpdateMask
 	}
 	return nil
-}
-
-func (x *UpdateTenantRequest) GetLock() bool {
-	if x != nil {
-		return x.Lock
-	}
-	return false
 }
 
 // Response of UpdateTenant.
@@ -576,12 +591,11 @@ const file_ai_grid_v1_tenants_service_proto_rawDesc = "" +
 	"\x13CreateTenantRequest\x12*\n" +
 	"\x06object\x18\x01 \x01(\v2\x12.ai_grid.v1.TenantR\x06object\"B\n" +
 	"\x14CreateTenantResponse\x12*\n" +
-	"\x06object\x18\x01 \x01(\v2\x12.ai_grid.v1.TenantR\x06object\"\x92\x01\n" +
+	"\x06object\x18\x01 \x01(\v2\x12.ai_grid.v1.TenantR\x06object\"\x8a\x01\n" +
 	"\x13UpdateTenantRequest\x12*\n" +
 	"\x06object\x18\x01 \x01(\v2\x12.ai_grid.v1.TenantR\x06object\x12;\n" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
-	"updateMask\x12\x12\n" +
-	"\x04lock\x18\x03 \x01(\bR\x04lock\"B\n" +
+	"updateMaskJ\x04\b\x03\x10\x04R\x04lock\"B\n" +
 	"\x14UpdateTenantResponse\x12*\n" +
 	"\x06object\x18\x01 \x01(\v2\x12.ai_grid.v1.TenantR\x06object\"%\n" +
 	"\x13DeleteTenantRequest\x12\x0e\n" +

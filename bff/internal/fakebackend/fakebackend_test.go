@@ -245,6 +245,22 @@ func TestLoadRejectsBadFixtures(t *testing.T) {
 	if _, err := Load(dir); err == nil {
 		t.Error("tenants and unavailable together should fail")
 	}
+	write("tenants.json", `{"realmMissing": true, "unavailable": "x"}`)
+	if _, err := Load(dir); err == nil {
+		t.Error("realmMissing and unavailable together should fail")
+	}
+	write("tenants.json", `{"realmMissing": true}`)
+	if fx, err := Load(dir); err != nil || !fx.TenantsRealmMissing || fx.Tenants != nil {
+		t.Errorf("realmMissing fixture = %+v, %v", fx, err)
+	}
+	write("tenants.json", `{"organizationsDisabled": true, "realmMissing": true}`)
+	if _, err := Load(dir); err == nil {
+		t.Error("two realm modes together should fail")
+	}
+	write("tenants.json", `{"organizationsDisabled": true}`)
+	if fx, err := Load(dir); err != nil || !fx.TenantsOrgsDisabled {
+		t.Errorf("organizationsDisabled fixture = %+v, %v", fx, err)
+	}
 	write("tenants.json", `{"unavailable": "request Keycloak token: dial tcp: lookup keycloak.ai-grid.svc: no such host"}`)
 	write("settings.json", `{"latency": "15ms"}`)
 	fx, err = Load(dir)
@@ -299,7 +315,7 @@ func authed(ctx context.Context) context.Context {
 func TestNewCopiesTheFixtures(t *testing.T) {
 	fx := &Fixtures{
 		Clusters: []*aigridv1.ManagedCluster{{Name: "a", Labels: map[string]string{"name": "a"}}},
-		Tenants:  []*aigridv1.Tenant{{Id: "1", Name: "t-corp", Domains: []string{"t.example.com"}}},
+		Tenants:  []*aigridv1.Tenant{{Id: "4c1d2e3f-5a6b-4c7d-8e9f-0a1b2c3d4e5f", Name: "t-corp", Domains: []string{"t.example.com"}}},
 	}
 	s, err := New(fx, slog.New(slog.DiscardHandler))
 	if err != nil {
@@ -348,7 +364,7 @@ func TestServerBehavesLikeTheBackend(t *testing.T) {
 			{Name: "zeta", Labels: map[string]string{"name": "zeta"}, HubAcceptsClient: true},
 			{Name: "alpha", Labels: map[string]string{"name": "alpha"}, HubAcceptsClient: true},
 		},
-		Tenants: []*aigridv1.Tenant{{Id: "1", Name: "b-corp"}, {Id: "2", Name: "a-corp", Domains: []string{"a.example.com"}}},
+		Tenants: []*aigridv1.Tenant{{Id: "6b1f0b4e-2f6a-4a2a-8c1e-0f3a2b4c5d6e", Name: "b-corp"}, {Id: "9d0c7e21-4b3a-4f1e-a2b3-c4d5e6f7a8b9", Name: "a-corp", Domains: []string{"a.example.com"}}},
 	}
 	s, err := New(fx, slog.New(slog.DiscardHandler))
 	if err != nil {
@@ -385,8 +401,8 @@ func TestServerBehavesLikeTheBackend(t *testing.T) {
 		t.Fatalf("tenants should be sorted by name: %v, %v", tenants, err)
 	}
 
-	s.TenantsErr = status.Error(codes.Unknown, "request Keycloak token: connection refused")
-	if _, err := aigridv1.NewTenantsClient(conn).ListTenants(ctx, &aigridv1.ListTenantsRequest{}); status.Code(err) != codes.Unknown {
+	s.TenantsErr = status.Error(codes.Unavailable, "Keycloak is unavailable: request Keycloak token: connection refused")
+	if _, err := aigridv1.NewTenantsClient(conn).ListTenants(ctx, &aigridv1.ListTenantsRequest{}); status.Code(err) != codes.Unavailable {
 		t.Errorf("tenants error should pass through with its code, got %v", err)
 	}
 }

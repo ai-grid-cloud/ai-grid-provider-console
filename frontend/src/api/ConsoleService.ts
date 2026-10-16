@@ -1,4 +1,4 @@
-import type { ClusterPatch, ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type { ClusterPatch, ConsoleConfig, GridCluster, ListTenantsParams, Tenant, TenantCreate, TenantPage, TenantPatch, User } from './types';
 
 /**
  * Every page talks to the BFF through this interface only. The HTTP
@@ -10,7 +10,11 @@ export interface ConsoleService {
   listClusters(): Promise<GridCluster[]>;
   getCluster(name: string): Promise<GridCluster>;
   updateCluster(name: string, patch: ClusterPatch): Promise<GridCluster>;
-  listTenants(): Promise<Tenant[]>;
+  listTenants(params?: ListTenantsParams): Promise<TenantPage>;
+  getTenant(id: string): Promise<Tenant>;
+  createTenant(body: TenantCreate): Promise<Tenant>;
+  updateTenant(id: string, patch: TenantPatch): Promise<Tenant>;
+  deleteTenant(id: string): Promise<void>;
 }
 
 export class ServiceError extends Error {

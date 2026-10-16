@@ -6,9 +6,21 @@ import (
 	"strconv"
 )
 
-// envelope wraps every successful JSON response.
+// envelope wraps every successful JSON response. List endpoints that page
+// add `meta`; everything else has `data` only.
 type envelope struct {
-	Data any `json:"data"`
+	Data any       `json:"data"`
+	Meta *ListMeta `json:"meta,omitempty"`
+}
+
+// ListMeta describes one page of a paged list: how many items came back,
+// how many match in total, and the offset and limit that were applied.
+// Limit is omitted when the caller asked for everything.
+type ListMeta struct {
+	Size   int  `json:"size"`
+	Total  int  `json:"total"`
+	Offset int  `json:"offset"`
+	Limit  *int `json:"limit,omitempty"`
 }
 
 // errorBody is the JSON shape of every error response.
@@ -38,6 +50,10 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeData(w http.ResponseWriter, status int, v any) {
 	writeJSON(w, status, envelope{Data: v})
+}
+
+func writeList(w http.ResponseWriter, status int, v any, meta ListMeta) {
+	writeJSON(w, status, envelope{Data: v, Meta: &meta})
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {

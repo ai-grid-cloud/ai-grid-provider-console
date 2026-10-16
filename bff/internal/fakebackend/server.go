@@ -63,11 +63,19 @@ type Server struct {
 	// clock is the time source for scenarios, condition transition times
 	// and taint stamps; time.Now unless SetClock replaced it.
 	clock func() time.Time
+	// newID assigns Keycloak organization ids; random UUID v4 unless
+	// SetIDGenerator replaced it.
+	newID func() string
+	// realmMissing makes every Tenants RPC answer FailedPrecondition, the
+	// state of the dev hub today (Keycloak without an ai-grid realm);
+	// orgsDisabled does the same for a realm with organizationsEnabled=false.
+	realmMissing bool
+	orgsDisabled bool
 	// Latency is added to every RPC to resemble a hub round trip.
 	Latency time.Duration
 	// TenantsErr, when set, makes every Tenants RPC fail with it. It models a
-	// backend whose Keycloak is unreachable or has no realm, the state of the
-	// dev hub today, so the UI's error path is exercised with a real code.
+	// backend whose Keycloak is unreachable, so the UI's error path is
+	// exercised with a real code.
 	TenantsErr error
 	// stopTimeout bounds GracefulStop in Serve; zero means defaultStopTimeout.
 	stopTimeout time.Duration
@@ -93,6 +101,7 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 		access:   fx.Access,
 		speed:    fx.Speed,
 		clock:    time.Now,
+		newID:    newUUID,
 		Latency:  fx.Latency.Duration(),
 		logger:   logger,
 	}
@@ -130,18 +139,27 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 	s.scenarios = scenarios
 	s.start = s.clock()
 	for _, t := range fx.Tenants {
-		if t.GetId() == "" || t.GetName() == "" {
-			return nil, fmt.Errorf("fixture tenant needs id and name: %v", t)
+		if err := s.seedTenant(t); err != nil {
+			return nil, err
 		}
-		if _, dup := s.tenants[t.GetId()]; dup {
-			return nil, fmt.Errorf("fixture tenant id %q listed twice", t.GetId())
-		}
-		s.tenants[t.GetId()] = cloneTenant(t)
 	}
 	if fx.Tenants == nil && fx.TenantsUnavailable != "" {
-		s.TenantsErr = status.Error(codes.Unknown, fx.TenantsUnavailable)
+		// backend-conventions.md 5.7: Keycloak unreachable is Unavailable with
+		// a message that names Keycloak. The shipped backend still returns
+		// Unknown here (keycloak.md 7); the fake implements the convention.
+		s.TenantsErr = status.Error(codes.Unavailable, MsgKeycloakDownPref+fx.TenantsUnavailable)
 	}
+	s.realmMissing = fx.TenantsRealmMissing
+	s.orgsDisabled = fx.TenantsOrgsDisabled
 	return s, nil
+}
+
+// SetIDGenerator replaces the source of organization ids, so tests can
+// predict the id of a created tenant.
+func (s *Server) SetIDGenerator(next func() string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.newID = next
 }
 
 // SetClock replaces the time source and restarts the scenario clock from it,
@@ -259,19 +277,28 @@ func authenticate(ctx context.Context) (string, error) {
 	return token, nil
 }
 
-// authorizePatch is the hub's RBAC answer for a mutating RPC, taken from the
-// same access fixture the fake hub uses for the BFF's SelfSubjectAccessReview,
-// so a token that is not a provider admin there cannot write here either
+// isProviderAdmin is the hub's RBAC answer for the token, taken from the same
+// access fixture the fake hub uses for the BFF's SelfSubjectAccessReview, so
+// a token that is not a provider admin there cannot write here either
 // (backend-conventions.md section 5.6: hub 401 -> Unauthenticated, hub 403 ->
-// PermissionDenied). The message is shaped like the API server's Forbidden
-// status; the user name comes from the advisory x-forwarded-user header.
-func (s *Server) authorizePatch(ctx context.Context, token, name string) error {
+// PermissionDenied). It returns the advisory user name for the message.
+func (s *Server) isProviderAdmin(ctx context.Context, token string) (user string, allowed bool, err error) {
 	if err := s.rejected(token); err != nil {
+		return "", false, err
+	}
+	md, _ := metadata.FromIncomingContext(ctx)
+	user = strings.Join(md.Get("x-forwarded-user"), ",")
+	return user, s.access.DefaultAllowed && !slices.Contains(s.access.DeniedTokens, token), nil
+}
+
+// authorizePatch gates a hub write. The message is shaped like the API
+// server's Forbidden status for a patch on the named ManagedCluster.
+func (s *Server) authorizePatch(ctx context.Context, token, name string) error {
+	user, allowed, err := s.isProviderAdmin(ctx, token)
+	if err != nil {
 		return err
 	}
-	if !s.access.DefaultAllowed || slices.Contains(s.access.DeniedTokens, token) {
-		md, _ := metadata.FromIncomingContext(ctx)
-		user := strings.Join(md.Get("x-forwarded-user"), ",")
+	if !allowed {
 		return status.Errorf(codes.PermissionDenied,
 			"managedclusters.cluster.open-cluster-management.io %q is forbidden: User %q cannot patch resource \"managedclusters\" in API group \"cluster.open-cluster-management.io\" at the cluster scope", name, user)
 	}
@@ -285,6 +312,23 @@ func (s *Server) authorizePatch(ctx context.Context, token, name string) error {
 func (s *Server) rejected(token string) error {
 	if slices.Contains(s.access.RejectedTokens, token) {
 		return status.Error(codes.Unauthenticated, "the hub rejected the token: Unauthorized")
+	}
+	return nil
+}
+
+// authorizeProviderAdmin gates a Keycloak mutation: the backend uses its own
+// Keycloak credential but first checks that the caller may patch
+// ManagedClusters on the hub (backend-conventions.md 5.6, "provider admin").
+// The conventions fix only the code; the message text is the console's
+// proposal (keycloak.md 8.2), nothing on the hub or in Keycloak produces it.
+func (s *Server) authorizeProviderAdmin(ctx context.Context, token string) error {
+	user, allowed, err := s.isProviderAdmin(ctx, token)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return status.Errorf(codes.PermissionDenied,
+			"User %q is not a provider admin: cannot patch resource \"managedclusters\" in API group \"cluster.open-cluster-management.io\" at the cluster scope", user)
 	}
 	return nil
 }
@@ -322,25 +366,6 @@ func (s *Server) Ping(ctx context.Context, req *aigridv1.PingRequest) (*aigridv1
 		return nil, err
 	}
 	return &aigridv1.PingResponse{Message: fmt.Sprintf("Hello, %s!", req.GetName())}, nil
-}
-
-// ListTenants implements Tenants. Keycloak returns organizations ordered by
-// name; the real backend passes that order through.
-func (s *Server) ListTenants(ctx context.Context, _ *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
-	if _, err := s.begin(ctx); err != nil {
-		return nil, err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.TenantsErr != nil {
-		return nil, s.TenantsErr
-	}
-	out := make([]*aigridv1.Tenant, 0, len(s.tenants))
-	for _, t := range s.tenants {
-		out = append(out, cloneTenant(t))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].GetName() < out[j].GetName() })
-	return &aigridv1.ListTenantsResponse{Tenants: out}, nil
 }
 
 // Responses are deep copies so a caller cannot mutate the fixture state.

@@ -12,6 +12,10 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+APIPrefix+"/clusters/{name}", a.getCluster)
 	mux.HandleFunc("PATCH "+APIPrefix+"/clusters/{name}", a.patchCluster)
 	mux.HandleFunc("GET "+APIPrefix+"/tenants", a.listTenants)
+	mux.HandleFunc("POST "+APIPrefix+"/tenants", a.createTenant)
+	mux.HandleFunc("GET "+APIPrefix+"/tenants/{id}", a.getTenant)
+	mux.HandleFunc("PATCH "+APIPrefix+"/tenants/{id}", a.patchTenant)
+	mux.HandleFunc("DELETE "+APIPrefix+"/tenants/{id}", a.deleteTenant)
 
 	// Unknown API paths get a JSON 404 instead of the SPA fallback.
 	mux.HandleFunc(APIPrefix+"/", a.notFound)

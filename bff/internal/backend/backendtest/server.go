@@ -5,7 +5,11 @@ import (
 	"context"
 	"maps"
 	"net"
+	"regexp"
+	"slices"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -31,6 +35,9 @@ import (
 // object, so a test can simulate a write that lands between the BFF's read
 // and its update. Updates mutate the slice in place and bump
 // `resource_version`; LastUpdate keeps the last request, reached or refused.
+// Tenants follow the same idea with the few Keycloak rules a handler test
+// needs (ids `t-<n>`, duplicate name 409, NotFound); the Last*Tenant fields
+// keep the last request of each tenant RPC, reached or refused.
 type Fake struct {
 	aigridv1.UnimplementedAiGridServer
 	aigridv1.UnimplementedManagedClustersServer
@@ -48,12 +55,22 @@ type Fake struct {
 	Metadata   metadata.MD
 	LastUpdate *aigridv1.UpdateManagedClusterRequest
 	AfterGet   func(stored *aigridv1.ManagedCluster)
+
+	LastListTenants  *aigridv1.ListTenantsRequest
+	LastCreateTenant *aigridv1.CreateTenantRequest
+	LastUpdateTenant *aigridv1.UpdateTenantRequest
+	LastDeleteTenant *aigridv1.DeleteTenantRequest
+	// lastTenantID is the highest `t-<n>` handed out or seeded, so an id is
+	// never reused after a delete.
+	lastTenantID int
 }
 
-// begin records the call and returns the injected error for it, if any.
+// begin records the call and returns the injected error for it, if any. It
+// also notes the tenant ids present so far, before a delete can remove one.
 func (f *Fake) begin(ctx context.Context, method string) error {
 	md, _ := metadata.FromIncomingContext(ctx)
 	f.Metadata = md
+	f.noteTenantIDs()
 	f.Calls = append(f.Calls, method)
 	if f.Err != nil {
 		return f.Err
@@ -147,12 +164,176 @@ func (f *Fake) find(name string) *aigridv1.ManagedCluster {
 	return nil
 }
 
-// ListTenants implements Tenants.
-func (f *Fake) ListTenants(ctx context.Context, _ *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
+// tenantFilter is the one filter form the draft supports (see
+// ListTenantsRequest.filter): the same term in both halves.
+var tenantFilter = regexp.MustCompile(`^this\.name\.contains\("((?:[^"\\]|\\.)*)"\) \|\| this\.domains\.exists\(d, d\.contains\("((?:[^"\\]|\\.)*)"\)\)$`)
+
+// ListTenants implements Tenants: name order, `offset`/`limit` paging and
+// the name-or-domain contains filter (case-insensitive), with `total`
+// counted over the filtered set.
+func (f *Fake) ListTenants(ctx context.Context, req *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
 	if err := f.begin(ctx, "ListTenants"); err != nil {
 		return nil, err
 	}
-	return &aigridv1.ListTenantsResponse{Tenants: f.Tenants}, nil
+	f.LastListTenants = req
+	term := ""
+	if filter := req.GetFilter(); filter != "" {
+		m := tenantFilter.FindStringSubmatch(filter)
+		if m == nil || m[1] != m[2] {
+			return nil, status.Errorf(codes.InvalidArgument, "filter %s is not supported", filter)
+		}
+		term = strings.ToLower(strings.NewReplacer(`\"`, `"`, `\\`, `\`).Replace(m[1]))
+	}
+	all := make([]*aigridv1.Tenant, 0, len(f.Tenants))
+	for _, t := range f.Tenants {
+		match := strings.Contains(strings.ToLower(t.GetName()), term)
+		for _, d := range t.GetDomains() {
+			match = match || strings.Contains(strings.ToLower(d), term)
+		}
+		if match {
+			all = append(all, t)
+		}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].GetName() < all[j].GetName() })
+	total := len(all)
+	page := all[min(int(req.GetOffset()), total):]
+	if req.Limit != nil && int(req.GetLimit()) < len(page) {
+		page = page[:req.GetLimit()]
+	}
+	return &aigridv1.ListTenantsResponse{Tenants: page, Size: int32(len(page)), Total: int32(total)}, nil
+}
+
+// GetTenant implements Tenants with the backend's NotFound message.
+func (f *Fake) GetTenant(ctx context.Context, req *aigridv1.GetTenantRequest) (*aigridv1.GetTenantResponse, error) {
+	if err := f.begin(ctx, "GetTenant"); err != nil {
+		return nil, err
+	}
+	t := f.findTenant(req.GetId())
+	if t == nil {
+		return nil, status.Errorf(codes.NotFound, "object with identifier '%s' not found", req.GetId())
+	}
+	return &aigridv1.GetTenantResponse{Object: t}, nil
+}
+
+// CreateTenant implements Tenants: assigns the next `t-<n>` (monotonic, past
+// every seeded or deleted id), defaults the alias to the name and `enabled`
+// to true, mirrors `domains` into `domain_details`, 409 on a taken name with
+// Keycloak's message.
+func (f *Fake) CreateTenant(ctx context.Context, req *aigridv1.CreateTenantRequest) (*aigridv1.CreateTenantResponse, error) {
+	f.LastCreateTenant = req
+	if err := f.begin(ctx, "CreateTenant"); err != nil {
+		return nil, err
+	}
+	t := proto.Clone(req.GetObject()).(*aigridv1.Tenant)
+	if t.GetName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "Name can not be null")
+	}
+	for _, other := range f.Tenants {
+		if other.GetName() == t.GetName() {
+			return nil, status.Error(codes.AlreadyExists, "A organization with the same name already exists.")
+		}
+	}
+	if t.GetAlias() == "" {
+		t.Alias = t.GetName()
+	}
+	if t.Enabled == nil {
+		t.Enabled = proto.Bool(true)
+	}
+	if len(t.GetDomainDetails()) == 0 {
+		for _, d := range t.GetDomains() {
+			t.DomainDetails = append(t.DomainDetails, &aigridv1.TenantDomain{Name: d})
+		}
+	}
+	t.Id = f.nextTenantID()
+	f.Tenants = append(f.Tenants, t)
+	return &aigridv1.CreateTenantResponse{Object: t}, nil
+}
+
+// UpdateTenant implements Tenants: applies the mask paths in place.
+func (f *Fake) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantRequest) (*aigridv1.UpdateTenantResponse, error) {
+	f.LastUpdateTenant = req
+	if err := f.begin(ctx, "UpdateTenant"); err != nil {
+		return nil, err
+	}
+	t := f.findTenant(req.GetObject().GetId())
+	if t == nil {
+		return nil, status.Errorf(codes.NotFound, "object with identifier '%s' not found", req.GetObject().GetId())
+	}
+	if alias := req.GetObject().GetAlias(); alias != "" && alias != t.GetAlias() {
+		return nil, status.Error(codes.InvalidArgument, "Cannot change the alias")
+	}
+	obj := req.GetObject()
+	for _, p := range req.GetUpdateMask().GetPaths() {
+		switch p {
+		case "name":
+			t.Name = obj.GetName()
+		case "enabled":
+			t.Enabled = proto.Bool(obj.GetEnabled())
+		case "description":
+			t.Description = obj.GetDescription()
+		case "attributes":
+			t.Attributes = maps.Clone(obj.GetAttributes())
+		case "domains":
+			// Names only; unlike the real fake this drops the metadata of a
+			// domain that stays, which handler tests do not depend on.
+			t.Domains = slices.Clone(obj.GetDomains())
+			t.DomainDetails = nil
+			for _, d := range t.Domains {
+				t.DomainDetails = append(t.DomainDetails, &aigridv1.TenantDomain{Name: d})
+			}
+		case "domain_details":
+			t.DomainDetails = obj.GetDomainDetails()
+			t.Domains = nil
+			for _, d := range t.DomainDetails {
+				t.Domains = append(t.Domains, d.GetName())
+			}
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "update_mask path %q is not supported", p)
+		}
+	}
+	return &aigridv1.UpdateTenantResponse{Object: t}, nil
+}
+
+// DeleteTenant implements Tenants.
+func (f *Fake) DeleteTenant(ctx context.Context, req *aigridv1.DeleteTenantRequest) (*aigridv1.DeleteTenantResponse, error) {
+	f.LastDeleteTenant = req
+	if err := f.begin(ctx, "DeleteTenant"); err != nil {
+		return nil, err
+	}
+	for i, t := range f.Tenants {
+		if t.GetId() == req.GetId() {
+			f.Tenants = slices.Delete(f.Tenants, i, i+1)
+			return &aigridv1.DeleteTenantResponse{}, nil
+		}
+	}
+	return nil, status.Errorf(codes.NotFound, "object with identifier '%s' not found", req.GetId())
+}
+
+// noteTenantIDs raises lastTenantID to the highest `t-<n>` currently
+// present (seeded ids included), so a later delete cannot free a number.
+func (f *Fake) noteTenantIDs() {
+	for _, t := range f.Tenants {
+		if n, err := strconv.Atoi(strings.TrimPrefix(t.GetId(), "t-")); err == nil && n > f.lastTenantID {
+			f.lastTenantID = n
+		}
+	}
+}
+
+// nextTenantID returns the next unused `t-<n>`: one past the highest number
+// ever seen among the seeded ids and the ids handed out, deleted or not.
+func (f *Fake) nextTenantID() string {
+	f.noteTenantIDs()
+	f.lastTenantID++
+	return "t-" + strconv.Itoa(f.lastTenantID)
+}
+
+func (f *Fake) findTenant(id string) *aigridv1.Tenant {
+	for _, t := range f.Tenants {
+		if t.GetId() == id {
+			return t
+		}
+	}
+	return nil
 }
 
 // Status is a shorthand for a gRPC error.

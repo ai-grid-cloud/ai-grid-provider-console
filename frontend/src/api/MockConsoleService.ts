@@ -1,13 +1,30 @@
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ClusterCondition, ClusterPatch, ClusterStatus, ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type {
+  ClusterCondition,
+  ClusterPatch,
+  ClusterStatus,
+  ConsoleConfig,
+  GridCluster,
+  ListTenantsParams,
+  Tenant,
+  TenantCreate,
+  TenantDomain,
+  TenantPage,
+  TenantPatch,
+  User,
+} from './types';
 
 /**
  * In-memory service for tests and UI work without a cluster. It follows the
  * same rules as the fake backend (bff/internal/fakebackend): the status is
  * derived from the conditions in the ACM console's order, an unknown name is
  * 404, a bad coordinate is 422, a non-admin write is 403, and a patch
- * replaces labels and annotations.
+ * replaces labels and annotations. Tenants follow Keycloak 26.8 Organizations
+ * as the fake implements them: unique name and alias (409 with Keycloak's
+ * messages), alias defaulting to the name and immutable, domain validation
+ * with Keycloak's messages (422), 404 for an unknown id, 403 for a
+ * non-admin write.
  */
 export class MockConsoleService implements ConsoleService {
   constructor(
@@ -28,7 +45,128 @@ export class MockConsoleService implements ConsoleService {
 
   listClusters = async (): Promise<GridCluster[]> => this.clusters.map((c) => ({ ...c }));
 
-  listTenants = async (): Promise<Tenant[]> => [...this.tenants];
+  listTenants = async (params: ListTenantsParams = {}): Promise<TenantPage> => {
+    const term = (params.search ?? '').toLowerCase();
+    // Byte order approximates the realm database's collation (see the fake backend).
+    const all = this.tenants
+      .filter((t) => !term || t.name.toLowerCase().includes(term) || t.domains.some((d) => d.includes(term)))
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const offset = Math.min(params.offset ?? 0, all.length);
+    const items = (params.limit === undefined ? all.slice(offset) : all.slice(offset, offset + params.limit)).map(copyTenant);
+    return { items, meta: { size: items.length, total: all.length, offset, limit: params.limit } };
+  };
+
+  getTenant = async (id: string): Promise<Tenant> => copyTenant(this.findTenant(id));
+
+  createTenant = async (body: TenantCreate): Promise<Tenant> => {
+    this.requireAdmin();
+    if (body.alias) {
+      const problem = validateAlias(body.alias);
+      if (problem) {
+        throw new ServiceError(422, problem);
+      }
+    }
+    if (!body.name.trim()) {
+      throw new ServiceError(422, 'Name can not be null');
+    }
+    const alias = body.alias?.trim() || body.name;
+    if (!body.alias?.trim()) {
+      const problem = validateAlias(alias);
+      if (problem) {
+        throw new ServiceError(422, `Name cannot be used as alias: ${problem}`);
+      }
+    }
+    if (this.tenants.some((t) => t.name === body.name)) {
+      throw new ServiceError(409, 'A organization with the same name already exists.');
+    }
+    if (this.tenants.some((t) => t.alias === alias)) {
+      throw new ServiceError(409, 'A organization with the same alias already exists');
+    }
+    // Keycloak validates the domains only after the organization row exists (toModel after create).
+    const domainDetails = normalizeDomains(body.domains ?? []);
+    this.checkDomainsFree(domainDetails, undefined);
+    const tenant: Tenant = {
+      id: mockUUID(),
+      name: body.name,
+      alias,
+      enabled: body.enabled ?? true,
+      description: body.description ?? '',
+      domains: domainDetails.map((d) => d.name),
+      domainDetails,
+      attributes: { ...(body.attributes ?? {}) },
+    };
+    this.tenants.push(tenant);
+    return copyTenant(tenant);
+  };
+
+  updateTenant = async (id: string, patch: TenantPatch): Promise<Tenant> => {
+    this.requireAdmin();
+    const current = this.findTenant(id);
+    const next: Tenant = copyTenant(current);
+    if (patch.name !== undefined) {
+      if (!patch.name.trim()) {
+        throw new ServiceError(422, 'Name can not be null');
+      }
+      next.name = patch.name;
+    }
+    // Keycloak's exact search matches names and domains and does not exclude the organization itself.
+    if (next.name !== current.name && this.tenants.some((t) => (t.id !== id && t.name === next.name) || t.domains.includes(next.name))) {
+      throw new ServiceError(409, 'A organization with the same name already exists.');
+    }
+    if (patch.alias !== undefined && patch.alias !== '' && patch.alias !== current.alias) {
+      throw new ServiceError(422, 'Cannot change the alias');
+    }
+    if (patch.enabled !== undefined) {
+      next.enabled = patch.enabled;
+    }
+    if (patch.description !== undefined) {
+      next.description = patch.description;
+    }
+    if (patch.attributes !== undefined) {
+      next.attributes = { ...patch.attributes };
+    }
+    if (patch.domains !== undefined) {
+      const kept = new Map(current.domainDetails.map((d) => [d.name, d]));
+      next.domainDetails = normalizeDomains(patch.domains).map((d) => kept.get(d.name) ?? d);
+      next.domains = next.domainDetails.map((d) => d.name);
+    }
+    this.checkDomainsFree(next.domainDetails, id);
+    this.tenants[this.tenants.indexOf(current)] = next;
+    return copyTenant(next);
+  };
+
+  deleteTenant = async (id: string): Promise<void> => {
+    this.requireAdmin();
+    const current = this.findTenant(id);
+    this.tenants.splice(this.tenants.indexOf(current), 1);
+  };
+
+  private findTenant(id: string): Tenant {
+    const tenant = this.tenants.find((t) => t.id === id);
+    if (!tenant) {
+      throw new ServiceError(404, `object with identifier '${id}' not found`);
+    }
+    return tenant;
+  }
+
+  private requireAdmin() {
+    // The message text is the console's proposal for the backend (mock/README.md lists it as invented).
+    if (!this.user.isProviderAdmin) {
+      throw new ServiceError(
+        403,
+        `User "${this.user.username}" is not a provider admin: cannot patch resource "managedclusters" in API group "cluster.open-cluster-management.io" at the cluster scope`,
+      );
+    }
+  }
+
+  private checkDomainsFree(domains: TenantDomain[], selfId: string | undefined) {
+    for (const d of domains) {
+      const owner = this.tenants.find((t) => t.id !== selfId && t.domains.includes(d.name));
+      if (owner) {
+        throw new ServiceError(422, `Domain ${d.name} is already linked to organization ${owner.name} in realm ai-grid`);
+      }
+    }
+  }
 
   getCluster = async (name: string): Promise<GridCluster> => {
     const cluster = this.clusters.find((c) => c.name === name);
@@ -453,7 +591,150 @@ export const seedClusters = (): GridCluster[] => [
   }),
 ];
 
+const copyTenant = (t: Tenant): Tenant => ({ ...t, domains: [...t.domains], domainDetails: t.domainDetails.map((d) => ({ ...d })), attributes: { ...t.attributes } });
+
+/** Keycloak's ReservedCharValidator.validateNoSpace: the message for the first offending character, or undefined. */
+export const validateAlias = (alias: string): string | undefined => {
+  for (const ch of alias) {
+    if (/\s/.test(ch)) {
+      return 'Empty Space not allowed.';
+    }
+    if (':/?#@!$&()*+,;=[]\\'.includes(ch)) {
+      return `Character '${ch}' not allowed.`;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * The e-mail domain rule Keycloak applies to a plain domain (hibernate-validator's
+ * EmailValidator via EmailValidationUtil): labels of letters, digits,
+ * !#$%&'*+/=?^`{|}~ (no underscore in Keycloak's copy of the pattern) and
+ * non-ASCII characters with inner hyphens, dot-joined,
+ * no trailing dot, or a bracketed IPv4 literal; 63 characters per label and 255
+ * in all. Approximation shared with the fake backend: the caps apply to the raw
+ * characters rather than to the punycode form, and the IPv6 literal is left out.
+ */
+const EMAIL_DOMAIN_CHARS = "[a-z0-9!#$%&'*+/=?^`{|}~\\u0080-\\uffff]";
+const EMAIL_DOMAIN_LABEL = `(?:${EMAIL_DOMAIN_CHARS}-*)*${EMAIL_DOMAIN_CHARS}+`;
+const EMAIL_DOMAIN = new RegExp(`^(?:${EMAIL_DOMAIN_LABEL}(?:\\.${EMAIL_DOMAIN_LABEL})*|\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])$`);
+const WILDCARD_PREFIX = '*.';
+
+const isEmailDomain = (domain: string): boolean =>
+  [...domain].length <= 255 && EMAIL_DOMAIN.test(domain) && domain.split('.').every((label) => [...label].length <= 63);
+
+/**
+ * Keycloak's Organizations.validateDomain (26.8.0), branch for branch, on a name
+ * that was already trimmed and lower-cased: the message, or undefined when valid.
+ * The two "parts" messages print the base (input without `*.`), the others the input.
+ */
+export const validateDomain = (domain: string): string | undefined => {
+  if (!domain.trim()) {
+    return 'Domain name cannot be empty';
+  }
+  let base = domain;
+  if (domain.includes(WILDCARD_PREFIX)) {
+    if (domain.length === WILDCARD_PREFIX.length) {
+      return `Wildcard domain must specify a base domain: ${domain}`;
+    }
+    if (!domain.startsWith(WILDCARD_PREFIX)) {
+      return 'Wildcard domain must start with the wildcard';
+    }
+    base = domain.slice(WILDCARD_PREFIX.length);
+    if (base.includes('*')) {
+      return `Multiple wildcards are not allowed: ${domain}`;
+    }
+    const parts = base.split('.').length;
+    if (parts < 2) {
+      return `Domain must have at least 2 parts (e.g. 'example.com'): ${base}`;
+    }
+    if (parts > 10) {
+      return `Domain has too many parts (max 10 allowed): ${base}`;
+    }
+  }
+  if (!isEmailDomain(base)) {
+    return `Invalid domain format: ${domain}`;
+  }
+  return undefined;
+};
+
+/** Trims and lower-cases (OrganizationDomainModel), validates, then de-duplicates like the fake backend. */
+const normalizeDomains = (names: string[]): TenantDomain[] => {
+  const out: TenantDomain[] = [];
+  for (const name of names) {
+    const lower = name.trim().toLowerCase();
+    const problem = validateDomain(lower);
+    if (problem) {
+      throw new ServiceError(422, problem);
+    }
+    if (!out.some((d) => d.name === lower)) {
+      out.push({ name: lower, verified: false, autoRedirect: false });
+    }
+  }
+  return out;
+};
+
+let mockIdCounter = 0;
+/** A UUID-shaped id that is stable within a session, so tests can predict it. */
+const mockUUID = (): string => `00000000-0000-4000-8000-${String(++mockIdCounter).padStart(12, '0')}`;
+
+const domain = (name: string, verified = false, identityProviderAlias?: string, autoRedirect = false): TenantDomain =>
+  identityProviderAlias === undefined ? { name, verified, autoRedirect } : { name, verified, identityProviderAlias, autoRedirect };
+
+type TenantSeed = Omit<Tenant, 'domains' | 'attributes' | 'description'> & { description?: string; attributes?: Record<string, string> };
+
+const tenantSeed = (t: TenantSeed): Tenant => ({
+  ...t,
+  description: t.description ?? '',
+  attributes: t.attributes ?? {},
+  domains: t.domainDetails.map((d) => d.name),
+});
+
+/**
+ * Mirrors mock/fixtures/tenants.json organization for organization; a test
+ * checks the two files agree.
+ */
 export const seedTenants = (): Tenant[] => [
-  { id: 'a1', name: 'tenant-a', domains: ['a.example.com'] },
-  { id: 'b2', name: 'tenant-b', domains: [] },
+  tenantSeed({
+    id: '3f1c9a72-5b6e-4d2a-8c01-2d3e4f5a6b7c',
+    name: 'acme-robotics',
+    alias: 'acme-robotics',
+    enabled: true,
+    description: 'Acme Robotics, EU region',
+    attributes: { 'ai-grid/region': 'europe-west', 'billing-account': 'ACME-0042' },
+    domainDetails: [domain('acme-robotics.example.com', true, 'acme-oidc', true), domain('acme.example.org')],
+  }),
+  tenantSeed({
+    id: '8d2e7b31-0c4f-4a9d-b5e6-7f8a9b0c1d2e',
+    name: 'globex-research',
+    alias: 'globex',
+    enabled: true,
+    description: 'Globex Research division',
+    domainDetails: [domain('globex.example.com', true)],
+  }),
+  tenantSeed({ id: 'c5a4d3e2-f1b0-4987-a6c5-d4e3f2a1b0c9', name: 'initech-labs', alias: 'initech-labs', enabled: true, domainDetails: [] }),
+  tenantSeed({
+    id: '0b7e5c1d-9a2f-4e3b-8d6c-1f2a3b4c5d6e',
+    name: 'umbrella-biotech',
+    alias: 'umbrella-biotech',
+    enabled: false,
+    description: 'Suspended pending contract renewal',
+    domainDetails: [domain('umbrella.example.net')],
+  }),
+  tenantSeed({
+    id: 'd4c3b2a1-6e5f-4a7b-9c8d-2e1f0a9b8c7d',
+    name: 'vandelay-industries',
+    alias: 'vandelay-industries',
+    enabled: true,
+    attributes: { 'ai-grid/region': 'us-east' },
+    domainDetails: [domain('*.vandelay.example.com', true)],
+  }),
+  tenantSeed({
+    id: '7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d',
+    name: 'wayne-aerospace',
+    alias: 'wayne-aerospace',
+    enabled: true,
+    description: 'Wayne Aerospace research cluster tenant',
+    domainDetails: [domain('wayne-aero.example.com', true, 'wayne-saml', false)],
+  }),
 ];

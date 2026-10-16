@@ -23,16 +23,25 @@ option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/a
 // the caller to be a provider admin; the backend then uses its own Keycloak
 // service credential.
 service Tenants {
-  // Lists tenants, ordered by name as Keycloak returns them.
+  // Lists tenants, ordered by name as Keycloak returns them, which is the
+  // realm database's collation (case-insensitive on a typical PostgreSQL
+  // locale; the fake uses byte order, so a client must not rely on how
+  // upper- and lower-case names interleave). Disabled tenants are included;
+  // there is no filter for `enabled`.
   rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse);
   // Returns one tenant by id. NotFound when absent.
   rpc GetTenant(GetTenantRequest) returns (GetTenantResponse);
-  // Creates a tenant. AlreadyExists when the name, alias or a domain is taken;
-  // InvalidArgument with Keycloak's message for a malformed domain.
+  // Creates a tenant (Keycloak POST, then GET of the Location). AlreadyExists
+  // with Keycloak's message when the name or alias is taken; InvalidArgument
+  // with Keycloak's message for a blank name, an alias with whitespace or
+  // reserved characters, a malformed domain or a domain another tenant owns.
   rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
-  // Updates the fields named in `update_mask`. `alias` is immutable.
+  // Updates the fields named in `update_mask` (Keycloak GET, merge, PUT).
+  // `alias` is immutable; a different value is InvalidArgument. A new name
+  // that matches another tenant's name or domain is AlreadyExists.
   rpc UpdateTenant(UpdateTenantRequest) returns (UpdateTenantResponse);
-  // Deletes a tenant and its memberships. NotFound when absent.
+  // Deletes a tenant and its memberships; unmanaged members stay realm
+  // users. NotFound when absent.
   rpc DeleteTenant(DeleteTenantRequest) returns (DeleteTenantResponse);
 }
 
@@ -44,9 +53,20 @@ message ListTenantsRequest {
   // Maximum number of results. Omitted means all; zero means count only;
   // negative is InvalidArgument.
   optional int32 limit = 2;
-  // CEL over `this` (a Tenant), for example `this.name.startsWith("acme")`.
+  // CEL over `this` (a Tenant). The only form supported today is the one
+  // that means what Keycloak's `search` parameter does, a case-insensitive
+  // contains on the name or on any domain:
+  //   this.name.contains("<term>") || this.domains.exists(d, d.contains("<term>"))
+  // with the same string literal in both places (CEL escapes `"` and `\`).
+  // The term is a literal substring: `%` and `_` match themselves, never act
+  // as wildcards. The backend may evaluate the expression in memory or push
+  // the term down to Keycloak's `search` parameter, which is a SQL LIKE
+  // built without escaping, so it MUST escape `%`, `_` and `\` in the term
+  // first; the fake's literal match is the reference behaviour. Any other
+  // expression is InvalidArgument naming it.
   optional string filter = 3;
-  // Sort order, `<field> [asc|desc]`. Default: by name.
+  // Sort order, `<field> [asc|desc]`. Keycloak only orders by name
+  // ascending, so a non-empty value is InvalidArgument today.
   optional string order = 4;
 }
 
@@ -74,7 +94,12 @@ message GetTenantResponse {
 
 // Request of CreateTenant.
 message CreateTenantRequest {
-  // `id` and `version` must be empty; `name` is required.
+  // `id` must be empty (Keycloak itself ignores a client id on POST; the
+  // console's draft rejects it so a mistaken PUT-as-POST is noticed);
+  // `name` is required. `alias` defaults to `name`; an omitted `enabled` is
+  // true. Domains come from `domain_details`, or from `domains` with default
+  // metadata when `domain_details` is empty; when both are set they must name
+  // the same domains in the same order.
   Tenant object = 1;
 }
 
@@ -86,12 +111,23 @@ message CreateTenantResponse {
 
 // Request of UpdateTenant.
 message UpdateTenantRequest {
-  // The tenant with the new values. `id` identifies it.
+  // Field 3 was `lock`: optimistic locking cannot be honoured against
+  // Keycloak (no server-side version), see `Tenant` field 8.
+  reserved 3;
+  reserved "lock";
+
+  // The tenant with the new values. `id` identifies it. `alias`, when set,
+  // must equal the stored alias.
   Tenant object = 1;
-  // Supported paths: `name`, `domains`, `enabled`, `description`, `attributes`.
+  // Supported paths: `name`, `domains`, `enabled`, `description`,
+  // `attributes`, `domain_details`. A path replaces that field as a whole
+  // (`domains` replaces the set of names and keeps the metadata of a domain
+  // that stays; `domain_details` replaces names and metadata). Without a
+  // mask the request is Keycloak's PUT of a body without the `attributes` and
+  // `domains` keys: `name`, `enabled` (true when omitted, as Keycloak
+  // defaults it) and `description` are replaced, `attributes` and the
+  // domains are left unchanged.
   google.protobuf.FieldMask update_mask = 2;
-  // When true, fails with Aborted unless `object.version` matches.
-  bool lock = 3;
 }
 
 // Response of UpdateTenant.

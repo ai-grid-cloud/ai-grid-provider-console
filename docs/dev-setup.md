@@ -27,7 +27,8 @@ gRPC services from `mock/fixtures` and answers the BFF's access review like a hu
 make dev-fake` shows the console as a user who is not a provider admin (no enrol or remove
 actions, and the fake backend answers `PermissionDenied` to a write), and
 `AUTH_TOKEN=expired-token` the signed-out path. Edit the fixtures and restart to change the
-fleet. The fake also moves clusters over time (`mock/fixtures/scenarios.json`: a cluster
+fleet or the tenants (`mock/fixtures/tenants.json` can also reproduce a Keycloak that is
+unreachable or has no `ai-grid` realm, see `mock/README.md`). The fake also moves clusters over time (`mock/fixtures/scenarios.json`: a cluster
 imports, one detaches, one recovers its lease); set `speed` in `mock/fixtures/settings.json`
 to play those faster. The gRPC services need `authorization` metadata like the real backend,
 which the BFF forwards from the proxy headers.
@@ -43,7 +44,8 @@ make dev            # backend on :9090, BFF on :8080, frontend on :9000
 Open http://127.0.0.1:9000. The masthead shows the `oc` user; Clusters lists the hub's
 `ManagedClusters` as the backend reports them. Tenants shows an error until the backend
 can reach a Keycloak with an `ai-grid` realm (the dev hub has Keycloak in `grid-sso` but
-no realm yet).
+no realm yet); against the fake (`make dev-fake`) it lists the organizations in
+`mock/fixtures/tenants.json` and a provider admin can create, edit and delete them.
 
 How the pieces connect:
 

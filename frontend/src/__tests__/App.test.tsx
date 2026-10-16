@@ -26,8 +26,8 @@ describe('App', () => {
     render(<App service={new MockConsoleService()} />);
     fireEvent.click(await screen.findByRole('link', { name: 'Tenants' }));
 
-    expect(await screen.findByText('tenant-a')).toBeInTheDocument();
-    expect(screen.getByText('a.example.com')).toBeInTheDocument();
+    expect(await screen.findByTestId('tenant-acme-robotics')).toBeInTheDocument();
+    expect(screen.getByText('globex.example.com')).toBeInTheDocument();
   });
 
   it('shows a not-available state, not an error, when the backend lacks the RPC', async () => {

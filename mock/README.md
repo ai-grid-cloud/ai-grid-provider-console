@@ -119,20 +119,30 @@ console's derivation order documented on the enum. The flattened claim fields an
 `cluster_claims` and the `feature.open-cluster-management.io/addon-*` labels, which the proto
 already carries verbatim.
 
+The Tenants area removed two drafted fields instead of adding: `Tenant.version` (field 8)
+and `UpdateTenantRequest.lock` (field 3) are `reserved`, because Keycloak Organizations have
+no server-side version, etag or `Last-Modified` and a Keycloak-backed backend could never
+honour them (`research/keycloak.md` 8.1). It added `TenantDomain` and
+`repeated TenantDomain domain_details = 9` (`name`, `verified`, `identity_provider_alias`,
+`auto_redirect`, the fields Keycloak 26.8 keeps per domain), kept `domains` as the list of
+names, and narrowed `ListTenantsRequest.filter` to the one CEL form the backend can push down
+to Keycloak's `search`, `this.name.contains("<term>") || this.domains.exists(d, d.contains("<term>"))`.
+
 ## Fixtures (`fixtures/`)
 
 | File | Shape | Notes |
 |---|---|---|
 | `managedclusters.json` | `{"clusters": [ai_grid.v1.ManagedCluster...]}` in protojson | Full hub objects: labels exactly as ACM writes them (`name`, `cloud`, `vendor`, `clusterID`, `openshiftVersion*`, `clusterset=default`, `feature.open-cluster-management.io/addon-*`) plus the console's `ai-grid/*` labels and annotations, `uid`, `resourceVersion`, `creationTimestamp`, finalizers, taints, client configs, and a `status` with every condition's exact type, reason and message, name-sorted claims, capacity (`nvidia.com/gpu` on GPU clusters) and version. One cluster per state the ACM console distinguishes: `local-cluster`, `site-paris-1`, `site-frankfurt-1` ready (Paris enrolled with GPUs, Frankfurt not enrolled); `site-madrid-1` unknown (lease expired, taint `unreachable`, add-ons `unreachable`); `site-ashburn-1` offline (API server down, taint `unavailable`); `site-berlin-1` importing and `site-oslo-1` pending import (`auto-detect` labels, no claims); `site-dublin-1` import failed; `site-lisbon-1` not accepted (`hubAcceptsClient: false`, `HubClusterAdminDenied`); `edge-lyon-2` detaching (`deletionTimestamp`, `Deleting/ResourceRemaining`; the research verified that reason but not its message, which is left empty). `status.state` and `status.stateMessage` are derived by the server on every read and must not be written here. |
-| `tenants.json` | `{"tenants": [ai_grid.v1.Tenant...]}` | Keycloak Organizations as the backend maps them. Replace with `{"unavailable": "..."}` to reproduce the dev hub, where the `ai-grid` realm does not exist. |
-| `access.json` | who is a provider admin | Drives the fake hub's access review **and** the fake backend's answer to a mutating RPC: a token in `deniedTokens` (or any token when `defaultAllowed` is false) gets `PermissionDenied` with the API server's forbidden message from `UpdateManagedCluster`, a token in `rejectedTokens` gets `Unauthenticated` from every RPC, reads included, like an expired OpenShift token at the hub; so `AUTH_TOKEN=viewer-token` sees the clusters but cannot enrol one (the BFF answers 403 and the UI hides the actions) and `AUTH_TOKEN=expired-token` sees nothing but the signed-out path. |
+| `tenants.json` | `{"tenants": [ai_grid.v1.Tenant...]}` in protojson | Keycloak 26.8 Organizations as the backend maps them: UUID `id`, unique `name` and `alias` (alias defaults to the name and never changes), `enabled`, `description`, `attributes` (first value per key), `domains` as the lower-case names of `domainDetails`, each with `verified`, `identityProviderAlias`, `autoRedirect`. Six fictional organizations: one disabled (`umbrella-biotech`), one with two domains and attributes (`acme-robotics`), one with a wildcard domain (`vandelay-industries`), one without domains (`initech-labs`), one whose alias differs from its name (`globex-research` / `globex`). The fake validates the file like Keycloak would (duplicate name, alias or domain, bad domain, non-v4-UUID id fail at start). Other modes, one at a time: `{"unavailable": "<text>"}` makes every Tenants RPC `Unavailable` (message `Keycloak is unavailable: <text>`; the shipped backend still returns `Unknown` here), `{"realmMissing": true}` makes them `FailedPrecondition` with `Keycloak realm "ai-grid": Realm not found.` (the dev hub today), `{"organizationsDisabled": true}` the same with `Organizations not enabled for this realm.`. |
+| `access.json` | who is a provider admin | Drives the fake hub's access review **and** the fake backend's answer to a mutating RPC: a token in `deniedTokens` (or any token when `defaultAllowed` is false) gets `PermissionDenied` with the API server's forbidden message from `UpdateManagedCluster` and with "is not a provider admin" from `CreateTenant`, `UpdateTenant` and `DeleteTenant`, a token in `rejectedTokens` gets `Unauthenticated` from every RPC, reads included, like an expired OpenShift token at the hub; so `AUTH_TOKEN=viewer-token` sees the clusters and tenants but cannot enrol a cluster or create a tenant (the BFF answers 403 and the UI hides the actions) and `AUTH_TOKEN=expired-token` sees nothing but the signed-out path. |
 | `settings.json` | latency, speed | A hub list from a pod on the hub takes tens of milliseconds. `speed` multiplies the scenario clock (`10` plays the five-minute scenario in 30 seconds; default `1`). |
 
 Fixtures are protojson so they use the field names grpcurl shows and fail to load on any
 unknown field. Tests load the shipped directory and check the ACM labels, that every
 condition uses only a type, reason and message the research verified, that claims are
-sorted, that hub taints match the Available condition, and that each cluster derives the
-state it was seeded for.
+sorted, that hub taints match the Available condition, that each cluster derives the
+state it was seeded for, and that the tenants are a realm Keycloak would accept and cover
+the shapes the UI renders.
 
 ## What the research found, in one paragraph each
 
@@ -226,15 +236,60 @@ message (`proto/ai_grid/v1/managed_cluster*.proto`), with the state derived serv
 
 ### 2. Tenants (Keycloak Organizations)
 
-Fake: an in-memory organization store with UUID ids, unique name and alias, alias defaulting
-to name and immutable, domain validation with Keycloak's messages, full-replace update
-semantics unless a field mask is given, offset paging and search, delete, and members from a
-small fictional user list; error injection for a missing realm (`FailedPrecondition`) and an
-unreachable Keycloak (`Unavailable`).
-Frontend: tenant list with search and paging, create and edit forms whose validation errors
-are the ones Keycloak would send, delete with confirmation, a members view.
-Backend ask: the `Tenants` CRUD proto in `research/keycloak.md` section 8, keyed by `id`;
-the gRPC code table there; a scoped service-account client instead of the master admin.
+Implemented. Fake (`bff/internal/fakebackend/{keycloak.go,tenants.go}`): an in-memory
+organization store keyed by UUID v4 that answers like the backend's mapping of Keycloak 26.8
+(`research/keycloak.md` 3, 5, 8). `CreateTenant` checks in Keycloak's order: an explicit
+alias with whitespace or an RFC 3986 reserved character ("Empty Space not allowed." /
+"Character '/' not allowed."), a blank name ("Name can not be null"), the alias defaulting to
+the name ("Name cannot be used as alias: ..."), a taken name or alias (`AlreadyExists`, "A
+organization with the same name already exists." / "...same alias already exists"), then the
+domains with `Organizations.validateDomain`'s messages, lower-cased, unique across the realm
+("Domain X is already linked to organization Y in realm ai-grid"); `enabled` is stored as
+sent. Domain names are trimmed and lower-cased before validation, as `OrganizationDomainModel`
+does, so messages print the canonical form; the wildcard "parts" messages print the base
+without `*.`, and a `*` not followed by a dot is an ordinary e-mail-domain character
+(`*acme.example.com` is accepted). The e-mail-domain rule is hibernate's pattern with two
+documented approximations (length caps on raw characters instead of punycode, no IPv6
+literal). `UpdateTenant` is the backend's GET, merge, PUT: mask paths `name`, `domains`,
+`enabled`, `description`, `attributes`, `domain_details` replace the field as a whole (the
+`domains` path keeps the metadata of a domain that stays); without a mask the scalars are
+replaced (`enabled` to true when unset, Keycloak's default) and `attributes` and the domains
+left alone, which is what a Keycloak PUT does with a body that lacks those keys; a different
+alias is "Cannot change the alias", a new name that matches another organization's name or
+any organization's domain, its own included, is `AlreadyExists` (Keycloak's exact search
+matches both and does not exclude the organization itself). `ListTenants` orders by name
+(byte order, an approximation of the realm database's collation), pages with `offset`/`limit`
+(`total` from the whole search like `/count`), includes disabled organizations and evaluates
+the one filter form `this.name.contains("<term>") || this.domains.exists(d, d.contains("<term>"))`,
+the expression that means what Keycloak's `search` does (contains on name or any domain). `Get`
+and `Delete` answer `NotFound` with the conventions' message and log Keycloak's "Organization
+not found.". Everything Keycloak would decide is answered only after the Keycloak gate, so
+with Keycloak unreachable a bad domain is `Unavailable`, as it would be from the real backend.
+Mutations are gated by the provider-admin rule of `access.json` (`PermissionDenied`); every
+RPC needs `authorization`. `tenants.json` selects the three failure modes (`unavailable`,
+`realmMissing`, `organizationsDisabled`); latency applies.
+Invented here, because nothing in Keycloak or the conventions fixes a text, and proposed to
+the backend in `research/keycloak.md` 8.2 so they become the contract: the `PermissionDenied`
+message ("User ... is not a provider admin: ..."), the `FailedPrecondition` wrapper
+(`Keycloak realm "ai-grid": ` before Keycloak's text), the `Unavailable` prefix, the
+request-shape messages ("object is required", "id is required", "object.id must be empty"; the
+draft rejects a client id that Keycloak would ignore) and "domains and domain_details name
+different domains". The UI only displays them.
+BFF: `GET /api/v1/tenants?offset=&limit=&search=` with a `meta` page, `GET/PATCH/DELETE
+/api/v1/tenants/{id}`, `POST /api/v1/tenants` (201 + Location); Keycloak's messages reach the
+UI as 422 and 409; an absent `enabled` from today's backend (fields 1-3 only) reads as enabled.
+Frontend: list with search, paging, name/alias/domains/enabled columns, create and edit modal
+(alias read-only on edit) that shows the server's validation message, enable/disable and
+delete with confirmation for provider admins only; the browser mock applies the same rules
+and mirrors the fixture file, with a test that keeps them in step.
+Remaining here: members (list, add, remove, invite; the draft has no member RPCs yet, open
+question 3 in `research/keycloak.md`), the realm and service-account bootstrap (section 9),
+attribute editing in the UI (the PATCH exists), and the `exact` search form.
+Backend ask: the `Tenants` CRUD proto as now drafted in `proto/ai_grid/v1/tenant*.proto`
+(without `version`/`lock`, with `domain_details` and `optional bool enabled`), keyed by `id`;
+the gRPC code table and the proposed message texts in `research/keycloak.md` 8.2 (today every
+failure is `Unknown`); reading both Keycloak error body shapes (`errorMessage` and `error`);
+a scoped service-account client instead of the master admin.
 
 ### 3. Models (LLMInferenceService, Placement, ManifestWorkReplicaSet)
 

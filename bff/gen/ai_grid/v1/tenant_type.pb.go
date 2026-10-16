@@ -36,26 +36,43 @@ const (
 // A consumer organisation. Backed by a Keycloak Organization in the AI Grid realm.
 //
 // Fields 1-3 are the ones the backend ships and must not move. New fields are
-// appended.
+// appended. Keycloak serialises with NON_NULL, so an unset `description`
+// and an organization without domains arrive without those keys; in proto
+// that is the empty string and the empty list, nothing more to do.
 type Tenant struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Keycloak Organization id (UUID). Output only; the identifier for Get/Update/Delete.
+	// Keycloak Organization id (UUID v4). Output only; the identifier for Get/Update/Delete.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// Organization name. Required on create, unique within the realm, 1-255 chars.
+	// Organization name. Required on create, unique within the realm
+	// (Keycloak: 409 "A organization with the same name already exists.").
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	// E-mail domains owned by the tenant; each must be a lowercase DNS hostname,
-	// unique across tenants.
+	// E-mail domains owned by the tenant: the `name` of each `domain_details`
+	// entry, in the same order. Keycloak trims and lower-cases them, validates
+	// them as the domain part of an e-mail address (hibernate-validator's rule:
+	// labels of letters, digits, `!#$%&'*+/=?^`{|}~` (no underscore) and non-ASCII characters
+	// with inner hyphens, at most 63 characters each and 255 in all) or as one
+	// wildcard `*.base.tld` whose base has 2 to 10 parts, and keeps them unique
+	// across the realm (mock/research/keycloak.md 5.7).
 	Domains []string `protobuf:"bytes,3,rep,name=domains,proto3" json:"domains,omitempty"`
-	// URL-safe alias. Defaults to `name` on create. Immutable.
+	// URL-safe alias (no whitespace or RFC 3986 reserved characters). Defaults
+	// to `name` on create. Immutable (Keycloak: 400 "Cannot change the alias").
 	Alias string `protobuf:"bytes,4,opt,name=alias,proto3" json:"alias,omitempty"`
-	// Whether members can log in. Default true on create.
-	Enabled bool `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Whether members can log in. Optional so that absence is visible: Keycloak
+	// defaults an omitted value to true on create and on a full update, and a
+	// backend that does not fill this field yet (the shipped one) reads as
+	// enabled. Always set on output.
+	Enabled *bool `protobuf:"varint,5,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"`
 	// Free-text description shown in the console.
 	Description string `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
-	// Keycloak Organization attributes. Opaque to the backend.
+	// Keycloak Organization attributes. Keycloak stores `map<string, list<string>>`;
+	// this field carries the first value of each key (lossy; see
+	// mock/research/keycloak.md open question 4).
 	Attributes map[string]string `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	// Server-assigned, increments on every change; used by `lock` on Update. Output only.
-	Version       int32 `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	// The domains with their Keycloak metadata. `verified` is free-form (no
+	// verification flow exists), `identity_provider_alias` and `auto_redirect`
+	// route logins for that domain to one of the organization's identity
+	// providers. Always consistent with `domains`.
+	DomainDetails []*TenantDomain `protobuf:"bytes,9,rep,name=domain_details,json=domainDetails,proto3" json:"domain_details,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -119,8 +136,8 @@ func (x *Tenant) GetAlias() string {
 }
 
 func (x *Tenant) GetEnabled() bool {
-	if x != nil {
-		return x.Enabled
+	if x != nil && x.Enabled != nil {
+		return *x.Enabled
 	}
 	return false
 }
@@ -139,11 +156,85 @@ func (x *Tenant) GetAttributes() map[string]string {
 	return nil
 }
 
-func (x *Tenant) GetVersion() int32 {
+func (x *Tenant) GetDomainDetails() []*TenantDomain {
 	if x != nil {
-		return x.Version
+		return x.DomainDetails
 	}
-	return 0
+	return nil
+}
+
+// One organization domain, as Keycloak 26.8 represents it
+// (`OrganizationDomainRepresentation`).
+type TenantDomain struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Lower-case DNS name or `*.base.tld`.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Whether the provider marked the domain as verified. Default false.
+	Verified bool `protobuf:"varint,2,opt,name=verified,proto3" json:"verified,omitempty"`
+	// Alias of the organization identity provider that handles this domain, or empty.
+	IdentityProviderAlias string `protobuf:"bytes,3,opt,name=identity_provider_alias,json=identityProviderAlias,proto3" json:"identity_provider_alias,omitempty"`
+	// Redirect logins for this domain straight to that identity provider.
+	AutoRedirect  bool `protobuf:"varint,4,opt,name=auto_redirect,json=autoRedirect,proto3" json:"auto_redirect,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TenantDomain) Reset() {
+	*x = TenantDomain{}
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TenantDomain) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TenantDomain) ProtoMessage() {}
+
+func (x *TenantDomain) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_tenant_type_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TenantDomain.ProtoReflect.Descriptor instead.
+func (*TenantDomain) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_tenant_type_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TenantDomain) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *TenantDomain) GetVerified() bool {
+	if x != nil {
+		return x.Verified
+	}
+	return false
+}
+
+func (x *TenantDomain) GetIdentityProviderAlias() string {
+	if x != nil {
+		return x.IdentityProviderAlias
+	}
+	return ""
+}
+
+func (x *TenantDomain) GetAutoRedirect() bool {
+	if x != nil {
+		return x.AutoRedirect
+	}
+	return false
 }
 
 var File_ai_grid_v1_tenant_type_proto protoreflect.FileDescriptor
@@ -151,21 +242,28 @@ var File_ai_grid_v1_tenant_type_proto protoreflect.FileDescriptor
 const file_ai_grid_v1_tenant_type_proto_rawDesc = "" +
 	"\n" +
 	"\x1cai_grid/v1/tenant_type.proto\x12\n" +
-	"ai_grid.v1\"\xb5\x02\n" +
+	"ai_grid.v1\"\xfc\x02\n" +
 	"\x06Tenant\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\adomains\x18\x03 \x03(\tR\adomains\x12\x14\n" +
-	"\x05alias\x18\x04 \x01(\tR\x05alias\x12\x18\n" +
-	"\aenabled\x18\x05 \x01(\bR\aenabled\x12 \n" +
+	"\x05alias\x18\x04 \x01(\tR\x05alias\x12\x1d\n" +
+	"\aenabled\x18\x05 \x01(\bH\x00R\aenabled\x88\x01\x01\x12 \n" +
 	"\vdescription\x18\x06 \x01(\tR\vdescription\x12B\n" +
 	"\n" +
 	"attributes\x18\a \x03(\v2\".ai_grid.v1.Tenant.AttributesEntryR\n" +
-	"attributes\x12\x18\n" +
-	"\aversion\x18\b \x01(\x05R\aversion\x1a=\n" +
+	"attributes\x12?\n" +
+	"\x0edomain_details\x18\t \x03(\v2\x18.ai_grid.v1.TenantDomainR\rdomainDetails\x1a=\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01BOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\b_enabledJ\x04\b\b\x10\tR\aversion\"\x9b\x01\n" +
+	"\fTenantDomain\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bverified\x18\x02 \x01(\bR\bverified\x126\n" +
+	"\x17identity_provider_alias\x18\x03 \x01(\tR\x15identityProviderAlias\x12#\n" +
+	"\rauto_redirect\x18\x04 \x01(\bR\fautoRedirectBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
 
 var (
 	file_ai_grid_v1_tenant_type_proto_rawDescOnce sync.Once
@@ -179,18 +277,20 @@ func file_ai_grid_v1_tenant_type_proto_rawDescGZIP() []byte {
 	return file_ai_grid_v1_tenant_type_proto_rawDescData
 }
 
-var file_ai_grid_v1_tenant_type_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ai_grid_v1_tenant_type_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_ai_grid_v1_tenant_type_proto_goTypes = []any{
-	(*Tenant)(nil), // 0: ai_grid.v1.Tenant
-	nil,            // 1: ai_grid.v1.Tenant.AttributesEntry
+	(*Tenant)(nil),       // 0: ai_grid.v1.Tenant
+	(*TenantDomain)(nil), // 1: ai_grid.v1.TenantDomain
+	nil,                  // 2: ai_grid.v1.Tenant.AttributesEntry
 }
 var file_ai_grid_v1_tenant_type_proto_depIdxs = []int32{
-	1, // 0: ai_grid.v1.Tenant.attributes:type_name -> ai_grid.v1.Tenant.AttributesEntry
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 0: ai_grid.v1.Tenant.attributes:type_name -> ai_grid.v1.Tenant.AttributesEntry
+	1, // 1: ai_grid.v1.Tenant.domain_details:type_name -> ai_grid.v1.TenantDomain
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_ai_grid_v1_tenant_type_proto_init() }
@@ -198,13 +298,14 @@ func file_ai_grid_v1_tenant_type_proto_init() {
 	if File_ai_grid_v1_tenant_type_proto != nil {
 		return
 	}
+	file_ai_grid_v1_tenant_type_proto_msgTypes[0].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_grid_v1_tenant_type_proto_rawDesc), len(file_ai_grid_v1_tenant_type_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

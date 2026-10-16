@@ -44,7 +44,7 @@ backend service for cluster access and this BFF for the browser.
 | Login in development | The Vite dev server and `hack/api.sh` set the same headers from `oc whoami` and `oc whoami -t`. The backend runs locally with `--kubeconfig` (`hack/dev-backend.sh`). | Any developer who has run `oc login` works against a real hub. |
 | Deployment | One pod: kube-auth-proxy (:8443), bff on `127.0.0.1:8080`, ai-grid-backend on `127.0.0.1:9090`. The BFF dials the backend in plaintext over loopback; plaintext to any other address is refused unless `BACKEND_INSECURE=true`. The kubelet probes `/readyz` through the proxy (`--skip-auth-route=^/readyz$`); neither the BFF nor the backend has a probe of its own. | Nothing on the pod network can reach the BFF with forged identity headers or the backend at all. When the backend gets its own Deployment, set `BACKEND_ADDRESS` to its Service and `BACKEND_CA_FILE` to its serving CA. |
 | Cluster labels | `ai-grid/enabled`, `ai-grid/provisioned`, `location`, `ai-grid/site`, `ai-grid/region`, and ACM's `openshiftVersion`. | The POC's conventions (site and region were added to the POC on 2026-10-14) so that Placements written by either tool select the same clusters. The BFF derives fields from the labels the backend returns. |
-| Response envelope | Success: `{"data": ...}`. Error: `{"error": {"code": "<http status>", "message": "..."}}`. | Same as the odh-dashboard BFFs. |
+| Response envelope | Success: `{"data": ...}`; a paged list adds `"meta": {"size", "total", "offset", "limit"}` next to `data` (`limit` omitted when the caller asked for everything). Error: `{"error": {"code": "<http status>", "message": "..."}}`. `DELETE` answers 204 with no body. | Same as the odh-dashboard BFFs; `meta` is only on list endpoints that page, so the shape of `data` never changes. |
 | Tests | `httptest` against an in-memory backend (`internal/backend/backendtest`, gRPC over `bufconn`). | No cluster, no binaries; the fake records incoming metadata so identity forwarding is tested. `hack/smoke.sh` checks a live backend. |
 
 ## Modules
@@ -77,7 +77,11 @@ Paths are under `/api/v1`.
 | GET | `/api/v1/clusters` | `GridCluster[]` sorted by name | `ManagedClusters/ListManagedClusters` |
 | GET | `/api/v1/clusters/{name}` | `GridCluster` | `ManagedClusters/GetManagedCluster`; 404 with the backend's message when absent. Against a backend without that RPC (the shipped one answers `Unimplemented`) the BFF filters `ListManagedClusters` by name instead, so the detail works either way |
 | PATCH | `/api/v1/clusters/{name}` | `GridCluster` after the write | `GetManagedCluster` then `UpdateManagedCluster` with mask `labels` and/or `annotations` and `lock: true` on the fetched `resource_version`; 409 when the hub object changed in between, 422 on a bad body, 413 over 1 MiB |
-| GET | `/api/v1/tenants` | `Tenant[]` sorted by name | `Tenants/ListTenants` |
+| GET | `/api/v1/tenants?offset=&limit=&search=` | `Tenant[]` in Keycloak's order (by name, the realm database's collation) plus `meta`; `search` is a case-insensitive literal substring of the name or a domain (`%` and `_` are not wildcards: a backend that pushes the term to Keycloak's `search`, a SQL LIKE, must escape them first); `limit` omitted returns everything | `Tenants/ListTenants` with `offset`, `limit` and `filter: this.name.contains("<search>") \|\| this.domains.exists(d, d.contains("<search>"))` |
+| GET | `/api/v1/tenants/{id}` | `Tenant` | `Tenants/GetTenant`; 404 with the backend's message when absent |
+| POST | `/api/v1/tenants` | 201, `Tenant` as created, `Location: /api/v1/tenants/{id}` | `Tenants/CreateTenant`; 422 with Keycloak's message on a bad name, alias or domain, 409 on a taken name or alias |
+| PATCH | `/api/v1/tenants/{id}` | `Tenant` after the write | `Tenants/UpdateTenant` with the present body fields as the mask; 422 "Cannot change the alias", 409 on a taken name |
+| DELETE | `/api/v1/tenants/{id}` | 204 | `Tenants/DeleteTenant`; 404 when absent |
 
 `GridCluster` (fields the shipped backend does not fill are omitted or empty, so the page
 also works against a backend that only returns `name`, `labels`, `hubAcceptsClient`):
@@ -142,7 +146,54 @@ anything after the object is 422, more than 1 MiB is 413, and the body is valida
 before the backend is called. The BFF sends the whole `labels` and `annotations` maps
 back (field masks replace a map as a whole) and only the maps it changed are in the mask.
 
-`Tenant`: `{"id": "<keycloak org id>", "name": "tenant-a", "domains": ["a.example.com"]}`.
+`Tenant` (a Keycloak Organization in the `ai-grid` realm, `mock/research/keycloak.md` section 4;
+the collections are always present even though Keycloak omits an empty `domains`):
+
+```json
+{
+  "id": "3f1c9a72-5b6e-4d2a-8c01-2d3e4f5a6b7c",
+  "name": "acme-robotics",
+  "alias": "acme-robotics",
+  "enabled": true,
+  "description": "Acme Robotics, EU region",
+  "domains": ["acme-robotics.example.com", "acme.example.org"],
+  "domainDetails": [
+    {"name": "acme-robotics.example.com", "verified": true, "identityProviderAlias": "acme-oidc", "autoRedirect": true},
+    {"name": "acme.example.org", "verified": false, "autoRedirect": false}
+  ],
+  "attributes": {"ai-grid/region": "europe-west", "billing-account": "ACME-0042"}
+}
+```
+
+- `alias` is the URL-safe handle: it defaults to `name` on create and cannot change
+  afterwards. Against today's backend (fields `id`, `name`, `domains` only) the BFF fills it
+  from `name`, derives `domainDetails` from `domains` and reads the absent `enabled` as true
+  (Keycloak's default), so the page does not show every tenant as disabled.
+- `domains` are the names of `domainDetails`, lower-case, unique across tenants; Keycloak
+  accepts the domain part of an e-mail address or one wildcard `*.base.tld`.
+
+`POST /api/v1/tenants` body: `{"name": "acme-robotics", "alias": "acme", "description": "...",
+"enabled": true, "domains": ["acme.example.com"], "attributes": {"k": "v"}}`; only `name` is
+required, `alias` defaults to the name, an omitted `enabled` is passed through as unset and
+the backend applies Keycloak's default (true). Unknown fields, trailing content after the JSON
+value and malformed JSON are rejected (422), a body over 1 MiB with 413; everything else is
+validated by the backend, whose Keycloak message comes back as the 422 or 409 message.
+
+`PATCH /api/v1/tenants/{id}` body, every field optional: `{"name": "...", "description": "...",
+"enabled": false, "domains": ["..."], "attributes": {"k": "v"}, "alias": "<unchanged>"}`. An
+absent field is left alone; a present field replaces the stored one as a whole (`domains: []`
+removes every domain, `attributes: {}` every attribute; a domain that stays keeps its
+`verified` and identity-provider metadata); `null` is the same as absent. `alias` may be sent
+for a round trip but must equal the stored alias. The present fields become the field mask of
+one `UpdateTenant` call; an empty body, or one with only `alias`, reads the tenant and answers
+without a write (422 "Cannot change the alias" when the alias differs). There is no optimistic
+locking: Keycloak Organizations carry no version.
+
+The list response:
+
+```json
+{"data": [...], "meta": {"size": 10, "total": 42, "offset": 0, "limit": 10}}
+```
 
 ### Waiting on backend RPCs
 
@@ -153,11 +204,12 @@ exists; the frontend uses the mock service meanwhile.
 |---|---|---|---|
 | GET | `/api/v1/user` (`isProviderAdmin`) | Optional: `AiGrid/GetCurrentUser` returning roles, once the backend acts as the caller; today the BFF asks the hub directly | Step 1 |
 | GET/PATCH | `/api/v1/clusters[/{name}]` (implemented against the draft) | The backend has to ship the draft's `GetManagedCluster`, `UpdateManagedCluster` and the richer `ManagedCluster` (`mock/proto/ai_grid/v1/managed_cluster*.proto`), with `status.state` derived server-side; `patch` on managedclusters in its ClusterRole | Steps 2, 10 |
+| GET/POST/PATCH/DELETE | `/api/v1/tenants[/{id}]` (implemented against the draft) | The backend has to ship the draft's `GetTenant`, `CreateTenant`, `UpdateTenant`, `DeleteTenant`, the paged `ListTenants` and the richer `Tenant` (`mock/proto/ai_grid/v1/tenant*.proto`), mapping Keycloak outcomes to the codes in `mock/research/keycloak.md` 8.2 instead of `Unknown`, and gating mutations on the provider-admin check | Step 6 |
 | GET | `/api/v1/grid/overview?range=1h|6h|24h&site=&metrics=false` | `Grid/GetOverview` with the POC's metric contract: requests, errors, latency, gpu from Thanos with a `cluster` label; `metricsSource: thanos|demo` | Steps 5, 10 |
 | GET/POST/PATCH/PUT/DELETE | `/api/v1/models[/{name}]` | `Models/*` over Placement and ManifestWorkReplicaSet (feature plan 3a: `feedbackRules`, `SelectivelyOrphan`); needs the `ManifestWorkReplicaSet` feature gate on the hub | Steps 3, 4 |
 | GET/POST/PUT/DELETE | `/api/v1/catalog[/{name}]` | `Catalog/*` on ConfigMaps | Step 9 |
 | GET/POST/PUT/DELETE | `/api/v1/subscriptions[/{name}]` | `Subscriptions/*` over MaaSSubscription | Step 8 |
-| POST/PUT/DELETE | `/api/v1/tenants[/{name}]` | `Tenants/CreateTenant`, `UpdateTenant`, `DeleteTenant` on Keycloak Organizations | Step 6 |
+| GET/POST/DELETE | `/api/v1/tenants/{id}/members[/{userId}]` | Member RPCs on `Tenants` (not drafted yet; `mock/research/keycloak.md` open question 3) | Step 6 |
 | GET | `/api/v1/grid` | `Grid/GetNetwork` from `grid.praxis.fast/v1alpha1` once the RHOAI AI Gateway component installs the CRDs | Step 10a |
 
 ## Errors
@@ -170,13 +222,14 @@ exists; the frontend uses the mock service meanwhile.
 | Backend `Unauthenticated` | 401 |
 | Backend `PermissionDenied` (the hub's RBAC denies the caller, e.g. a PATCH by a user who may not patch ManagedClusters) | 403, backend message kept |
 | Backend `NotFound` | 404, backend message kept (`object with identifier '<name>' not found`) |
-| Invalid PATCH body (unknown field, wrong type, coordinate out of range) | 422, BFF message |
-| Backend `InvalidArgument`, `OutOfRange` | 422, backend message kept |
-| Backend `AlreadyExists`, `Aborted` (the cluster changed between the BFF's read and write) | 409 |
-| Backend `FailedPrecondition` | 412 |
+| Invalid POST or PATCH body (unknown field, wrong type, trailing content, coordinate out of range), bad `offset`/`limit` query | 422, BFF message |
+| Request body over 1 MiB | 413 |
+| Backend `InvalidArgument`, `OutOfRange` (including Keycloak's validation messages: "Name can not be null", "Invalid domain format: x", "Cannot change the alias", "Domain x is already linked to organization y in realm ai-grid") | 422, backend message kept |
+| Backend `AlreadyExists` (Keycloak: "A organization with the same name already exists."), `Aborted` (the cluster changed between the BFF's read and write) | 409, backend message kept |
+| Backend `FailedPrecondition` (hub feature gate missing; Keycloak realm missing or organizations disabled) | 412, backend message kept |
 | Backend `ResourceExhausted` | 429 |
 | Backend `Unimplemented` | 501 |
-| Backend `Unavailable`, `Canceled` | 503 |
+| Backend `Unavailable` (hub or Keycloak unreachable), `Canceled` | 503 |
 | Backend `DeadlineExceeded` or BFF timeout (`BACKEND_TIMEOUT`, 10s) | 504 |
 | Any other backend code | 502, generic message, detail in the BFF log |
 

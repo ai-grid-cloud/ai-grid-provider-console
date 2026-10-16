@@ -18,7 +18,11 @@ import (
 //	managedclusters.json  {"clusters": [ManagedCluster...]} in protojson
 //	tenants.json          {"tenants": [Tenant...]} in protojson, or
 //	                      {"unavailable": "<error text>"} to simulate a backend
-//	                      whose Keycloak cannot be reached
+//	                      whose Keycloak cannot be reached, or
+//	                      {"realmMissing": true} for a Keycloak without the
+//	                      ai-grid realm (the dev hub today), or
+//	                      {"organizationsDisabled": true} for a realm whose
+//	                      organizations feature is off
 //	access.json           who the fake hub treats as provider admin
 //	settings.json         latency, scenario speed and other knobs
 //	scenarios.json        {"events": [ScenarioEvent...]} timed transitions
@@ -26,11 +30,13 @@ import (
 // Proto messages are decoded with protojson so the files use the same field
 // names (lowerCamelCase) that grpcurl and the real backend's JSON logs show.
 type Fixtures struct {
-	Clusters           []*aigridv1.ManagedCluster
-	Tenants            []*aigridv1.Tenant
-	TenantsUnavailable string
-	Access             Access
-	Latency            Duration
+	Clusters            []*aigridv1.ManagedCluster
+	Tenants             []*aigridv1.Tenant
+	TenantsUnavailable  string
+	TenantsRealmMissing bool
+	TenantsOrgsDisabled bool
+	Access              Access
+	Latency             Duration
 	// Speed multiplies the scenario clock; 2 fires a "20s" event after 10s.
 	// Zero (not set) means 1.
 	Speed     float64
@@ -103,16 +109,26 @@ func Load(dir string) (*Fixtures, error) {
 		return nil, err
 	} else if ok {
 		var doc struct {
-			Tenants     []json.RawMessage `json:"tenants"`
-			Unavailable string            `json:"unavailable"`
+			Tenants               []json.RawMessage `json:"tenants"`
+			Unavailable           string            `json:"unavailable"`
+			RealmMissing          bool              `json:"realmMissing"`
+			OrganizationsDisabled bool              `json:"organizationsDisabled"`
 		}
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			return nil, fmt.Errorf("tenants.json: %w", err)
 		}
-		if doc.Unavailable != "" && doc.Tenants != nil {
-			return nil, errors.New("tenants.json: use either tenants or unavailable, not both")
+		modes := 0
+		for _, set := range []bool{doc.Unavailable != "", doc.RealmMissing, doc.OrganizationsDisabled, doc.Tenants != nil} {
+			if set {
+				modes++
+			}
+		}
+		if modes > 1 {
+			return nil, errors.New("tenants.json: use one of tenants, unavailable, realmMissing or organizationsDisabled")
 		}
 		fx.TenantsUnavailable = doc.Unavailable
+		fx.TenantsRealmMissing = doc.RealmMissing
+		fx.TenantsOrgsDisabled = doc.OrganizationsDisabled
 		if doc.Tenants != nil {
 			fx.Tenants = []*aigridv1.Tenant{}
 		}

@@ -81,8 +81,69 @@ export type ClusterPatch = {
   longitude?: number | null;
 };
 
+/** One organization domain with Keycloak's metadata. */
+export type TenantDomain = {
+  name: string;
+  verified: boolean;
+  identityProviderAlias?: string;
+  autoRedirect: boolean;
+};
+
+/** A Keycloak Organization in the AI Grid realm, as the BFF exposes it. */
 export type Tenant = {
   id: string;
   name: string;
+  /** URL-safe handle, defaults to the name on create, immutable afterwards. */
+  alias: string;
+  enabled: boolean;
+  description: string;
+  /** Names of domainDetails, in the same order. */
   domains: string[];
+  domainDetails: TenantDomain[];
+  attributes: Record<string, string>;
+};
+
+/** Query of GET /api/v1/tenants. */
+export type ListTenantsParams = {
+  offset?: number;
+  limit?: number;
+  /** Case-insensitive contains on the name or a domain (Keycloak's `search`). */
+  search?: string;
+};
+
+/** `meta` of a paged list response. */
+export type ListMeta = {
+  size: number;
+  total: number;
+  offset: number;
+  limit?: number;
+};
+
+export type TenantPage = {
+  items: Tenant[];
+  meta: ListMeta;
+};
+
+/** Body of POST /api/v1/tenants. `enabled` defaults to true, `alias` to the name. */
+export type TenantCreate = {
+  name: string;
+  alias?: string;
+  description?: string;
+  enabled?: boolean;
+  domains?: string[];
+  attributes?: Record<string, string>;
+};
+
+/**
+ * Body of PATCH /api/v1/tenants/{id}. Absent fields are left alone; a present
+ * field replaces the stored one as a whole. `alias` may be sent but must
+ * equal the stored alias (Keycloak: "Cannot change the alias").
+ */
+export type TenantPatch = {
+  name?: string;
+  alias?: string;
+  description?: string;
+  enabled?: boolean;
+  domains?: string[];
+  attributes?: Record<string, string>;
 };

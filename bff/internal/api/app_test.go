@@ -684,11 +684,11 @@ func TestPatchCluster(t *testing.T) {
 			t.Errorf("trailing whitespace -> %d %s", rec.Code, rec.Body.String())
 		}
 		fake.Calls = nil
-		huge := `{"location": "` + strings.Repeat("x", maxPatchBody) + `"}`
+		huge := `{"location": "` + strings.Repeat("x", maxBodyBytes) + `"}`
 		if rec := serve(app, patchRequest("site-1", huge)); rec.Code != http.StatusRequestEntityTooLarge {
 			t.Errorf("oversized body -> %d %s", rec.Code, rec.Body.String())
 		}
-		if rec := serve(app, patchRequest("site-1", `{"aiGridEnabled": true}`+strings.Repeat(" ", maxPatchBody))); rec.Code != http.StatusRequestEntityTooLarge {
+		if rec := serve(app, patchRequest("site-1", `{"aiGridEnabled": true}`+strings.Repeat(" ", maxBodyBytes))); rec.Code != http.StatusRequestEntityTooLarge {
 			t.Errorf("oversized trailing content -> %d %s", rec.Code, rec.Body.String())
 		}
 		if len(fake.Calls) != 0 {

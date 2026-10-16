@@ -1,8 +1,60 @@
 {
-  "_comment": "ai_grid.v1.Tenant in protojson, as the backend maps Keycloak Organizations (id = Keycloak UUID, name = organization name, domains = verified and unverified domain names). All values are fictional. Replace the object with {\"unavailable\": \"request Keycloak token: ...\"} to simulate the dev hub, where the ai-grid realm does not exist yet.",
+  "_comment": "ai_grid.v1.Tenant in protojson, as the backend maps Keycloak 26.8 Organizations in the ai-grid realm (mock/research/keycloak.md section 4): id = organization UUID, name and alias unique in the realm (alias defaults to name and never changes), domains = the names of domainDetails in the same order, lower-case, unique across organizations; verified is free-form metadata, identityProviderAlias/autoRedirect route a domain's logins to an organization IdP. attributes carry the first value of each Keycloak attribute. All values are fictional. The fake validates the file like Keycloak would (duplicate name/alias/domain, bad domain, non-UUID id fail at start). Other modes, one at a time: {\"unavailable\": \"request Keycloak token: dial tcp ...: connection refused\"} makes every Tenants RPC Unavailable (Keycloak unreachable); {\"realmMissing\": true} makes them FailedPrecondition (the dev hub today, whose Keycloak has no ai-grid realm).",
   "tenants": [
-    { "id": "3f1c9a72-5b6e-4d2a-8c01-2d3e4f5a6b7c", "name": "acme-robotics", "domains": ["acme-robotics.example.com", "acme.example.org"] },
-    { "id": "8d2e7b31-0c4f-4a9d-b5e6-7f8a9b0c1d2e", "name": "globex-research", "domains": ["globex.example.com"] },
-    { "id": "c5a4d3e2-f1b0-4987-a6c5-d4e3f2a1b0c9", "name": "initech-labs", "domains": [] }
+    {
+      "id": "3f1c9a72-5b6e-4d2a-8c01-2d3e4f5a6b7c",
+      "name": "acme-robotics",
+      "alias": "acme-robotics",
+      "enabled": true,
+      "description": "Acme Robotics, EU region",
+      "attributes": { "ai-grid/region": "europe-west", "billing-account": "ACME-0042" },
+      "domains": ["acme-robotics.example.com", "acme.example.org"],
+      "domainDetails": [
+        { "name": "acme-robotics.example.com", "verified": true, "identityProviderAlias": "acme-oidc", "autoRedirect": true },
+        { "name": "acme.example.org", "verified": false }
+      ]
+    },
+    {
+      "id": "8d2e7b31-0c4f-4a9d-b5e6-7f8a9b0c1d2e",
+      "name": "globex-research",
+      "alias": "globex",
+      "enabled": true,
+      "description": "Globex Research division",
+      "domains": ["globex.example.com"],
+      "domainDetails": [{ "name": "globex.example.com", "verified": true }]
+    },
+    {
+      "id": "c5a4d3e2-f1b0-4987-a6c5-d4e3f2a1b0c9",
+      "name": "initech-labs",
+      "alias": "initech-labs",
+      "enabled": true
+    },
+    {
+      "id": "0b7e5c1d-9a2f-4e3b-8d6c-1f2a3b4c5d6e",
+      "name": "umbrella-biotech",
+      "alias": "umbrella-biotech",
+      "enabled": false,
+      "description": "Suspended pending contract renewal",
+      "domains": ["umbrella.example.net"],
+      "domainDetails": [{ "name": "umbrella.example.net", "verified": false }]
+    },
+    {
+      "id": "d4c3b2a1-6e5f-4a7b-9c8d-2e1f0a9b8c7d",
+      "name": "vandelay-industries",
+      "alias": "vandelay-industries",
+      "enabled": true,
+      "attributes": { "ai-grid/region": "us-east" },
+      "domains": ["*.vandelay.example.com"],
+      "domainDetails": [{ "name": "*.vandelay.example.com", "verified": true }]
+    },
+    {
+      "id": "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d",
+      "name": "wayne-aerospace",
+      "alias": "wayne-aerospace",
+      "enabled": true,
+      "description": "Wayne Aerospace research cluster tenant",
+      "domains": ["wayne-aero.example.com"],
+      "domainDetails": [{ "name": "wayne-aero.example.com", "verified": true, "identityProviderAlias": "wayne-saml", "autoRedirect": false }]
+    }
   ]
 }

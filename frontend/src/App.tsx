@@ -83,7 +83,7 @@ export const App: React.FC<Props> = ({ service }) => {
         {section === 'clusters' ? (
           <ClustersPage service={service} canEdit={user?.isProviderAdmin ?? false} />
         ) : (
-          <TenantsPage service={service} />
+          <TenantsPage service={service} canEdit={user?.isProviderAdmin ?? false} />
         )}
       </PageSection>
     </Page>
