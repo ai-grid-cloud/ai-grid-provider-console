@@ -1,0 +1,154 @@
+// Ported from krisv/ai-grid-cloud-provider-poc src/shared/components/K8sNameDescriptionField/K8sNameDescriptionField.tsx at 62319b8.
+// Adapted from opendatahub-io/odh-dashboard
+// packages/ui-core/src/components/K8sNameDescriptionField/K8sNameDescriptionField.tsx
+// upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
+import * as React from 'react';
+import { Button, FormGroup, HelperText, HelperTextItem, TextArea, TextInput } from '@patternfly/react-core';
+import type { UseK8sNameDescriptionFieldData } from './nameField';
+import { ROUTE_NAME_TOO_LONG_MESSAGE } from './nameField';
+import { ResourceNameDefinitionTooltip } from './ResourceNameDefinitionTooltip';
+import { HelperTextItemResourceNameTaken } from './HelperTextItemVariants';
+import { ResourceNameField } from './ResourceNameField';
+
+type K8sNameDescriptionFieldProps = {
+  autoFocusName?: boolean;
+  data: UseK8sNameDescriptionFieldData['data'];
+  dataTestId: string;
+  descriptionLabel?: string;
+  nameLabel?: string;
+  nameHelperTextAbove?: React.ReactNode;
+  nameHelperText?: React.ReactNode;
+  onDataChange?: UseK8sNameDescriptionFieldData['onDataChange'];
+  hideDescription?: boolean;
+  descriptionHelperText?: React.ReactNode;
+  maxLength?: number;
+  maxLengthDesc?: number;
+  resourceNameTakenHelperText?: React.ReactNode;
+};
+
+/**
+ * Use in place of any K8s Resource creation / edit.
+ * @see useK8sNameDescriptionFieldData in ./useK8sNameDescriptionFieldData
+ */
+export const K8sNameDescriptionField: React.FC<K8sNameDescriptionFieldProps> = ({
+  autoFocusName,
+  data,
+  dataTestId,
+  descriptionLabel = 'Description',
+  onDataChange,
+  nameLabel = 'Name',
+  nameHelperTextAbove,
+  nameHelperText,
+  hideDescription,
+  maxLength,
+  maxLengthDesc,
+  descriptionHelperText,
+  resourceNameTakenHelperText,
+}) => {
+  const [showK8sField, setShowK8sField] = React.useState(false);
+
+  const { name, description, k8sName } = data;
+
+  const showNameWarning = maxLength && name.length > maxLength - 10;
+  const showDescWarning =
+    maxLengthDesc && description.length > maxLengthDesc - Math.min(250, Math.floor(maxLengthDesc * 0.1));
+
+  return (
+    <>
+      <FormGroup label={nameLabel} isRequired fieldId={`${dataTestId}-name`}>
+        {nameHelperTextAbove && (
+          <HelperText>
+            <HelperTextItem>{nameHelperTextAbove}</HelperTextItem>
+          </HelperText>
+        )}
+        <TextInput
+          aria-readonly={!onDataChange}
+          data-testid={`${dataTestId}-name`}
+          id={`${dataTestId}-name`}
+          name={`${dataTestId}-name`}
+          autoFocus={autoFocusName}
+          isRequired
+          value={name}
+          onChange={(_event, value) => onDataChange?.('name', value)}
+          maxLength={maxLength}
+        />
+        {showNameWarning && (
+          <HelperText>
+            <HelperTextItem>
+              Cannot exceed {maxLength} characters ({maxLength - name.length} remaining)
+            </HelperTextItem>
+          </HelperText>
+        )}
+        {nameHelperText || (!showK8sField && !k8sName.state.immutable) ? (
+          <HelperText>
+            {nameHelperText && <HelperTextItem>{nameHelperText}</HelperTextItem>}
+            {!showK8sField && !k8sName.state.immutable && (
+              <>
+                {k8sName.value && (
+                  <HelperTextItem
+                    variant={k8sName.state.invalidCharacters || k8sName.state.routeNameTooLong ? 'error' : 'default'}
+                  >
+                    The resource name will be <b>{k8sName.value}</b>.
+                    {k8sName.state.invalidCharacters &&
+                      ` ${
+                        k8sName.state.invalidCharsMessage ||
+                        'Must start and end with a letter or number. Valid characters include lowercase letters, numbers, and hyphens (-).'
+                      }`}
+                    {k8sName.state.routeNameTooLong && ` ${ROUTE_NAME_TOO_LONG_MESSAGE}.`}
+                  </HelperTextItem>
+                )}
+                <HelperTextItem>
+                  <Button
+                    data-testid={`${dataTestId}-editResourceLink`}
+                    variant="link"
+                    isInline
+                    onClick={() => setShowK8sField(true)}
+                  >
+                    Edit resource name
+                  </Button>{' '}
+                  <ResourceNameDefinitionTooltip />
+                  {resourceNameTakenHelperText && (
+                    <HelperTextItemResourceNameTaken resourceNameTakenMessage={resourceNameTakenHelperText} />
+                  )}
+                </HelperTextItem>
+              </>
+            )}
+          </HelperText>
+        ) : null}
+      </FormGroup>
+      <ResourceNameField
+        allowEdit={showK8sField}
+        dataTestId={dataTestId}
+        k8sName={k8sName}
+        onDataChange={onDataChange}
+        resourceNameTakenHelperText={resourceNameTakenHelperText}
+      />
+      {!hideDescription ? (
+        <FormGroup label={descriptionLabel} fieldId={`${dataTestId}-description`}>
+          <TextArea
+            aria-readonly={!onDataChange}
+            data-testid={`${dataTestId}-description`}
+            id={`${dataTestId}-description`}
+            name={`${dataTestId}-description`}
+            value={description}
+            onChange={(_event, value) => onDataChange?.('description', value)}
+            resizeOrientation="vertical"
+            maxLength={maxLengthDesc}
+          />
+          {showDescWarning && (
+            <HelperText>
+              <HelperTextItem>
+                Cannot exceed {maxLengthDesc} characters ({maxLengthDesc - description.length} remaining)
+              </HelperTextItem>
+            </HelperText>
+          )}
+          {descriptionHelperText && (
+            <HelperText>
+              <HelperTextItem>{descriptionHelperText}</HelperTextItem>
+            </HelperText>
+          )}
+        </FormGroup>
+      ) : null}
+    </>
+  );
+};

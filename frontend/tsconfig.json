@@ -15,5 +15,13 @@
     "noEmit": true,
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "e2e", "playwright.config.ts", "vite.config.ts", "vitest.setup.ts", "../mock/validation/*.json"]
+  "include": [
+    "src",
+    "e2e",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.setup.ts",
+    "../mock/validation/*.json",
+    "../mock/examples/*.json"
+  ]
 }

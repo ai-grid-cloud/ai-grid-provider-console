@@ -527,6 +527,682 @@
       "fieldErrors": {
         "identityProvider": "Required"
       }
+    },
+    {
+      "schema": "model",
+      "name": "valid model",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "model",
+      "name": "bad URI scheme",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "ftp://models.example.com/granite",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "modelUri": "Enter a model URI using hf, oci, s3, pvc, http or https."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "runtime image with a space",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm openai:v1",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "runtimeImage": "Enter a container image without spaces."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "CPU 0",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "0",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "cpu": "Enter positive CPU cores or millicores, for example 2 or 500m."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "CPU 500m",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "500m",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "model",
+      "name": "CPU 1.5",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "1.5",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "model",
+      "name": "memory 4G",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4G",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "memory": "Enter memory such as 4Gi or 512Mi."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "replicas 0",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 0,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "replicas": "Number must be greater than or equal to 1"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "replicas 100",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 100,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "replicas": "Number must be less than or equal to 99"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "GPUs 65",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 65,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "gpuCount": "Number must be less than or equal to 64"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "no locations",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": []
+      },
+      "fieldErrors": {
+        "locations": "Select at least one location."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "location with a space",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "bad location"
+        ]
+      },
+      "fieldErrors": {
+        "locations.0": "Use a Kubernetes label value for the location."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "duplicate locations",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site1"
+        ]
+      },
+      "fieldErrors": {
+        "locations": "Locations must be unique."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "resource name with uppercase",
+      "input": {
+        "name": "Granite",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "name": "Invalid"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "replicas as a string",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": "1",
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "replicas": "Expected number, received string"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "namespace is not accepted",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ],
+        "namespace": "maas"
+      },
+      "fieldErrors": {
+        "": "Unrecognized key(s) in object: 'namespace'"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "blank display name and model name",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "  ",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "displayName": "String must contain at least 1 character(s)",
+        "modelName": "String must contain at least 1 character(s)"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "missing fields",
+      "input": {
+        "name": "widget"
+      },
+      "fieldErrors": {
+        "displayName": "Required",
+        "modelUri": "Required",
+        "modelName": "Required",
+        "runtimeImage": "Required",
+        "replicas": "Required",
+        "cpu": "Required",
+        "memory": "Required",
+        "gpuCount": "Required",
+        "runtimeArgs": "Required",
+        "locations": "Required"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "empty runtime image",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "runtimeImage": "Enter a container image without spaces."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "fractional replicas below the minimum",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 0.5,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "replicas": "Number must be greater than or equal to 1"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "invalid duplicate locations",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "bad location",
+          "bad location"
+        ]
+      },
+      "fieldErrors": {
+        "locations.0": "Use a Kubernetes label value for the location.",
+        "locations.1": "Use a Kubernetes label value for the location.",
+        "locations": "Locations must be unique."
+      }
+    },
+    {
+      "schema": "model",
+      "name": "a location that is not a string skips the list rules",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          1,
+          1
+        ]
+      },
+      "fieldErrors": {
+        "locations.0": "Expected string, received number",
+        "locations.1": "Expected string, received number"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "resource name over 63 characters",
+      "input": {
+        "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--max-model-len=8192"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "name": "String must contain at most 63 character(s)"
+      }
+    },
+    {
+      "schema": "model",
+      "name": "too many runtime arguments",
+      "input": {
+        "name": "granite-3-8b",
+        "displayName": "Granite 3.3 8B Instruct",
+        "description": "Enterprise language model",
+        "modelUri": "hf://ibm-granite/granite-3.3-8b-instruct",
+        "modelName": "ibm-granite/granite-3.3-8b-instruct",
+        "runtimeImage": "registry.example.com/vllm/vllm-openai:v0.11.0",
+        "replicas": 1,
+        "cpu": "2",
+        "memory": "4Gi",
+        "gpuCount": 1,
+        "runtimeArgs": [
+          "--arg0",
+          "--arg1",
+          "--arg2",
+          "--arg3",
+          "--arg4",
+          "--arg5",
+          "--arg6",
+          "--arg7",
+          "--arg8",
+          "--arg9",
+          "--arg10",
+          "--arg11",
+          "--arg12",
+          "--arg13",
+          "--arg14",
+          "--arg15",
+          "--arg16",
+          "--arg17",
+          "--arg18",
+          "--arg19",
+          "--arg20",
+          "--arg21",
+          "--arg22",
+          "--arg23",
+          "--arg24",
+          "--arg25",
+          "--arg26",
+          "--arg27",
+          "--arg28",
+          "--arg29",
+          "--arg30",
+          "--arg31",
+          "--arg32",
+          "--arg33",
+          "--arg34",
+          "--arg35",
+          "--arg36",
+          "--arg37",
+          "--arg38",
+          "--arg39",
+          "--arg40",
+          "--arg41",
+          "--arg42",
+          "--arg43",
+          "--arg44",
+          "--arg45",
+          "--arg46",
+          "--arg47",
+          "--arg48",
+          "--arg49",
+          "--arg50",
+          "--arg51",
+          "--arg52",
+          "--arg53",
+          "--arg54",
+          "--arg55",
+          "--arg56",
+          "--arg57",
+          "--arg58",
+          "--arg59",
+          "--arg60",
+          "--arg61",
+          "--arg62",
+          "--arg63",
+          "--arg64"
+        ],
+        "locations": [
+          "site1",
+          "site2"
+        ]
+      },
+      "fieldErrors": {
+        "runtimeArgs": "Array must contain at most 64 element(s)"
+      }
     }
   ]
 }

@@ -1,10 +1,20 @@
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ConsoleConfig, GridCluster, Organization, OrganizationInput, User } from './types';
-import { fieldErrorsOf, organizationInputSchema } from '../validation';
+import type {
+  ConsoleConfig,
+  CreateModelRequest,
+  GridCluster,
+  ManagedModel,
+  Organization,
+  OrganizationInput,
+  User,
+} from './types';
+import { createModelSchema, fieldErrorsOf, locationSchema, organizationInputSchema } from '../validation';
 
 /** In-memory service for tests and UI work without a cluster. */
 export class MockConsoleService implements ConsoleService {
+  public models: ManagedModel[] = seedModels();
+
   constructor(
     public user: User = { username: 'dev-user', groups: ['cluster-admins'], isProviderAdmin: true },
     public clusters: GridCluster[] = seedClusters(),
@@ -14,6 +24,7 @@ export class MockConsoleService implements ConsoleService {
       mapTileUrl: '',
       billingUrl: '',
       version: 'mock',
+      modelsNamespace: 'ai-grid-models',
       fakeBackend: false,
     },
   ) {}
@@ -93,6 +104,69 @@ export class MockConsoleService implements ConsoleService {
     this.organizations.splice(index, 1);
   };
 
+  // The fake backend's model rules and messages (bff/internal/fakebackend/models.go),
+  // with the BFF's status codes.
+
+  listModels = async (): Promise<ManagedModel[]> =>
+    structuredClone(this.models).sort((a, b) => a.name.localeCompare(b.name));
+
+  /** The PoC's eligibleLocations: Ready, provisioned AI Grid members' location labels. */
+  listLocations = async (): Promise<string[]> =>
+    [
+      ...new Set(
+        this.clusters
+          .filter(
+            (c) =>
+              c.aiGridEnabled && c.provisioned && c.status === 'Ready' && locationSchema.safeParse(c.location).success,
+          )
+          .map((c) => c.location as string),
+      ),
+    ].sort();
+
+  createModel = async (input: CreateModelRequest): Promise<ManagedModel> => {
+    const fieldErrors = fieldErrorsOf(createModelSchema, input);
+    if (Object.keys(fieldErrors).length > 0) {
+      throw new ServiceError(422, 'The model is invalid.', fieldErrors);
+    }
+    const known = await this.listLocations();
+    if (input.locations.some((l) => !known.includes(l))) {
+      throw new ServiceError(422, unknownLocation, { locations: unknownLocation });
+    }
+    const namespace = this.config.modelsNamespace;
+    if (this.models.some((m) => m.namespace === namespace && m.name === input.name)) {
+      throw new ServiceError(409, 'A model with this resource name already exists.');
+    }
+    const created: ManagedModel = {
+      name: input.name,
+      namespace,
+      displayName: input.displayName.trim(),
+      description: input.description,
+      modelRef: { kind: 'LLMInferenceService', name: input.name },
+      phase: 'Pending',
+      creationTimestamp: new Date().toISOString(),
+      resourceVersion: '1',
+      locations: [...input.locations],
+      availableForSubscriptions: true,
+      modelUri: input.modelUri.trim(),
+      modelName: input.modelName.trim(),
+      runtimeImage: input.runtimeImage.trim(),
+      replicas: input.replicas,
+    };
+    this.models.push(created);
+    return structuredClone(created);
+  };
+
+  deleteModel = async (namespace: string, name: string, resourceVersion: string): Promise<void> => {
+    const index = this.models.findIndex((m) => m.namespace === namespace && m.name === name);
+    if (index < 0) {
+      throw new ServiceError(404, `object with identifier '${namespace}/${name}' not found`);
+    }
+    if (resourceVersion && resourceVersion !== this.models[index].resourceVersion) {
+      throw new ServiceError(409, 'This model changed. Reload it before deleting.');
+    }
+    this.models.splice(index, 1);
+  };
+
   private organizationIndex(id: string): number {
     const index = this.organizations.findIndex((o) => o.id === id);
     if (index < 0) {
@@ -115,6 +189,8 @@ export class MockConsoleService implements ConsoleService {
     }
   }
 }
+
+const unknownLocation = 'Select locations from the available location catalog.';
 
 // The fake backend's Aborted message (checkTenantVersion), which the BFF passes through as a 409.
 const organizationChanged = (id: string, stored: string, carried: string) =>
@@ -212,3 +288,27 @@ export const seedOrganizations = (): Organization[] =>
       creationTimestamp: created,
     };
   });
+
+// The models in mock/fixtures/models.json (the PoC's catalog models), except that
+// granite-3-8b is placed on site1, so pages that follow placement have one to show (A27).
+export const seedModels = (): ManagedModel[] =>
+  (
+    [
+      ['granite-3-8b', 'Granite 3.3 8B Instruct', 'Enterprise language model', 'Ready', ['site1']],
+      ['llama-3-70b', 'Llama 3.3 70B Instruct', 'General purpose language model', 'Ready', []],
+      ['granite-research', 'Granite research endpoint', undefined, 'Pending', []],
+    ] as [string, string, string | undefined, string, string[]][]
+  ).map(([name, displayName, description, phase, locations]) => ({
+    name,
+    namespace: 'ai-grid-models',
+    displayName,
+    description,
+    modelRef: { kind: 'LLMInferenceService', name },
+    phase,
+    ...(name === 'granite-research'
+      ? { reason: 'ModelNotReady', statusMessage: 'The model endpoint is starting.' }
+      : {}),
+    resourceVersion: '1',
+    locations,
+    availableForSubscriptions: true,
+  }));

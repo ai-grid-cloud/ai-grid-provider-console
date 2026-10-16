@@ -1,5 +1,6 @@
-import { toGridCluster, toOrganization } from './adapters';
-import type { ApiCluster, ApiTenant } from './types';
+import getModels from '../../../mock/examples/get-models.json';
+import { toGridCluster, toManagedModel, toModelCreate, toOrganization } from './adapters';
+import type { ApiCluster, ApiModel, ApiTenant, CreateModelRequest } from './types';
 
 // The cluster JSON of GET /api/v1/clusters (mock/examples/get-clusters.json), trimmed.
 const apiCluster = (overrides: Partial<ApiCluster> = {}): ApiCluster => ({
@@ -162,5 +163,118 @@ describe('toOrganization', () => {
   it('shows a dash without a creation time', () => {
     // The list prints a dash for an empty creationTimestamp.
     expect(toOrganization(apiTenant({ createTime: undefined })).creationTimestamp).toBe('');
+  });
+});
+
+// The wizard's input (the PoC's CreateModelRequest).
+const wizardInput = (overrides: Partial<CreateModelRequest> = {}): CreateModelRequest => ({
+  name: 'widget',
+  displayName: 'Widget',
+  description: 'A test model',
+  modelUri: 'hf://org/widget',
+  modelName: 'org/widget',
+  runtimeImage: 'registry.example/runtime:test',
+  replicas: 2,
+  cpu: '500m',
+  memory: '4Gi',
+  gpuCount: 1,
+  runtimeArgs: [],
+  locations: ['paris', 'madrid'],
+  ...overrides,
+});
+
+describe('toModelCreate', () => {
+  it('builds the PoC placement from locations', () => {
+    expect(toModelCreate(wizardInput(), 'ai-grid-models')).toMatchObject({
+      placement: {
+        matchLabels: { 'ai-grid/enabled': 'true', 'ai-grid/provisioned': 'true' },
+        matchExpressions: [{ key: 'location', operator: 'In', values: ['paris', 'madrid'] }],
+      },
+      rollout: { strategy: 'All' },
+    });
+  });
+
+  it('puts runtime arguments in VLLM_ADDITIONAL_ARGS', () => {
+    const body = toModelCreate(wizardInput({ runtimeArgs: ['--max-model-len=4096', '--enforce-eager'] }), 'ns');
+    expect(body.env).toEqual([{ name: 'VLLM_ADDITIONAL_ARGS', value: '--max-model-len=4096 --enforce-eager' }]);
+  });
+
+  it('omits env without runtime arguments', () => {
+    expect(toModelCreate(wizardInput(), 'ns')).not.toHaveProperty('env');
+  });
+
+  it("sends only the wizard's keys", () => {
+    const body = toModelCreate(wizardInput({ runtimeArgs: ['--enforce-eager'] }), 'ai-grid-models');
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        'name',
+        'namespace',
+        'annotations',
+        'modelUri',
+        'modelName',
+        'runtimeImage',
+        'replicas',
+        'cpu',
+        'memory',
+        'gpuCount',
+        'env',
+        'placement',
+        'rollout',
+      ].sort(),
+    );
+    expect(body).toMatchObject({
+      name: 'widget',
+      namespace: 'ai-grid-models',
+      annotations: { 'openshift.io/display-name': 'Widget', 'openshift.io/description': 'A test model' },
+      modelUri: 'hf://org/widget',
+      modelName: 'org/widget',
+      runtimeImage: 'registry.example/runtime:test',
+      replicas: 2,
+      cpu: '500m',
+      memory: '4Gi',
+      gpuCount: 1,
+    });
+  });
+});
+
+describe('toManagedModel', () => {
+  // GET /api/v1/models under PR 12's fixtures (mock/examples/get-models.json).
+  const models = getModels.body.data as unknown as ApiModel[];
+  const byName = (name: string) => toManagedModel(models.find((m) => m.name === name)!);
+
+  it('reads locations from placement.locations', () => {
+    expect(byName('granite-8b-instruct').locations).toEqual(['paris']);
+    expect(byName('codellama-13b').locations).toEqual([]);
+  });
+
+  it('has no locations without a placement', () => {
+    expect(byName('tiny-llm').locations).toEqual([]);
+  });
+
+  it('shows the phase with its reason and message', () => {
+    expect(byName('granite-8b-instruct').phase).toBe('Ready');
+    expect(byName('codellama-13b')).toMatchObject({ phase: 'Pending', reason: 'PlacementDecisionEmpty' });
+    expect(byName('llama-3-70b')).toMatchObject({
+      phase: 'Failed',
+      reason: 'ConfigNotFound',
+      statusMessage: expect.stringContaining('not found in namespaces'),
+    });
+    expect(toManagedModel({ name: 'new', namespace: 'ns', modelUri: 'hf://x', modelName: 'x' }).phase).toBe('Pending');
+  });
+
+  it('maps the fields the pages read', () => {
+    expect(byName('granite-8b-instruct')).toMatchObject({
+      name: 'granite-8b-instruct',
+      namespace: 'ai-grid-models',
+      displayName: 'Granite 8B Instruct',
+      modelRef: { kind: 'LLMInferenceService', name: 'granite-8b-instruct' },
+      modelUri: 'hf://example-org/granite-8b-instruct',
+      modelName: 'example-org/granite-8b-instruct',
+      replicas: 1,
+      resourceVersion: '48760230',
+      // PR 12 models have no MaaS registration: every one is deployed and open to subscriptions.
+      availableForSubscriptions: true,
+    });
+    expect(byName('granite-8b-instruct').creationTimestamp).toBeTruthy();
   });
 });

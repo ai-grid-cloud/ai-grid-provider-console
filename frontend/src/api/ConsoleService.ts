@@ -1,4 +1,5 @@
 import type { ClustersService } from './clusters';
+import type { ModelsService } from './models';
 import type { OrganizationsService } from './organizations';
 import type { ConsoleConfig, User } from './types';
 
@@ -12,7 +13,7 @@ export interface UserService {
  * just the areas it uses. The HTTP implementation is used in the browser; tests
  * use an in-memory one.
  */
-export interface ConsoleService extends ClustersService, OrganizationsService, UserService {
+export interface ConsoleService extends ClustersService, OrganizationsService, ModelsService, UserService {
   getConfig(): Promise<ConsoleConfig>;
 }
 

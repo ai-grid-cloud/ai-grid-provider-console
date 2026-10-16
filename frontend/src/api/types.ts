@@ -13,6 +13,8 @@ export type ConsoleConfig = {
   mapTileUrl: string;
   billingUrl: string;
   version: string;
+  /** The namespace the deploy wizard creates models in. */
+  modelsNamespace: string;
   /** The BFF talks to the fake backend; the UI shows a banner. */
   fakeBackend: boolean;
 };
@@ -132,4 +134,96 @@ export type ApiTenant = {
     enabled?: boolean;
     config?: Partial<OidcConfig>;
   };
+};
+
+// The PoC's model types (src/app/types/models.ts and MaaSModelRefSummary in
+// src/app/types/subscriptions.ts at 62319b8), with resourceVersion for the PoC's revision.
+export type ModelReference = { kind: string; name: string };
+
+/** The body of POST /api/v1/models; the PoC's CreateModelRequest. */
+export type CreateModelRequest = {
+  name: string;
+  displayName: string;
+  description?: string;
+  modelUri: string;
+  modelName: string;
+  runtimeImage: string;
+  replicas: number;
+  cpu: string;
+  memory: string;
+  gpuCount: number;
+  runtimeArgs: string[];
+  locations: string[];
+};
+
+/**
+ * The body of POST /api/v1/models: the keys of PR 12's `ModelCreate` (bff/internal/api/models.go)
+ * that the wizard sets, and no others. `toModelCreate` in adapters.ts builds it.
+ */
+export type ApiModelCreate = {
+  name: string;
+  namespace: string;
+  /** `openshift.io/display-name` and `openshift.io/description`. */
+  annotations: Record<string, string>;
+  modelUri: string;
+  modelName: string;
+  runtimeImage: string;
+  replicas: number;
+  cpu: string;
+  memory: string;
+  gpuCount: number;
+  env?: { name: string; value: string }[];
+  placement: {
+    matchLabels: Record<string, string>;
+    matchExpressions: { key: string; operator: 'In'; values: string[] }[];
+  };
+  rollout: { strategy: 'All' };
+};
+
+/**
+ * A model of GET /api/v1/models (PR 12's `Model` in bff/internal/api/models.go), limited to the
+ * fields the console reads. `toManagedModel` in adapters.ts maps it.
+ */
+export type ApiModel = {
+  name: string;
+  namespace: string;
+  displayName?: string;
+  description?: string;
+  modelUri: string;
+  modelName: string;
+  runtimeImage?: string;
+  replicas?: number;
+  /** pending, ready or failed; absent before the backend reports one. */
+  phase?: string;
+  reason?: string;
+  message?: string;
+  /** Absent for a model served on the hub only. `locations` is proposal P8. */
+  placement?: { locations?: string[] };
+  resourceVersion?: string;
+  creationTimestamp?: string;
+};
+
+/** A model deployment: its saved deployment and placement, and PR 12's phase. */
+export type ManagedModel = {
+  name: string;
+  namespace: string;
+  displayName?: string;
+  description?: string;
+  modelRef: ModelReference;
+  /** PR 12's phase: Pending, Ready or Failed. */
+  phase?: string;
+  endpoint?: string;
+  status?: string;
+  reason?: string;
+  statusMessage?: string;
+  creationTimestamp?: string;
+  /** Opaque; sent back as If-Match on delete. */
+  resourceVersion: string;
+  /** The `location` labels of the clusters the placement decided on; empty without one. */
+  locations: string[];
+  availableForSubscriptions: boolean;
+  modelUri?: string;
+  modelName?: string;
+  runtimeImage?: string;
+  replicas?: number;
 };

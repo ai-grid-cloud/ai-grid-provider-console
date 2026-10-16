@@ -1,7 +1,18 @@
-import { toGridCluster, toOrganization } from './adapters';
+import { toGridCluster, toManagedModel, toModelCreate, toOrganization } from './adapters';
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ApiCluster, ApiTenant, ConsoleConfig, GridCluster, Organization, OrganizationInput, User } from './types';
+import type {
+  ApiCluster,
+  ApiModel,
+  ApiTenant,
+  ConsoleConfig,
+  CreateModelRequest,
+  GridCluster,
+  ManagedModel,
+  Organization,
+  OrganizationInput,
+  User,
+} from './types';
 
 const API_PREFIX = '/api/v1';
 
@@ -67,6 +78,28 @@ export class HttpConsoleService implements ConsoleService {
 
   deleteOrganization(id: string, resourceVersion: string): Promise<void> {
     return this.request<void>('DELETE', `/tenants/${encodeURIComponent(id)}`, { ifMatch: resourceVersion });
+  }
+
+  async listModels(): Promise<ManagedModel[]> {
+    return (await this.request<ApiModel[]>('GET', '/models')).map(toManagedModel);
+  }
+
+  listLocations(): Promise<string[]> {
+    return this.request<string[]>('GET', '/locations');
+  }
+
+  /** POSTs PR 12's ModelCreate with only the wizard's keys, in the configured models namespace. */
+  async createModel(input: CreateModelRequest): Promise<ManagedModel> {
+    const { modelsNamespace } = await this.getConfig();
+    return toManagedModel(
+      await this.request<ApiModel>('POST', '/models', { body: toModelCreate(input, modelsNamespace) }),
+    );
+  }
+
+  deleteModel(namespace: string, name: string, resourceVersion: string): Promise<void> {
+    return this.request<void>('DELETE', `/models/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`, {
+      ifMatch: resourceVersion,
+    });
   }
 
   /** Calls the BFF and unwraps its data envelope; `undefined` for 204. */
