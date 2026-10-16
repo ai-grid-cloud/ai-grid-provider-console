@@ -40,13 +40,13 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
     expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument();
-    expect(await screen.findByText('tenant-a')).toBeInTheDocument();
-    expect(screen.getByText('a.example.com')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'acme-robotics' })).toBeInTheDocument();
+    expect(screen.getByText('acme-robotics.example.com')).toBeInTheDocument();
   });
 
   it('shows a not-available state, not an error, when the backend lacks the RPC', async () => {
     const service = new MockConsoleService();
-    service.listTenants = async () => {
+    service.listOrganizations = async () => {
       throw new ServiceError(501, 'the AI Grid backend does not support this operation yet');
     };
     render(
@@ -57,12 +57,12 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
     expect(await screen.findByText('Organizations are not available on this backend yet')).toBeInTheDocument();
-    expect(screen.queryByText('Organizations could not be loaded')).not.toBeInTheDocument();
+    expect(screen.queryByText('Error loading organizations')).not.toBeInTheDocument();
   });
 
   it('shows the backend error when organizations cannot be loaded', async () => {
     const service = new MockConsoleService();
-    service.listTenants = async () => {
+    service.listOrganizations = async () => {
       throw new ServiceError(502, 'the AI Grid backend failed to process the request');
     };
     render(
@@ -72,7 +72,7 @@ describe('App', () => {
     );
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
-    expect(await screen.findByText('Organizations could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByText('Error loading organizations')).toBeInTheDocument();
     expect(screen.getByText('the AI Grid backend failed to process the request')).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
-import { toGridCluster } from './adapters';
+import { toGridCluster, toOrganization } from './adapters';
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ApiCluster, ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type { ApiCluster, ApiTenant, ConsoleConfig, GridCluster, Organization, OrganizationInput, User } from './types';
 
 const API_PREFIX = '/api/v1';
 
@@ -39,8 +39,34 @@ export class HttpConsoleService implements ConsoleService {
     return toGridCluster(updated);
   }
 
-  listTenants(): Promise<Tenant[]> {
-    return this.request<Tenant[]>('GET', '/tenants');
+  async listOrganizations(): Promise<Organization[]> {
+    return (await this.request<ApiTenant[]>('GET', '/tenants')).map(toOrganization);
+  }
+
+  async getOrganization(id: string): Promise<Organization> {
+    return toOrganization(await this.request<ApiTenant>('GET', `/tenants/${encodeURIComponent(id)}`));
+  }
+
+  async createOrganization(input: OrganizationInput): Promise<Organization> {
+    const { name, domains, identityProvider } = input;
+    return toOrganization(
+      await this.request<ApiTenant>('POST', '/tenants', { body: { name, domains, identityProvider } }),
+    );
+  }
+
+  /** PATCHes only what the PoC can change: the domains and the identity provider, not the name. */
+  async updateOrganization(id: string, input: OrganizationInput, resourceVersion: string): Promise<Organization> {
+    const { domains, identityProvider } = input;
+    return toOrganization(
+      await this.request<ApiTenant>('PATCH', `/tenants/${encodeURIComponent(id)}`, {
+        body: { domains, identityProvider },
+        ifMatch: resourceVersion,
+      }),
+    );
+  }
+
+  deleteOrganization(id: string, resourceVersion: string): Promise<void> {
+    return this.request<void>('DELETE', `/tenants/${encodeURIComponent(id)}`, { ifMatch: resourceVersion });
   }
 
   /** Calls the BFF and unwraps its data envelope; `undefined` for 204. */

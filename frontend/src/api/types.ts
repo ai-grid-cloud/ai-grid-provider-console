@@ -75,8 +75,61 @@ export type GridCluster = {
   labels: Record<string, string>;
 };
 
-export type Tenant = {
+// The PoC's tenant types (src/app/types/tenants.ts at 62319b8) as organizations,
+// with the id the backend assigns and resourceVersion for the PoC's revision.
+export type OidcConfig = {
+  clientId: string;
+  /** Only the name of the Secret holding the client secret; never the secret itself. */
+  clientSecretSecret: { name: string };
+  issuer: string;
+  authorizationUrl: string;
+  tokenUrl: string;
+  defaultScopes: string;
+  userInfoUrl: string;
+  jwksUrl: string;
+  logoutUrl: string;
+  validateSignature: boolean;
+};
+
+export type IdentityProvider = { title: string; description: string; enabled: true; config: OidcConfig };
+
+export type OrganizationInput = { name: string; domains: string[]; identityProvider: IdentityProvider };
+
+/**
+ * An organization as the pages read it. `identityProvider` is absent for an organization
+ * created without one (by another client, or before the backend stored one).
+ */
+export type Organization = Omit<OrganizationInput, 'identityProvider'> & {
+  id: string;
+  identityProvider?: IdentityProvider;
+  /** "Saved" for an enabled organization, as the PoC shows every saved one; "Disabled" otherwise. */
+  status: 'Saved' | 'Disabled';
+  /** Opaque; sent back as If-Match on update and delete. Empty when the backend sends none. */
+  resourceVersion: string;
+  /** When the backend created it; empty when it doesn't know. */
+  creationTimestamp: string;
+};
+
+/**
+ * A tenant of GET /api/v1/tenants (PR 12's JSON plus the identity provider, proposal P1).
+ * The pages read it through toOrganization.
+ */
+export type ApiTenant = {
   id: string;
   name: string;
+  alias?: string;
+  enabled: boolean;
+  description?: string;
   domains: string[];
+  domainDetails?: { name: string; verified: boolean; identityProviderAlias?: string; autoRedirect: boolean }[];
+  attributes?: Record<string, string>;
+  resourceVersion?: string;
+  createTime?: string;
+  identityProvider?: {
+    title?: string;
+    description?: string;
+    /** Absent means true. */
+    enabled?: boolean;
+    config?: Partial<OidcConfig>;
+  };
 };

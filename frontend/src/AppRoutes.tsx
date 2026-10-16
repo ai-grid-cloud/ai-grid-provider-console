@@ -4,7 +4,9 @@ import type { ConsoleService } from './api/ConsoleService';
 import { NotFoundPage } from './components/NotFoundPage';
 import { NotYetPortedPage } from './components/NotYetPortedPage';
 import { ClustersPage } from './pages/ClustersPage';
-import { TenantsPage } from './pages/TenantsPage';
+import { OrganizationDetailsPage } from './pages/organizations/OrganizationDetailsPage';
+import { OrganizationListPage } from './pages/organizations/OrganizationListPage';
+import { OrganizationWizardPage } from './pages/organizations/OrganizationWizardPage';
 
 type Props = { service: ConsoleService };
 
@@ -27,13 +29,34 @@ export const AppRoutes: React.FC<Props> = ({ service }) => (
       path="/organizations"
       element={
         <PageSection>
-          <TenantsPage service={service} />
+          <OrganizationListPage service={service} />
         </PageSection>
       }
     />
-    <Route path="/organizations/create" element={<NotYetPortedPage title="Create organization" />} />
-    <Route path="/organizations/:id" element={<NotYetPortedPage title="Organization" />} />
-    <Route path="/organizations/:id/edit" element={<NotYetPortedPage title="Edit organization" />} />
+    <Route
+      path="/organizations/create"
+      element={
+        <PageSection>
+          <OrganizationWizardPage service={service} />
+        </PageSection>
+      }
+    />
+    <Route
+      path="/organizations/:id"
+      element={
+        <PageSection>
+          <OrganizationDetailsPage service={service} />
+        </PageSection>
+      }
+    />
+    <Route
+      path="/organizations/:id/edit"
+      element={
+        <PageSection>
+          <OrganizationWizardPage service={service} />
+        </PageSection>
+      }
+    />
     <Route path="/models" element={<NotYetPortedPage title="Models" />} />
     <Route path="/models/deploy" element={<NotYetPortedPage title="Deploy model" />} />
     <Route path="/subscriptions" element={<NotYetPortedPage title="Subscriptions" />} />

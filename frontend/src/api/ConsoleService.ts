@@ -1,5 +1,6 @@
 import type { ClustersService } from './clusters';
-import type { ConsoleConfig, Tenant, User } from './types';
+import type { OrganizationsService } from './organizations';
+import type { ConsoleConfig, User } from './types';
 
 /** The signed-in user, for pages that show actions only to provider admins. */
 export interface UserService {
@@ -11,9 +12,8 @@ export interface UserService {
  * just the areas it uses. The HTTP implementation is used in the browser; tests
  * use an in-memory one.
  */
-export interface ConsoleService extends ClustersService, UserService {
+export interface ConsoleService extends ClustersService, OrganizationsService, UserService {
   getConfig(): Promise<ConsoleConfig>;
-  listTenants(): Promise<Tenant[]>;
 }
 
 export class ServiceError extends Error {
@@ -30,6 +30,11 @@ export class ServiceError extends Error {
   /** The BFF answers 501 when the backend has no RPC for this yet. */
   get isNotImplemented(): boolean {
     return this.status === 501;
+  }
+
+  /** Someone else changed the resource, or the form never read its version. */
+  get isConflict(): boolean {
+    return this.status === 409 || this.status === 412 || this.status === 428;
   }
 
   /** The session is gone; the proxy will start a new login on reload. */
