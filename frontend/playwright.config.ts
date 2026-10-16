@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// The stack's ports default to the ones `make dev-fake` documents. Set them when
+// The stack's ports default to the ones `make dev-fake-poc` documents. Set them when
 // another process already holds a default (for example a PoC on :8080); CI keeps the defaults.
 const port = process.env.E2E_FRONTEND_PORT ?? '9000';
 const bffPort = process.env.E2E_BFF_PORT ?? '8080';
@@ -21,7 +21,8 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
   webServer: {
-    command: 'make -C .. dev-fake',
+    // The PoC preset (mock/fixtures-poc): the specs use the PoC's site, model and pin names.
+    command: 'make -C .. dev-fake-poc',
     // Vite answers before the BFF and the fake do, so wait on an API path that only they serve.
     url: `${origin}/api/v1/clusters`,
     reuseExistingServer: !process.env.CI,

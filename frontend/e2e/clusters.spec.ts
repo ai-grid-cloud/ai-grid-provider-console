@@ -1,8 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-// A ready fixture cluster that is not yet an AI Grid member and that no scenario moves
-// (mock/fixtures/managedclusters.json and scenarios.json).
-const ENROLLABLE = 'site-frankfurt-1';
+// The fixture cluster that is not yet an AI Grid member (mock/fixtures-poc/managedclusters.json).
+const ENROLLABLE = 'site4';
 
 // The fake keeps its state in memory and the site is fixed, so a rerun against a reused
 // server finds it already enrolled: the spec adapts instead of requiring a fresh server.
