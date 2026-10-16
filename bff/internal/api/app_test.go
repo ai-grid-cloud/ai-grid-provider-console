@@ -1000,3 +1000,15 @@ func TestConfigReportsFakeBackend(t *testing.T) {
 		t.Fatal("fakeBackend not reported")
 	}
 }
+
+// TestConfigReportsModelsNamespace: /config names the namespace the console
+// creates models in, MODELS_NAMESPACE.
+func TestConfigReportsModelsNamespace(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.ModelsNamespace = "team-models"
+	var got ConsoleConfig
+	decodeData(t, serve(newTestApp(t, cfg, &backendtest.Fake{}), asUser(http.MethodGet, "/api/v1/config")), &got)
+	if got.ModelsNamespace != "team-models" {
+		t.Fatalf("modelsNamespace = %q", got.ModelsNamespace)
+	}
+}

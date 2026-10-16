@@ -8,6 +8,8 @@ type ConsoleConfig struct {
 	MapTileURL   string `json:"mapTileUrl"`
 	BillingURL   string `json:"billingUrl"`
 	Version      string `json:"version"`
+	// ModelsNamespace is the namespace the console creates models in.
+	ModelsNamespace string `json:"modelsNamespace"`
 	// FakeBackend tells the UI to show its fake-backend banner.
 	FakeBackend bool `json:"fakeBackend"`
 }
@@ -15,10 +17,11 @@ type ConsoleConfig struct {
 // getConfig answers GET /api/v1/config.
 func (a *App) getConfig(w http.ResponseWriter, _ *http.Request) {
 	writeData(w, http.StatusOK, ConsoleConfig{
-		GridEndpoint: a.cfg.GridEndpoint,
-		MapTileURL:   a.cfg.MapTileURL,
-		BillingURL:   a.cfg.BillingURL,
-		Version:      Version,
-		FakeBackend:  a.cfg.FakeBackend,
+		GridEndpoint:    a.cfg.GridEndpoint,
+		MapTileURL:      a.cfg.MapTileURL,
+		BillingURL:      a.cfg.BillingURL,
+		Version:         Version,
+		ModelsNamespace: a.cfg.ModelsNamespace,
+		FakeBackend:     a.cfg.FakeBackend,
 	})
 }

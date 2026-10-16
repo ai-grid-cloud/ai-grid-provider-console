@@ -9,6 +9,7 @@
       "mapTileUrl": "",
       "billingUrl": "",
       "version": "dev",
+      "modelsNamespace": "ai-grid-models",
       "fakeBackend": false
     }
   }

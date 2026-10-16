@@ -79,6 +79,8 @@ type Fake struct {
 	LastCreateModel *aigridv1.CreateModelRequest
 	LastUpdateModel *aigridv1.UpdateModelRequest
 	LastDeleteModel *aigridv1.DeleteModelRequest
+	// Locations is what ListLocations answers.
+	Locations []string
 
 	// ShippedLists serves the lists without paging, filtering or counts.
 	ShippedLists bool
@@ -544,6 +546,14 @@ func (f *Fake) DeleteModel(ctx context.Context, req *aigridv1.DeleteModelRequest
 		}
 	}
 	return nil, status.Errorf(codes.NotFound, "object with identifier '%s/%s' not found", req.GetNamespace(), req.GetName())
+}
+
+// ListLocations implements Models: it answers Locations.
+func (f *Fake) ListLocations(ctx context.Context, _ *aigridv1.ListLocationsRequest) (*aigridv1.ListLocationsResponse, error) {
+	if err := f.begin(ctx, "ListLocations"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.ListLocationsResponse{Locations: f.Locations}, nil
 }
 
 func (f *Fake) findModel(namespace, name string) *aigridv1.Model {

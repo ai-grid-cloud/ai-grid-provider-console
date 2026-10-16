@@ -410,6 +410,12 @@ message PlacementStatus {
   repeated ClusterDecision decisions = 2;
   // `PlacementSatisfied` and `PlacementMisconfigured`.
   repeated Condition conditions = 3;
+  // Proposal for the ai-grid-backend owners; implemented in the fake (P8,
+  // field 4). The `location` labels of the decided clusters, unique and
+  // sorted; a decided cluster without one adds nothing. Output only. The
+  // console shows a model's locations from this, whatever selected the
+  // clusters, as the PoC shows the locations it placed the model on.
+  repeated string locations = 4;
 }
 
 // One `status.decisions[]` entry.

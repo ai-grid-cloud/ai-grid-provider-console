@@ -54,6 +54,7 @@
             }
           ],
           "selectedClusters": [],
+          "locations": [],
           "satisfied": false,
           "reason": "NoManagedClusterMatched",
           "message": "No ManagedCluster matches any of the cluster predicate",
@@ -161,6 +162,9 @@
           },
           "selectedClusters": [
             "site-paris-1"
+          ],
+          "locations": [
+            "paris"
           ],
           "satisfied": true,
           "reason": "AllDecisionsScheduled",
@@ -392,6 +396,9 @@
           "selectedClusters": [
             "site-frankfurt-1",
             "site-paris-1"
+          ],
+          "locations": [
+            "paris"
           ],
           "satisfied": true,
           "reason": "AllDecisionsScheduled",

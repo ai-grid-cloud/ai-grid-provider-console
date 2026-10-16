@@ -748,6 +748,20 @@ func (s *Server) summarize(m *model, params rolloutParams, now time.Time) (*aigr
 	return sum, succeeded
 }
 
+// decidedLocations (P8) is the `location` labels of the decided clusters,
+// unique and sorted; a cluster without one adds nothing.
+func (s *Server) decidedLocations(decisions []*aigridv1.ClusterDecision) []string {
+	var out []string
+	for _, d := range decisions {
+		l := s.clusters[d.GetClusterName()].GetLabels()[LabelLocation]
+		if l != "" && !slices.Contains(out, l) {
+			out = append(out, l)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // viewModel is the model as a read returns it: the stored object plus the
 // status derived at scenario time `now`.
 func (s *Server) viewModel(m *model, now time.Time) *aigridv1.Model {
@@ -767,7 +781,7 @@ func (s *Server) viewModel(m *model, now time.Time) *aigridv1.Model {
 	if decisions == nil {
 		decisions = computePlacement(m.obj.GetSpec().GetPlacement(), s.bindingsFor(m.obj.GetMetadata().GetNamespace()), s.clusters, nil, now, s.scenarioTime)
 	}
-	st.Placement = &aigridv1.PlacementStatus{NumberOfSelectedClusters: decisions.GetNumberOfSelectedClusters(), Decisions: decisions.GetDecisions()}
+	st.Placement = &aigridv1.PlacementStatus{NumberOfSelectedClusters: decisions.GetNumberOfSelectedClusters(), Decisions: decisions.GetDecisions(), Locations: s.decidedLocations(decisions.GetDecisions())}
 	for _, c := range m.placementConds {
 		st.Placement.Conditions = append(st.Placement.Conditions, proto.Clone(c).(*aigridv1.Condition))
 	}

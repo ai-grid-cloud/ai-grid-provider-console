@@ -1877,7 +1877,13 @@ type PlacementStatus struct {
 	// `PlacementDecision.status.decisions[]`, in cluster-name order.
 	Decisions []*ClusterDecision `protobuf:"bytes,2,rep,name=decisions,proto3" json:"decisions,omitempty"`
 	// `PlacementSatisfied` and `PlacementMisconfigured`.
-	Conditions    []*Condition `protobuf:"bytes,3,rep,name=conditions,proto3" json:"conditions,omitempty"`
+	Conditions []*Condition `protobuf:"bytes,3,rep,name=conditions,proto3" json:"conditions,omitempty"`
+	// Proposal for the ai-grid-backend owners; implemented in the fake (P8,
+	// field 4). The `location` labels of the decided clusters, unique and
+	// sorted; a decided cluster without one adds nothing. Output only. The
+	// console shows a model's locations from this, whatever selected the
+	// clusters, as the PoC shows the locations it placed the model on.
+	Locations     []string `protobuf:"bytes,4,rep,name=locations,proto3" json:"locations,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1929,6 +1935,13 @@ func (x *PlacementStatus) GetDecisions() []*ClusterDecision {
 func (x *PlacementStatus) GetConditions() []*Condition {
 	if x != nil {
 		return x.Conditions
+	}
+	return nil
+}
+
+func (x *PlacementStatus) GetLocations() []string {
+	if x != nil {
+		return x.Locations
 	}
 	return nil
 }
@@ -2610,13 +2623,14 @@ const file_ai_grid_v1_model_type_proto_rawDesc = "" +
 	"\tapi_group\x18\x01 \x01(\tR\bapiGroup\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12%\n" +
-	"\x0eready_replicas\x18\x04 \x01(\x05R\rreadyReplicas\"\xc2\x01\n" +
+	"\x0eready_replicas\x18\x04 \x01(\x05R\rreadyReplicas\"\xe0\x01\n" +
 	"\x0fPlacementStatus\x12=\n" +
 	"\x1bnumber_of_selected_clusters\x18\x01 \x01(\x05R\x18numberOfSelectedClusters\x129\n" +
 	"\tdecisions\x18\x02 \x03(\v2\x1b.ai_grid.v1.ClusterDecisionR\tdecisions\x125\n" +
 	"\n" +
 	"conditions\x18\x03 \x03(\v2\x15.ai_grid.v1.ConditionR\n" +
-	"conditions\"L\n" +
+	"conditions\x12\x1c\n" +
+	"\tlocations\x18\x04 \x03(\tR\tlocations\"L\n" +
 	"\x0fClusterDecision\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xb2\x01\n" +

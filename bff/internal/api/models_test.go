@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -54,7 +55,7 @@ func seedModels() []*aigridv1.Model {
 			},
 			Status: &aigridv1.ModelStatus{
 				Phase: aigridv1.ModelPhase_MODEL_PHASE_PENDING, Reason: "Processing",
-				Placement: &aigridv1.PlacementStatus{NumberOfSelectedClusters: 2, Decisions: []*aigridv1.ClusterDecision{{ClusterName: "site-paris-1"}, {ClusterName: "site-madrid-1"}},
+				Placement: &aigridv1.PlacementStatus{NumberOfSelectedClusters: 2, Decisions: []*aigridv1.ClusterDecision{{ClusterName: "site-paris-1"}, {ClusterName: "site-madrid-1"}}, Locations: []string{"madrid", "paris"},
 					Conditions: []*aigridv1.Condition{modelCondition("PlacementSatisfied", aigridv1.ConditionStatus_CONDITION_STATUS_TRUE, "AllDecisionsScheduled", "All cluster decisions scheduled")}},
 				Rollout: &aigridv1.RolloutStatus{
 					Summary:    &aigridv1.RolloutSummary{Total: 2, Applied: 2, Available: 1, Progressing: 1, Updated: 2}, // updated is never written by OCM; the BFF drops it
@@ -101,7 +102,7 @@ func TestListModels(t *testing.T) {
 		t.Fatalf("granite = %+v", granite)
 	}
 	p := granite.Placement
-	if !p.Satisfied || p.Reason != "AllDecisionsScheduled" || len(p.SelectedClusters) != 2 || p.MatchLabels["ai-grid/enabled"] != "true" || p.MatchExpressions[0].Values[0] != "europe-west" || p.Tolerations[0].TolerationSeconds == nil || *p.Tolerations[0].TolerationSeconds != 600 || p.ClusterSets[0] != "global" {
+	if !p.Satisfied || p.Reason != "AllDecisionsScheduled" || len(p.SelectedClusters) != 2 || !slices.Equal(p.Locations, []string{"madrid", "paris"}) || p.MatchLabels["ai-grid/enabled"] != "true" || p.MatchExpressions[0].Values[0] != "europe-west" || p.Tolerations[0].TolerationSeconds == nil || *p.Tolerations[0].TolerationSeconds != 600 || p.ClusterSets[0] != "global" {
 		t.Errorf("placement = %+v", p)
 	}
 	r := granite.Rollout
@@ -409,7 +410,7 @@ func TestModelFromTodaysShapes(t *testing.T) {
 	// A placed model whose backend sent no rollout status still has a
 	// placement with empty collections.
 	m = toModel(&aigridv1.Model{Name: "p", Metadata: &aigridv1.ObjectMeta{Namespace: "ns"}, Spec: &aigridv1.ModelSpec{Placement: &aigridv1.Placement{}}})
-	if m.Placement == nil || m.Placement.SelectedClusters == nil || m.Placement.Conditions == nil || m.Rollout == nil || m.Rollout.Works == nil || m.Rollout.Strategy != StrategyAll {
+	if m.Placement == nil || m.Placement.SelectedClusters == nil || m.Placement.Locations == nil || m.Placement.Conditions == nil || m.Rollout == nil || m.Rollout.Works == nil || m.Rollout.Strategy != StrategyAll {
 		t.Errorf("placed = %+v", m)
 	}
 }
@@ -498,5 +499,28 @@ func TestCreateModelTakesNoDisplayNameField(t *testing.T) {
 		if rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.Message != `invalid request body: json: unknown field "`+field+`"` || fake.Reached("CreateModel") {
 			t.Errorf("%s on create = %d %s", field, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// TestModelWithoutSpec: a model the backend sends without a spec (as a
+// subscription's referenced model can be) maps instead of panicking into a 500.
+func TestModelWithoutSpec(t *testing.T) {
+	got := toModel(&aigridv1.Model{Name: "bare", Metadata: &aigridv1.ObjectMeta{Namespace: "ai-grid-models"}})
+	if got.Name != "bare" || got.Replicas != nil {
+		t.Fatalf("model %+v", got)
+	}
+}
+
+// TestListLocations: GET /api/v1/locations passes ListLocations through.
+func TestListLocations(t *testing.T) {
+	fake := &backendtest.Fake{Locations: []string{"madrid", "paris"}}
+	app := newTestApp(t, testConfig(t), fake)
+	rec := serve(app, asUser(http.MethodGet, "/api/v1/locations"))
+	if rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != `{"data":["madrid","paris"]}` {
+		t.Fatalf("locations: %d %s", rec.Code, rec.Body)
+	}
+	fake.Locations = nil
+	if rec := serve(app, asUser(http.MethodGet, "/api/v1/locations")); rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != `{"data":[]}` {
+		t.Fatalf("no locations: %d %s", rec.Code, rec.Body)
 	}
 }
