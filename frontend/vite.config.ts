@@ -14,6 +14,7 @@ import { defineConfig } from 'vite';
  *
  * Environment:
  *   BFF_URL      BFF base URL (default http://127.0.0.1:8080)
+ *   FRONTEND_PORT  dev server port (default 9000)
  *   AUTH_TOKEN   use this token instead of running `oc whoami -t`
  *   AUTH_USER    use this user name instead of running `oc whoami`
  *   AUTH_GROUPS  comma-separated groups to send in `x-forwarded-groups`
@@ -61,7 +62,7 @@ const caller = (): Caller => {
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 9000,
+    port: Number(process.env.FRONTEND_PORT ?? 9000),
     strictPort: true,
     proxy: {
       '/api': {
@@ -96,5 +97,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     css: false,
+    // Playwright specs run with `pnpm e2e`.
+    exclude: ['**/node_modules/**', 'e2e/**'],
   },
 });

@@ -1,13 +1,18 @@
-import type { ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type { ClustersService } from './clusters';
+import type { ConsoleConfig, Tenant, User } from './types';
+
+/** The signed-in user, for pages that show actions only to provider admins. */
+export interface UserService {
+  getUser(): Promise<User>;
+}
 
 /**
- * Every page talks to the BFF through this interface only. The HTTP
- * implementation is used in the browser; tests use an in-memory one.
+ * Every page talks to the BFF through this interface only, and each page takes
+ * just the areas it uses. The HTTP implementation is used in the browser; tests
+ * use an in-memory one.
  */
-export interface ConsoleService {
-  getUser(): Promise<User>;
+export interface ConsoleService extends ClustersService, UserService {
   getConfig(): Promise<ConsoleConfig>;
-  listClusters(): Promise<GridCluster[]>;
   listTenants(): Promise<Tenant[]>;
 }
 
@@ -15,6 +20,8 @@ export class ServiceError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Per-field messages keyed by the JSON path of the request body. */
+    readonly fieldErrors?: Record<string, string>,
   ) {
     super(message);
     this.name = 'ServiceError';

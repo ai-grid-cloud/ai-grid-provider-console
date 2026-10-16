@@ -13,25 +13,25 @@ export const TenantsPage: React.FC<Props> = ({ service }) => {
   return (
     <Stack hasGutter>
       <StackItem>
-        <Title headingLevel="h2">Tenants</Title>
+        <Title headingLevel="h2">Organizations</Title>
       </StackItem>
       {error && (
         <StackItem>
-          <LoadError subject="Tenants" error={error} />
+          <LoadError subject="Organizations" error={error} />
         </StackItem>
       )}
       <StackItem>
         {!loaded ? (
-          <Spinner aria-label="Loading tenants" />
+          <Spinner aria-label="Loading organizations" />
         ) : error ? null : tenants.length === 0 ? (
-          <EmptyState titleText="No tenants" headingLevel="h3">
-            <EmptyStateBody>No organisations exist in the AI Grid identity realm yet.</EmptyStateBody>
+          <EmptyState titleText="No organizations" headingLevel="h3">
+            <EmptyStateBody>No organizations exist in the AI Grid identity realm yet.</EmptyStateBody>
           </EmptyState>
         ) : (
-          <Table aria-label="Tenants" variant="compact">
+          <Table aria-label="Organizations" variant="compact">
             <Thead>
               <Tr>
-                <Th>Tenant</Th>
+                <Th>Organization</Th>
                 <Th>Domains</Th>
                 <Th>ID</Th>
               </Tr>
@@ -39,7 +39,7 @@ export const TenantsPage: React.FC<Props> = ({ service }) => {
             <Tbody>
               {tenants.map((t) => (
                 <Tr key={t.id}>
-                  <Td dataLabel="Tenant">{t.name}</Td>
+                  <Td dataLabel="Organization">{t.name}</Td>
                   <Td dataLabel="Domains">{t.domains.length ? t.domains.join(', ') : '-'}</Td>
                   <Td dataLabel="ID">{t.id}</Td>
                 </Tr>

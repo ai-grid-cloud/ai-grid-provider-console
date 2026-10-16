@@ -5,7 +5,7 @@ TAG ?= dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker)
 
-.PHONY: help dev dev-fake dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build image manifests deploy undeploy
+.PHONY: help dev dev-fake dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
 
 help: ## Show targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -62,6 +62,9 @@ test: ## Run all tests
 build: ## Build the BFF binary and the frontend bundle
 	$(MAKE) -C bff build
 	cd frontend && pnpm build
+
+e2e: ## Browser tests against make dev-fake (Playwright; first run: cd frontend && pnpm exec playwright install chromium)
+	cd frontend && pnpm e2e
 
 ##@ Packaging and deployment
 
