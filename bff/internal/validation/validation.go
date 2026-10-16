@@ -10,7 +10,10 @@ import "encoding/json"
 // side checks to its rule; FrontendOnly lists the rest.
 // Every rule returns field errors keyed by JSON path, the last message per
 // path (as the PoC keeps them), and nil when the body is valid.
-var Schemas = map[string]func(json.RawMessage) map[string]string{}
+var Schemas = map[string]func(json.RawMessage) map[string]string{
+	"createSubscription": CreateSubscription,
+	"updateSubscription": UpdateSubscription,
+}
 
 // FrontendOnly are the schemas in mock/validation/cases.json that only the
 // frontend's zod rules run: organizations and models are validated by the

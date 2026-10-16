@@ -84,6 +84,13 @@ type Fake struct {
 
 	// ShippedLists serves the lists without paging, filtering or counts.
 	ShippedLists bool
+
+	Subscriptions          []*aigridv1.Subscription
+	AuthPolicies           []*aigridv1.AuthPolicy
+	ModelRegistrations     []*aigridv1.ModelRegistration
+	LastSubscriptionCreate *aigridv1.CreateSubscriptionRequest
+	LastSubscriptionUpdate *aigridv1.UpdateSubscriptionRequest
+	LastSubscriptionDelete *aigridv1.DeleteSubscriptionRequest
 }
 
 // stale is the Aborted answer to an expected version that is not the stored one.
@@ -563,6 +570,63 @@ func (f *Fake) findModel(namespace, name string) *aigridv1.Model {
 		}
 	}
 	return nil
+}
+
+// ListSubscriptions implements Subscriptions.
+func (f *Fake) ListSubscriptions(ctx context.Context, _ *aigridv1.ListSubscriptionsRequest) (*aigridv1.ListSubscriptionsResponse, error) {
+	if err := f.begin(ctx, "ListSubscriptions"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.ListSubscriptionsResponse{Subscriptions: f.Subscriptions}, nil
+}
+
+// GetSubscription implements Subscriptions: it finds the subscription by name
+// and answers with every model and policy.
+func (f *Fake) GetSubscription(ctx context.Context, req *aigridv1.GetSubscriptionRequest) (*aigridv1.GetSubscriptionResponse, error) {
+	if err := f.begin(ctx, "GetSubscription"); err != nil {
+		return nil, err
+	}
+	for _, s := range f.Subscriptions {
+		if s.GetName() == req.GetName() {
+			return &aigridv1.GetSubscriptionResponse{Subscription: s, ModelRefs: f.Models, AuthPolicies: f.AuthPolicies, ModelRegistrations: f.ModelRegistrations}, nil
+		}
+	}
+	return nil, status.Errorf(codes.NotFound, "object with identifier '%s' not found", req.GetName())
+}
+
+// CreateSubscription implements Subscriptions: it records the request and
+// returns its object with version "1", and with create_auth_policy a
+// <name>-policy.
+func (f *Fake) CreateSubscription(ctx context.Context, req *aigridv1.CreateSubscriptionRequest) (*aigridv1.CreateSubscriptionResponse, error) {
+	f.LastSubscriptionCreate = req
+	if err := f.begin(ctx, "CreateSubscription"); err != nil {
+		return nil, err
+	}
+	out := proto.Clone(req.GetObject()).(*aigridv1.Subscription)
+	out.ResourceVersion = "1"
+	resp := &aigridv1.CreateSubscriptionResponse{Subscription: out}
+	if req.GetCreateAuthPolicy() {
+		resp.AuthPolicy = &aigridv1.AuthPolicy{Name: out.GetName() + "-policy"}
+	}
+	return resp, nil
+}
+
+// UpdateSubscription implements Subscriptions: it records the request and returns its object.
+func (f *Fake) UpdateSubscription(ctx context.Context, req *aigridv1.UpdateSubscriptionRequest) (*aigridv1.UpdateSubscriptionResponse, error) {
+	f.LastSubscriptionUpdate = req
+	if err := f.begin(ctx, "UpdateSubscription"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.UpdateSubscriptionResponse{Subscription: req.GetObject()}, nil
+}
+
+// DeleteSubscription implements Subscriptions: it records the request.
+func (f *Fake) DeleteSubscription(ctx context.Context, req *aigridv1.DeleteSubscriptionRequest) (*aigridv1.DeleteSubscriptionResponse, error) {
+	f.LastSubscriptionDelete = req
+	if err := f.begin(ctx, "DeleteSubscription"); err != nil {
+		return nil, err
+	}
+	return &aigridv1.DeleteSubscriptionResponse{}, nil
 }
 
 // Status is a shorthand for a gRPC error.

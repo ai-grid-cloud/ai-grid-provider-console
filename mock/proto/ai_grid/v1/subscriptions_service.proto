@@ -9,58 +9,79 @@
 //
 // When the backend ships these RPCs the console switches its import back to the
 // backend's generated package and deletes this draft.
-//
-// Placeholder: the names are agreed now, the fields later. Empty request and
-// response messages are deliberate; adding fields is additive, and the fake can
-// already register the service so the drift test covers it. Every RPC answers
-// Unimplemented until the shape is agreed.
 
 syntax = "proto3";
 
 package ai_grid.v1;
 
+import "ai_grid/v1/model_type.proto";
+import "ai_grid/v1/subscription_type.proto";
+
 option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1";
 
-// Tenant subscriptions to catalog items: MaaSSubscription objects on the hub.
+// MaaS subscriptions and the authorization policies paired with them.
 service Subscriptions {
-  // Lists Subscriptions.
+  // Lists every subscription.
   rpc ListSubscriptions(ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
-  // Returns one Subscription.
+  // The subscription, the models it references, the auth policies that cover them
+  // and the models' MaaS registrations.
   rpc GetSubscription(GetSubscriptionRequest) returns (GetSubscriptionResponse);
-  // Creates a Subscription.
+  // With create_auth_policy, also creates <name>-policy for the same groups and models.
+  // AlreadyExists when the name is taken, or an authorization policy this service didn't
+  // create already has the policy's name.
   rpc CreateSubscription(CreateSubscriptionRequest) returns (CreateSubscriptionResponse);
-  // Updates a Subscription.
+  // Replaces the editable fields and applies the groups and models to <name>-policy when
+  // this service created it; never touches other authorization policies. With lock,
+  // Aborted unless object.resource_version is the current one.
   rpc UpdateSubscription(UpdateSubscriptionRequest) returns (UpdateSubscriptionResponse);
-  // Deletes a Subscription.
+  // Also deletes <name>-policy when this service created it. FailedPrecondition while the
+  // subscription is being deleted.
   rpc DeleteSubscription(DeleteSubscriptionRequest) returns (DeleteSubscriptionResponse);
 }
 
-// Request of ListSubscriptions. Fields to be agreed.
 message ListSubscriptionsRequest {}
 
-// Response of ListSubscriptions. Fields to be agreed.
-message ListSubscriptionsResponse {}
+message ListSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
+}
 
-// Request of GetSubscription. Fields to be agreed.
-message GetSubscriptionRequest {}
+message GetSubscriptionRequest {
+  string name = 1;
+}
 
-// Response of GetSubscription. Fields to be agreed.
-message GetSubscriptionResponse {}
+message GetSubscriptionResponse {
+  Subscription subscription = 1;
+  repeated Model model_refs = 2;
+  repeated AuthPolicy auth_policies = 3;
+  // Proposal for the ai-grid-backend owners; implemented in the fake (P12,
+  // field 4). The MaaSModelRef status of each referenced model that exists.
+  repeated ModelRegistration model_registrations = 4;
+}
 
-// Request of CreateSubscription. Fields to be agreed.
-message CreateSubscriptionRequest {}
+message CreateSubscriptionRequest {
+  Subscription object = 1;
+  bool create_auth_policy = 2;
+}
 
-// Response of CreateSubscription. Fields to be agreed.
-message CreateSubscriptionResponse {}
+message CreateSubscriptionResponse {
+  Subscription subscription = 1;
+  // Set when create_auth_policy was.
+  AuthPolicy auth_policy = 2;
+}
 
-// Request of UpdateSubscription. Fields to be agreed.
-message UpdateSubscriptionRequest {}
+message UpdateSubscriptionRequest {
+  Subscription object = 1;
+  bool lock = 2;
+}
 
-// Response of UpdateSubscription. Fields to be agreed.
-message UpdateSubscriptionResponse {}
+message UpdateSubscriptionResponse {
+  Subscription subscription = 1;
+}
 
-// Request of DeleteSubscription. Fields to be agreed.
-message DeleteSubscriptionRequest {}
+message DeleteSubscriptionRequest {
+  string name = 1;
+  // When set, Aborted unless it matches the current version.
+  string resource_version = 2;
+}
 
-// Response of DeleteSubscription. Fields to be agreed.
 message DeleteSubscriptionResponse {}

@@ -555,12 +555,6 @@ var intentionallyUnimplemented = map[string]string{
 	"/ai_grid.v1.CatalogItems/CreateCatalogItem": "placeholder until agreed with the backend team, see mock/proto/README.md",
 	"/ai_grid.v1.CatalogItems/UpdateCatalogItem": "placeholder until agreed with the backend team, see mock/proto/README.md",
 	"/ai_grid.v1.CatalogItems/DeleteCatalogItem": "placeholder until agreed with the backend team, see mock/proto/README.md",
-
-	"/ai_grid.v1.Subscriptions/ListSubscriptions":  "placeholder until agreed with the backend team, see mock/proto/README.md",
-	"/ai_grid.v1.Subscriptions/GetSubscription":    "placeholder until agreed with the backend team, see mock/proto/README.md",
-	"/ai_grid.v1.Subscriptions/CreateSubscription": "placeholder until agreed with the backend team, see mock/proto/README.md",
-	"/ai_grid.v1.Subscriptions/UpdateSubscription": "placeholder until agreed with the backend team, see mock/proto/README.md",
-	"/ai_grid.v1.Subscriptions/DeleteSubscription": "placeholder until agreed with the backend team, see mock/proto/README.md",
 }
 
 // TestFakeImplementsEveryProtoMethod fails when the draft proto gains a
