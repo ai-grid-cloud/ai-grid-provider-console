@@ -48,11 +48,11 @@ var pocStatus = map[aigridv1.MetricStatus]string{
 	aigridv1.MetricStatus_METRIC_STATUS_NO_DATA:        "no-data",
 }
 
-// fixtureMembers are the fixture clusters GetOverview passes to demoMetrics:
-// the AI Grid members.
-func fixtureMembers(t *testing.T) []*aigridv1.ManagedCluster {
+// fixtureMembers are the clusters in dir that GetOverview passes to
+// demoMetrics: the AI Grid members.
+func fixtureMembers(t *testing.T, dir string) []*aigridv1.ManagedCluster {
 	t.Helper()
-	fx, err := Load(repoFixtures)
+	fx, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,22 +74,17 @@ func TestDemoMetricsMatchThePoC(t *testing.T) {
 	if err := json.Unmarshal(raw, &want); err != nil {
 		t.Fatal(err)
 	}
-	// The golden's input is the PoC's three sites, which the default fixtures
-	// (PR 12's) no longer carry; Task A6 moves them to mock/fixtures-poc. The
-	// clusters are built from the input: demoMetrics reads only the name and
-	// the Available condition.
-	var clusters []*aigridv1.ManagedCluster
-	for _, c := range want.Input.Clusters {
-		available := aigridv1.ConditionStatus_CONDITION_STATUS_UNSPECIFIED
-		switch c.Status {
-		case "Ready":
-			available = aigridv1.ConditionStatus_CONDITION_STATUS_TRUE
-		case "Offline":
-			available = aigridv1.ConditionStatus_CONDITION_STATUS_FALSE
+	// The golden's input is the PoC's three sites, which are the members of
+	// the PoC preset (mock/fixtures-poc): the preset feeds demoMetrics, so a
+	// preset that drifts from the golden fails here.
+	clusters := fixtureMembers(t, pocFixtures)
+	if len(clusters) != len(want.Input.Clusters) {
+		t.Fatalf("preset members %d, golden input %d", len(clusters), len(want.Input.Clusters))
+	}
+	for i, c := range want.Input.Clusters {
+		if clusters[i].GetName() != c.Name || c.Status != "Ready" || !isTrue(clusters[i], CondAvailable) {
+			t.Fatalf("preset member %d is %s (available %v), golden input %s %s", i, clusters[i].GetName(), isTrue(clusters[i], CondAvailable), c.Name, c.Status)
 		}
-		clusters = append(clusters, &aigridv1.ManagedCluster{Name: c.Name, Status: &aigridv1.ManagedClusterStatus{
-			Conditions: []*aigridv1.Condition{{Type: CondAvailable, Status: available}},
-		}})
 	}
 
 	got := demoMetrics(clusters, want.Input.Start, want.Input.End, want.Input.Step)
@@ -117,7 +112,7 @@ func TestDemoMetricsMatchThePoC(t *testing.T) {
 }
 
 func TestDemoMetricsWithoutReadyClusters(t *testing.T) {
-	offline := fixtureMembers(t)[0]
+	offline := fixtureMembers(t, repoFixtures)[0]
 	offline.Status = &aigridv1.ManagedClusterStatus{Conditions: []*aigridv1.Condition{
 		{Type: "ManagedClusterConditionAvailable", Status: aigridv1.ConditionStatus_CONDITION_STATUS_FALSE},
 	}}

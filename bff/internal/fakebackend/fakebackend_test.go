@@ -42,6 +42,14 @@ func TestRepoFixturesLoad(t *testing.T) {
 	if len(fx.Clusters) < 6 {
 		t.Fatalf("expected a cluster per state, got %d", len(fx.Clusters))
 	}
+	checkClustersLookLikeTheHub(t, fx)
+}
+
+// checkClustersLookLikeTheHub checks that every cluster in fx carries the
+// labels, ids and claims ACM writes and that the server accepts the set. It
+// runs on every shipped fixture directory.
+func checkClustersLookLikeTheHub(t *testing.T, fx *Fixtures) {
+	t.Helper()
 	for _, c := range fx.Clusters {
 		for _, want := range []string{LabelName, LabelCloud, LabelVendor, LabelClusterSet} {
 			if _, ok := c.GetLabels()[want]; !ok {
@@ -112,6 +120,14 @@ func TestRepoFixturesUseOnlyHubStrings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	checkClustersUseOnlyHubStrings(t, fx)
+}
+
+// checkClustersUseOnlyHubStrings checks that every condition, claim list,
+// taint and add-on label in fx is one the hub's controllers write. It runs on
+// every shipped fixture directory.
+func checkClustersUseOnlyHubStrings(t *testing.T, fx *Fixtures) {
+	t.Helper()
 	for _, c := range fx.Clusters {
 		for _, cond := range c.GetStatus().GetConditions() {
 			reasons, ok := knownConditions[cond.GetType()]

@@ -5,7 +5,7 @@ TAG ?= dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker)
 
-.PHONY: help dev dev-fake dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
+.PHONY: help dev dev-fake dev-fake-poc dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
 
 help: ## Show targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -30,6 +30,9 @@ dev-fake: ## Run the fake backend on :9090/:9091, the BFF on :8080 and the front
 	$(MAKE) -s dev-bff-fake & \
 	$(MAKE) -s dev-frontend-fake & \
 	wait
+
+dev-fake-poc: ## make dev-fake with the PoC's four sites and three models (mock/fixtures-poc), for the visual comparison
+	$(MAKE) dev-fake FIXTURES=../mock/fixtures-poc
 
 dev-fake-backend: ## Run the fake ai-grid-backend and fake hub API
 	$(MAKE) -C bff fake-backend
@@ -63,7 +66,7 @@ build: ## Build the BFF binary and the frontend bundle
 	$(MAKE) -C bff build
 	cd frontend && pnpm build
 
-e2e: ## Browser tests against make dev-fake (Playwright; first run: cd frontend && pnpm exec playwright install chromium)
+e2e: ## Browser tests against make dev-fake-poc (Playwright; first run: cd frontend && pnpm exec playwright install chromium)
 	cd frontend && pnpm e2e
 
 ##@ Packaging and deployment
