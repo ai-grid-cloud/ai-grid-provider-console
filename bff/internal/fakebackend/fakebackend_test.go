@@ -547,8 +547,7 @@ func TestHubAccessReview(t *testing.T) {
 var intentionallyUnimplemented = map[string]string{
 	"/ai_grid.v1.AiGrid/GetCurrentUser": "GetCurrentUser not implemented yet; the BFF derives isProviderAdmin itself",
 
-	"/ai_grid.v1.Grid/GetOverview": "placeholder until agreed with the backend team, see mock/proto/README.md",
-	"/ai_grid.v1.Grid/GetNetwork":  "placeholder until agreed with the backend team, see mock/proto/README.md",
+	"/ai_grid.v1.Grid/GetNetwork": "placeholder until agreed with the backend team, see mock/proto/README.md",
 
 	"/ai_grid.v1.CatalogItems/ListCatalogItems":  "placeholder until agreed with the backend team, see mock/proto/README.md",
 	"/ai_grid.v1.CatalogItems/GetCatalogItem":    "placeholder until agreed with the backend team, see mock/proto/README.md",

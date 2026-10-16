@@ -1264,6 +1264,178 @@ func jsonValue(t *testing.T, v any) any {
 
 // member is an AI Grid member cluster at site, Available, with the state the
 // backend derives from that.
+func member(name, site string) *aigridv1.ManagedCluster {
+	return &aigridv1.ManagedCluster{Name: name, Labels: map[string]string{LabelEnabled: "true", LabelSite: site},
+		Status: &aigridv1.ManagedClusterStatus{
+			State:      aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_AVAILABLE,
+			Conditions: []*aigridv1.Condition{{Type: "ManagedClusterConditionAvailable", Status: aigridv1.ConditionStatus_CONDITION_STATUS_TRUE}},
+		}}
+}
+
+func TestGridOverview(t *testing.T) {
+	msg := "No enrolled clusters match this selection."
+	fake := &backendtest.Fake{
+		Clusters: []*aigridv1.ManagedCluster{member("site3", "brussels"), member("site1", "san-francisco"),
+			{Name: "site4", Labels: map[string]string{LabelSite: "sydney"}}},
+		Metrics: []*aigridv1.Metric{
+			{Key: "requests", Label: "Gateway request rate", Unit: "req/s", Status: aigridv1.MetricStatus_METRIC_STATUS_OK,
+				Points: []*aigridv1.MetricPoint{{Timestamp: 1790000000, Value: 355.669}}},
+			{Key: "errors", Label: "Gateway error rate", Unit: "req/s", Status: aigridv1.MetricStatus_METRIC_STATUS_UNAVAILABLE},
+			{Key: "latency", Label: "Gateway p95 latency", Unit: "ms", Status: aigridv1.MetricStatus_METRIC_STATUS_NOT_CONFIGURED},
+			{Key: "gpu", Label: "GPU utilization", Unit: "%", Status: aigridv1.MetricStatus_METRIC_STATUS_NO_DATA, Message: &msg},
+		},
+		OverviewTime: timestamppb.New(time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC)),
+	}
+	app := newTestApp(t, testConfig(t), fake)
+	get := func(query string) *httptest.ResponseRecorder {
+		return serve(app, asUser(http.MethodGet, "/api/v1/grid/overview"+query))
+	}
+
+	// The PoC's GridOverview: members only, lowercase sources, demo false.
+	rec := get("?range=6h")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("overview: %d %s", rec.Code, rec.Body)
+	}
+	var raw map[string]any
+	decodeData(t, rec, &raw)
+	clusters, _ := raw["clusters"].([]any)
+	delete(raw, "clusters")
+	want := map[string]any{
+		"updatedAt": "2026-10-16T09:00:00.000Z", "inventorySource": "acm", "demo": false, "metricsSource": "demo",
+		"metrics": []any{
+			map[string]any{"key": "requests", "label": "Gateway request rate", "unit": "req/s", "status": "ok",
+				"points": []any{map[string]any{"timestamp": float64(1790000000), "value": 355.669}}},
+			map[string]any{"key": "errors", "label": "Gateway error rate", "unit": "req/s", "status": "unavailable", "points": []any{}},
+			map[string]any{"key": "latency", "label": "Gateway p95 latency", "unit": "ms", "status": "not-configured", "points": []any{}},
+			map[string]any{"key": "gpu", "label": "GPU utilization", "unit": "%", "status": "no-data", "message": msg, "points": []any{}},
+		},
+	}
+	if !reflect.DeepEqual(raw, want) {
+		t.Fatalf("overview\n got %v\nwant %v", raw, want)
+	}
+	var overview struct{ Clusters []GridCluster }
+	decodeData(t, rec, &overview)
+	// The clusters keep the backend's order.
+	if len(clusters) != 2 || overview.Clusters[0].Name != "site3" || overview.Clusters[1].Name != "site1" ||
+		overview.Clusters[0].Status != StatusReady || overview.Clusters[0].Site != "brussels" || !overview.Clusters[0].AIGridEnabled {
+		t.Fatalf("clusters %+v", overview.Clusters)
+	}
+	if r := fake.LastOverview; r.GetRange() != "6h" || r.Site != nil || !r.GetIncludeMetrics() {
+		t.Fatalf("request %v", r)
+	}
+
+	// No range is forwarded as none (the backend defaults it); site filters;
+	// metrics=false leaves them out.
+	rec = get("?site=brussels&metrics=false")
+	decodeData(t, rec, &overview)
+	if rec.Code != http.StatusOK || len(overview.Clusters) != 1 || overview.Clusters[0].Name != "site3" ||
+		!strings.Contains(rec.Body.String(), `"metrics":[]`) {
+		t.Fatalf("brussels without metrics: %d %s", rec.Code, rec.Body)
+	}
+	if r := fake.LastOverview; r.GetRange() != "" || r.GetSite() != "brussels" || r.GetIncludeMetrics() {
+		t.Fatalf("request %v", r)
+	}
+
+	// The range is the backend's to check: it's forwarded as given, and the
+	// backend's InvalidArgument is 422 with its message.
+	fake.Errs = map[string]error{"GetOverview": status.Error(codes.InvalidArgument, "Choose a time range of 1h, 6h, or 24h.")}
+	rec = get("?range=2h")
+	if rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.Message != "Choose a time range of 1h, 6h, or 24h." || fake.LastOverview.GetRange() != "2h" {
+		t.Fatalf("2h: %d %s %v", rec.Code, rec.Body, fake.LastOverview)
+	}
+	fake.Errs = nil
+
+	// An unspecified enum leaves its key out instead of being guessed.
+	if got := toGridOverview(&aigridv1.GetOverviewResponse{Metrics: []*aigridv1.Metric{{Key: "requests"}}}); got.InventorySource != "" || got.MetricsSource != "" || got.Metrics[0].Status != "" {
+		t.Fatalf("unspecified enums %+v", got)
+	}
+	raw2, err := json.Marshal(toGridOverview(&aigridv1.GetOverviewResponse{Metrics: []*aigridv1.Metric{{Key: "requests"}}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw2), "inventorySource") || strings.Contains(string(raw2), "metricsSource") || strings.Contains(string(raw2), "status") {
+		t.Fatalf("unspecified enums: %s", raw2)
+	}
+}
+
+// TestGridOverviewOmitsUpdatedAtTheBackendDidNotSend: the BFF doesn't invent
+// an updated time (thin-BFF rule); the key is left out.
+func TestGridOverviewOmitsUpdatedAtTheBackendDidNotSend(t *testing.T) {
+	app := newTestApp(t, testConfig(t), &backendtest.Fake{OverviewTime: nil})
+	rec := serve(app, asUser(http.MethodGet, "/api/v1/grid/overview"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("overview: %d %s", rec.Code, rec.Body)
+	}
+	var raw map[string]any
+	decodeData(t, rec, &raw)
+	if _, ok := raw["updatedAt"]; ok {
+		t.Fatalf("updatedAt invented: %s", rec.Body)
+	}
+}
+
+// TestNewRoutesAnswer501OnTheRealBackendShape: the real ai-grid-backend serves
+// only Ping, ListManagedClusters and ListTenants. Every other route of the
+// merged table (PR 12's clusters, tenants and models, and the port's
+// subscriptions and grid overview) reaches its RPC (valid body, JSON content
+// type, If-Match) and answers 501, which the frontend shows as "not available
+// yet". GET /clusters/{name} is not in the list: PR 12 falls back to
+// ListManagedClusters (TestGetClusterFallsBackToListOnTheShippedBackend).
+func TestNewRoutesAnswer501OnTheRealBackendShape(t *testing.T) {
+	fake := &backendtest.Fake{
+		Clusters: []*aigridv1.ManagedCluster{member("site1", "san-francisco")},
+		Tenants:  []*aigridv1.Tenant{{Id: "id-acme", Name: "acme"}},
+	}
+	app := NewApp(testConfig(t), slog.New(slog.DiscardHandler), backendtest.StartRealShape(t, fake), startHub(t, &fakeHub{allowed: true}))
+	send := func(method, path, body, ifMatch string) *httptest.ResponseRecorder {
+		req := asUser(method, path)
+		if body != "" {
+			req.Body = io.NopCloser(strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if ifMatch != "" {
+			req.Header.Set("If-Match", ifMatch)
+		}
+		return serve(app, req)
+	}
+
+	// The three RPCs it has still work.
+	for _, path := range []string{"/api/v1/clusters", "/api/v1/tenants", "/api/v1/clusters/site1"} {
+		if rec := send(http.MethodGet, path, "", ""); rec.Code != http.StatusOK {
+			t.Fatalf("GET %s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+
+	subscriptionUpdate := `{"description":"New","priority":7,"owner":{"users":["alice"],"groups":[{"name":"engineering"}]},
+"modelRefs":[{"name":"granite-3-8b","tokenRateLimits":[{"limit":5,"window":"1m"}]}],"tokenMetadata":{"organizationId":"id-acme"}}`
+	routes := []struct{ method, path, body, ifMatch string }{
+		{http.MethodPatch, "/api/v1/clusters/site1", `{"labels":{"ai-grid/enabled":"true"}}`, `"1"`},
+		{http.MethodGet, "/api/v1/tenants/id-acme", "", ""},
+		{http.MethodPost, "/api/v1/tenants", `{"name":"acme-two","domains":["acme-two.example.com"]}`, ""},
+		{http.MethodPatch, "/api/v1/tenants/id-acme", `{"domains":["acme.example.com"]}`, `"1"`},
+		{http.MethodDelete, "/api/v1/tenants/id-acme", "", `"1"`},
+		{http.MethodGet, "/api/v1/models", "", ""},
+		{http.MethodPost, "/api/v1/models", `{"name":"cpu-only","namespace":"ai-grid-models","modelUri":"hf://example-org/cpu-only"}`, ""},
+		{http.MethodGet, "/api/v1/models/ai-grid-models/tiny-llm", "", ""},
+		{http.MethodPatch, "/api/v1/models/ai-grid-models/tiny-llm", `{"replicas":2}`, `"1"`},
+		{http.MethodDelete, "/api/v1/models/ai-grid-models/tiny-llm", "", `"1"`},
+		{http.MethodGet, "/api/v1/capabilities", "", ""},
+		{http.MethodGet, "/api/v1/locations", "", ""},
+		{http.MethodGet, "/api/v1/subscriptions", "", ""},
+		{http.MethodGet, "/api/v1/subscriptions/engineering", "", ""},
+		{http.MethodPost, "/api/v1/subscriptions", validSubscription, ""},
+		{http.MethodPut, "/api/v1/subscriptions/engineering", subscriptionUpdate, `"1"`},
+		{http.MethodDelete, "/api/v1/subscriptions/engineering", "", `"1"`},
+		{http.MethodGet, "/api/v1/grid/overview?range=1h", "", ""},
+		{http.MethodGet, "/api/v1/grid/overview?range=24h&site=brussels&metrics=false", "", ""},
+	}
+	for _, r := range routes {
+		rec := send(r.method, r.path, r.body, r.ifMatch)
+		if rec.Code != http.StatusNotImplemented || decodeError(t, rec).Error.Message != "the AI Grid backend does not support this operation yet" {
+			t.Errorf("%s %s on the real backend: %d %s", r.method, r.path, rec.Code, rec.Body)
+		}
+	}
+}
+
 // TestSubscriptionStatusMapsOneToOne: the MaaS status (P12) comes back as the
 // backend reports it, under the CRD's names, with no derived reason or
 // status message.

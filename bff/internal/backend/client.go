@@ -54,6 +54,7 @@ type Client struct {
 	Tenants       aigridv1.TenantsClient
 	Models        aigridv1.ModelsClient
 	Subscriptions aigridv1.SubscriptionsClient
+	Grid          aigridv1.GridClient
 }
 
 // Dial creates the connection. It does not connect until the first RPC, so a
@@ -93,6 +94,7 @@ func Dial(cfg Config, extra ...grpc.DialOption) (*Client, error) {
 		Tenants:       aigridv1.NewTenantsClient(conn),
 		Models:        aigridv1.NewModelsClient(conn),
 		Subscriptions: aigridv1.NewSubscriptionsClient(conn),
+		Grid:          aigridv1.NewGridClient(conn),
 	}, nil
 }
 

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend"
@@ -91,6 +92,11 @@ type Fake struct {
 	LastSubscriptionCreate *aigridv1.CreateSubscriptionRequest
 	LastSubscriptionUpdate *aigridv1.UpdateSubscriptionRequest
 	LastSubscriptionDelete *aigridv1.DeleteSubscriptionRequest
+
+	// Metrics and OverviewTime are GetOverview's metrics and updated_at.
+	Metrics      []*aigridv1.Metric
+	OverviewTime *timestamppb.Timestamp
+	LastOverview *aigridv1.GetOverviewRequest
 }
 
 // stale is the Aborted answer to an expected version that is not the stored one.
@@ -629,6 +635,30 @@ func (f *Fake) DeleteSubscription(ctx context.Context, req *aigridv1.DeleteSubsc
 	return &aigridv1.DeleteSubscriptionResponse{}, nil
 }
 
+// GetOverview implements Grid: it records the request and answers with the
+// clusters labelled ai-grid/enabled=true (and ai-grid/site=site when set), and
+// Metrics when include_metrics is set.
+func (f *Fake) GetOverview(ctx context.Context, req *aigridv1.GetOverviewRequest) (*aigridv1.GetOverviewResponse, error) {
+	f.LastOverview = req
+	if err := f.begin(ctx, "GetOverview"); err != nil {
+		return nil, err
+	}
+	resp := &aigridv1.GetOverviewResponse{
+		UpdatedAt:       f.OverviewTime,
+		InventorySource: aigridv1.InventorySource_INVENTORY_SOURCE_ACM,
+		MetricsSource:   aigridv1.MetricsSource_METRICS_SOURCE_DEMO,
+	}
+	for _, c := range f.Clusters {
+		if c.GetLabels()["ai-grid/enabled"] == "true" && (req.Site == nil || c.GetLabels()["ai-grid/site"] == req.GetSite()) {
+			resp.Clusters = append(resp.Clusters, c)
+		}
+	}
+	if req.GetIncludeMetrics() {
+		resp.Metrics = f.Metrics
+	}
+	return resp, nil
+}
+
 // Status is a shorthand for a gRPC error.
 func Status(code codes.Code, msg string) error { return status.Error(code, msg) }
 
@@ -645,6 +675,46 @@ func Start(t *testing.T, fake *Fake) *backend.Client {
 	aigridv1.RegisterModelsServer(srv, fake)
 	aigridv1.RegisterCatalogItemsServer(srv, fake)
 	aigridv1.RegisterSubscriptionsServer(srv, fake)
+	return serve(t, srv, lis)
+}
+
+// realShape is ai-grid-backend as it ships today: Ping, ListManagedClusters
+// and ListTenants, every other method of those services Unimplemented, and
+// no other service.
+type realShape struct {
+	aigridv1.UnimplementedAiGridServer
+	aigridv1.UnimplementedManagedClustersServer
+	aigridv1.UnimplementedTenantsServer
+	fake *Fake
+}
+
+func (r realShape) Ping(ctx context.Context, req *aigridv1.PingRequest) (*aigridv1.PingResponse, error) {
+	return r.fake.Ping(ctx, req)
+}
+
+func (r realShape) ListManagedClusters(ctx context.Context, req *aigridv1.ListManagedClustersRequest) (*aigridv1.ListManagedClustersResponse, error) {
+	return r.fake.ListManagedClusters(ctx, req)
+}
+
+func (r realShape) ListTenants(ctx context.Context, req *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
+	return r.fake.ListTenants(ctx, req)
+}
+
+// StartRealShape serves fake the way the real backend would: only Ping,
+// ListManagedClusters and ListTenants answer; everything else is Unimplemented.
+func StartRealShape(t *testing.T, fake *Fake) *backend.Client {
+	t.Helper()
+	lis := bufconn.Listen(1 << 20)
+	srv := grpc.NewServer()
+	real := realShape{fake: fake}
+	aigridv1.RegisterAiGridServer(srv, real)
+	aigridv1.RegisterManagedClustersServer(srv, real)
+	aigridv1.RegisterTenantsServer(srv, real)
+	return serve(t, srv, lis)
+}
+
+func serve(t *testing.T, srv *grpc.Server, lis *bufconn.Listener) *backend.Client {
+	t.Helper()
 	go func() { _ = srv.Serve(lis) }()
 
 	client, err := backend.Dial(backend.Config{Address: "passthrough:///bufconn", Insecure: true},
