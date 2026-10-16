@@ -84,6 +84,8 @@ const (
 	PathDescription   = "description"
 	PathAttributes    = "attributes"
 	PathDomainDetails = "domain_details"
+	// PathIdentityProvider is the console's proposal P1, not a Keycloak field.
+	PathIdentityProvider = "identity_provider"
 )
 
 // MsgKeycloakDownPref is invented by the console (mock/areas/tenants.md):
@@ -95,7 +97,7 @@ const MsgKeycloakDownPref = "Keycloak is unavailable: "
 const wildcardPrefix = "*."
 
 // tenantPaths is the list UpdateTenant names in its InvalidArgument messages.
-var tenantPaths = []string{PathName, PathAlias, PathDomains, PathEnabled, PathDescription, PathAttributes, PathDomainDetails}
+var tenantPaths = []string{PathName, PathAlias, PathDomains, PathEnabled, PathDescription, PathAttributes, PathDomainDetails, PathIdentityProvider}
 
 // uuidPattern is a lower-case version 4 UUID as KeycloakModelUtils.generateId()
 // (java.util.UUID.randomUUID) writes it: version nibble 4, variant 8-b.

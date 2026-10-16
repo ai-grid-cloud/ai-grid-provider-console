@@ -326,6 +326,8 @@ func (f *Fake) UpdateTenant(ctx context.Context, req *aigridv1.UpdateTenantReque
 			for _, d := range t.Domains {
 				t.DomainDetails = append(t.DomainDetails, &aigridv1.TenantDomain{Name: d})
 			}
+		case "identity_provider":
+			t.IdentityProvider = obj.GetIdentityProvider()
 		case "domain_details":
 			t.DomainDetails = obj.GetDomainDetails()
 			t.Domains = nil

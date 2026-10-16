@@ -33,7 +33,27 @@
         "ai-grid/region": "europe-west",
         "billing-account": "ACME-0042"
       },
-      "resourceVersion": "1"
+      "resourceVersion": "1",
+      "createTime": "2026-09-01T09:00:00Z",
+      "identityProvider": {
+        "title": "Acme Robotics SSO",
+        "description": "Employees of Acme Robotics sign in here.",
+        "enabled": true,
+        "config": {
+          "clientId": "ai-grid",
+          "clientSecretSecret": {
+            "name": "acme-robotics-oidc-client"
+          },
+          "issuer": "https://sso.example.com/realms/acme-robotics",
+          "authorizationUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/auth",
+          "tokenUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/token",
+          "defaultScopes": "openid profile email",
+          "userInfoUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/userinfo",
+          "jwksUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/certs",
+          "logoutUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/logout",
+          "validateSignature": true
+        }
+      }
     }
   }
 }

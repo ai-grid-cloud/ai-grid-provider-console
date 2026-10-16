@@ -10,9 +10,11 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend/backendtest"
@@ -406,6 +408,26 @@ func TestPatchTenant(t *testing.T) {
 	})
 }
 
+// TestTenantCarriesTheBackendsCreateTime: createTime is the backend's (P3),
+// omitted when it sends none.
+func TestTenantCarriesTheBackendsCreateTime(t *testing.T) {
+	created := time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC)
+	raw, err := json.Marshal(toTenant(&aigridv1.Tenant{Id: "t-1", ResourceVersion: "4", CreateTime: timestamppb.New(created)}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"resourceVersion":"4","createTime":"2026-09-01T09:00:00Z"`) {
+		t.Fatalf("tenant with a creation time: %s", raw)
+	}
+	raw, err = json.Marshal(toTenant(&aigridv1.Tenant{Id: "t-1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "createTime") {
+		t.Fatalf("tenant without a creation time: %s", raw)
+	}
+}
+
 func TestDeleteTenant(t *testing.T) {
 	fake := &backendtest.Fake{Tenants: seedTenants()}
 	app := newTestApp(t, testConfig(t), fake)
@@ -543,4 +565,87 @@ func TestTenantFilterAndPagingOnTheShippedBackend(t *testing.T) {
 			t.Errorf("%q = %d tenants, meta %+v", q, len(list), meta)
 		}
 	}
+}
+
+// idpJSON is an identity provider in the console's JSON, the PoC's shape.
+const idpJSON = `{"title": "Acme SSO", "description": "Acme employees sign in here.", "enabled": true, "config": {"clientId": "ai-grid", "clientSecretSecret": {"name": "acme-oidc-client"}, "issuer": "https://sso.example.com/realms/acme", "authorizationUrl": "https://sso.example.com/realms/acme/auth", "tokenUrl": "https://sso.example.com/realms/acme/token", "defaultScopes": "openid", "userInfoUrl": "", "jwksUrl": "https://sso.example.com/realms/acme/certs", "logoutUrl": "", "validateSignature": false}}`
+
+// TestTenantIdentityProviderRoundTrips: the identity provider (P1) travels
+// from POST to the backend and back, and a PATCH of only identityProvider
+// masks only identity_provider, so the domains stay.
+func TestTenantIdentityProviderRoundTrips(t *testing.T) {
+	fake := &backendtest.Fake{Tenants: seedTenants()}
+	app := newTestApp(t, testConfig(t), fake)
+	rec := serve(app, jsonRequest(http.MethodPost, "/api/v1/tenants", `{"name": "wayne-aerospace", "domains": ["wayne-aero.example.com"], "identityProvider": `+idpJSON+`}`))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create = %d %s", rec.Code, rec.Body)
+	}
+	sent := fake.LastCreateTenant.GetObject().GetIdentityProvider()
+	if sent.GetTitle() != "Acme SSO" || sent.Enabled == nil || !sent.GetEnabled() || sent.GetConfig().GetClientSecretSecretName() != "acme-oidc-client" ||
+		sent.GetConfig().GetJwksUrl() != "https://sso.example.com/realms/acme/certs" || sent.GetConfig().ValidateSignature == nil || sent.GetConfig().GetValidateSignature() {
+		t.Fatalf("identity provider sent = %v", sent)
+	}
+
+	rec = serve(app, asUser(http.MethodGet, "/api/v1/tenants/t-4"))
+	var got map[string]any
+	decodeData(t, rec, &got)
+	want := map[string]any{}
+	if err := json.Unmarshal([]byte(idpJSON), &want); err != nil {
+		t.Fatal(err)
+	}
+	if gotIdP, _ := json.Marshal(got["identityProvider"]); string(gotIdP) != string(mustMarshal(t, want)) {
+		t.Fatalf("GET identityProvider = %s, want %s", gotIdP, mustMarshal(t, want))
+	}
+
+	rec = serve(app, patchTenant("t-4", "1", `{"identityProvider": `+strings.Replace(idpJSON, "Acme SSO", "Wayne SSO", 1)+`}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("patch = %d %s", rec.Code, rec.Body)
+	}
+	if paths := fake.LastUpdateTenant.GetUpdateMask().GetPaths(); len(paths) != 1 || paths[0] != "identity_provider" {
+		t.Errorf("mask = %v, want [identity_provider]", paths)
+	}
+	var tn Tenant
+	decodeData(t, rec, &tn)
+	if tn.IdentityProvider == nil || tn.IdentityProvider.Title != "Wayne SSO" || len(tn.Domains) != 1 || tn.Domains[0] != "wayne-aero.example.com" {
+		t.Errorf("patched = %+v", tn)
+	}
+
+	// The client secret itself has no field: strict decoding refuses it.
+	rec = serve(app, patchTenant("t-4", "2", `{"identityProvider": {"config": {"clientSecret": "s3cr3t"}}}`))
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(decodeError(t, rec).Error.Message, `unknown field "clientSecret"`) {
+		t.Errorf("client secret value = %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestPatchWithoutIdentityProviderKeepsIt: a PATCH that leaves out
+// identityProvider doesn't name it in the mask, and a tenant without one
+// has no identityProvider key.
+func TestPatchWithoutIdentityProviderKeepsIt(t *testing.T) {
+	fake := &backendtest.Fake{Tenants: seedTenants()}
+	app := newTestApp(t, testConfig(t), fake)
+	if rec := serve(app, asUser(http.MethodGet, "/api/v1/tenants/t-1")); strings.Contains(rec.Body.String(), `"identityProvider":`) {
+		t.Fatalf("a tenant without an identity provider: %s", rec.Body)
+	}
+	fake.Tenants[1].IdentityProvider = &aigridv1.IdentityProvider{Title: "Acme SSO", Enabled: proto.Bool(true), Config: &aigridv1.OidcConfig{ClientId: "ai-grid"}}
+	rec := serve(app, patchTenant("t-1", "1", `{"domains": ["acme.example.com"]}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("patch = %d %s", rec.Code, rec.Body)
+	}
+	if paths := fake.LastUpdateTenant.GetUpdateMask().GetPaths(); len(paths) != 1 || paths[0] != "domains" {
+		t.Errorf("mask = %v, want [domains]", paths)
+	}
+	var tn Tenant
+	decodeData(t, rec, &tn)
+	if tn.IdentityProvider == nil || tn.IdentityProvider.Title != "Acme SSO" || tn.IdentityProvider.Config == nil || tn.IdentityProvider.Config.ClientID != "ai-grid" {
+		t.Errorf("identity provider kept = %+v", tn.IdentityProvider)
+	}
+}
+
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }

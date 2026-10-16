@@ -1,0 +1,532 @@
+{
+  "_comment": "Validation cases shared by the fake backend (Go) and the frontend (zod). Each case names a schema, an input in the BFF's JSON shape, and the field errors expected (empty when valid): the last message per path, as the PoC keeps (Object.fromEntries over the zod issues). Messages are the PoC's (shared/*-validation.mjs at 62319b8), with 'tenant' read as 'organization'.",
+  "cases": [
+    {
+      "schema": "organization",
+      "name": "every identity provider field",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "organization",
+      "name": "name with capitals",
+      "input": {
+        "name": "Acme",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "name": "Use lowercase letters, numbers, and hyphens."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "empty name",
+      "input": {
+        "name": "",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "name": "Use lowercase letters, numbers, and hyphens."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "duplicate domain after trimming and lowercasing",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "a.example.com",
+          "A.example.com "
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "domains": "Domains must be unique."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "one-label domain",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "localhost"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "domains.0": "Enter a valid domain, for example example.com."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "no domains",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "organization",
+      "name": "missing client ID",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "  ",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.clientId": "Client ID is required."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "ftp issuer",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "ftp://sso.example.com",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.issuer": "Use HTTP or HTTPS."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "issuer that is not a URL",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "sso.example.com",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.issuer": "Use HTTP or HTTPS."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "empty token URL",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.tokenUrl": "Use HTTP or HTTPS."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "invalid secret reference name",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "Acme_Secret"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.clientSecretSecret.name": "Enter a valid secret reference name."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "empty secret reference",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": ""
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config.clientSecretSecret.name": "Enter a valid secret reference name."
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "empty userInfoUrl is valid",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "",
+            "jwksUrl": "",
+            "logoutUrl": "",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "organization",
+      "name": "optional fields take their defaults",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "description": "Acme employees sign in here.",
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout"
+          }
+        }
+      },
+      "fieldErrors": {}
+    },
+    {
+      "schema": "organization",
+      "name": "disabled identity provider",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": false,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.enabled": "Invalid literal value, expected true"
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "a client secret value is rejected",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ],
+        "identityProvider": {
+          "title": "Acme SSO",
+          "description": "Acme employees sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-oidc-client"
+            },
+            "issuer": "https://sso.acme-robotics.example.com/realms/acme",
+            "authorizationUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.acme-robotics.example.com/realms/acme/protocol/openid-connect/logout",
+            "validateSignature": true,
+            "clientSecret": "s3cr3t"
+          }
+        }
+      },
+      "fieldErrors": {
+        "identityProvider.config": "Unrecognized key(s) in object: 'clientSecret'"
+      }
+    },
+    {
+      "schema": "organization",
+      "name": "missing identity provider",
+      "input": {
+        "name": "acme-robotics",
+        "domains": [
+          "acme-robotics.example.com",
+          "acme.example.org"
+        ]
+      },
+      "fieldErrors": {
+        "identityProvider": "Required"
+      }
+    }
+  ]
+}

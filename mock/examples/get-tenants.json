@@ -31,7 +31,27 @@
           "ai-grid/region": "europe-west",
           "billing-account": "ACME-0042"
         },
-        "resourceVersion": "1"
+        "resourceVersion": "1",
+        "createTime": "2026-09-01T09:00:00Z",
+        "identityProvider": {
+          "title": "Acme Robotics SSO",
+          "description": "Employees of Acme Robotics sign in here.",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "acme-robotics-oidc-client"
+            },
+            "issuer": "https://sso.example.com/realms/acme-robotics",
+            "authorizationUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/userinfo",
+            "jwksUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/certs",
+            "logoutUrl": "https://sso.example.com/realms/acme-robotics/protocol/openid-connect/logout",
+            "validateSignature": true
+          }
+        }
       },
       {
         "id": "8d2e7b31-0c4f-4a9d-b5e6-7f8a9b0c1d2e",
@@ -50,7 +70,26 @@
           }
         ],
         "attributes": {},
-        "resourceVersion": "1"
+        "resourceVersion": "1",
+        "identityProvider": {
+          "title": "Globex SSO",
+          "description": "",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "globex-research-oidc-client"
+            },
+            "issuer": "https://sso.example.com/realms/globex-research",
+            "authorizationUrl": "https://sso.example.com/realms/globex-research/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.example.com/realms/globex-research/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "",
+            "jwksUrl": "",
+            "logoutUrl": "",
+            "validateSignature": true
+          }
+        }
       },
       {
         "id": "c5a4d3e2-f1b0-4987-a6c5-d4e3f2a1b0c9",
@@ -61,7 +100,26 @@
         "domains": [],
         "domainDetails": [],
         "attributes": {},
-        "resourceVersion": "1"
+        "resourceVersion": "1",
+        "identityProvider": {
+          "title": "",
+          "description": "",
+          "enabled": true,
+          "config": {
+            "clientId": "ai-grid",
+            "clientSecretSecret": {
+              "name": "initech-labs-oidc-client"
+            },
+            "issuer": "https://sso.example.com/realms/initech-labs",
+            "authorizationUrl": "https://sso.example.com/realms/initech-labs/protocol/openid-connect/auth",
+            "tokenUrl": "https://sso.example.com/realms/initech-labs/protocol/openid-connect/token",
+            "defaultScopes": "openid profile email",
+            "userInfoUrl": "",
+            "jwksUrl": "",
+            "logoutUrl": "",
+            "validateSignature": true
+          }
+        }
       },
       {
         "id": "0b7e5c1d-9a2f-4e3b-8d6c-1f2a3b4c5d6e",
