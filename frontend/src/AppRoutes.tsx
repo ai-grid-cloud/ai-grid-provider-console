@@ -2,9 +2,9 @@ import { PageSection } from '@patternfly/react-core';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import type { ConsoleService } from './api/ConsoleService';
 import { NotFoundPage } from './components/NotFoundPage';
-import { NotYetPortedPage } from './components/NotYetPortedPage';
 import { MaaSGovernanceProvider } from './context/MaaSGovernanceContext';
 import { ClustersPage } from './pages/ClustersPage';
+import { GridPage } from './pages/grid/GridPage';
 import { ModelWizard } from './pages/models/ModelWizard';
 import { ModelsPage } from './pages/models/ModelsPage';
 import { OrganizationDetailsPage } from './pages/organizations/OrganizationDetailsPage';
@@ -18,12 +18,12 @@ import { ViewSubscriptionPage } from './pages/subscriptions/ViewSubscriptionPage
 type Props = { service: ConsoleService };
 
 // Ported from krisv/ai-grid-cloud-provider-poc src/app/App.tsx at 62319b8.
-// Later tasks replace each NotYetPortedPage with its page.
 export const AppRoutes: React.FC<Props> = ({ service }) => (
   <Routes>
     <Route path="/" element={<Navigate to="/clusters" replace />} />
-    <Route path="/ai-grid" element={<NotYetPortedPage title="AI Grid" />} />
-    <Route path="/monitoring" element={<NotYetPortedPage title="Monitoring" />} />
+    {/* Keyed, so moving between the map and monitoring mounts a fresh page with its own loads. */}
+    <Route path="/ai-grid" element={<GridPage key="ai-grid" service={service} />} />
+    <Route path="/monitoring" element={<GridPage key="monitoring" service={service} monitoring />} />
     <Route
       path="/clusters"
       element={

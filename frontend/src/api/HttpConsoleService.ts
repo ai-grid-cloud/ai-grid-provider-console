@@ -17,6 +17,8 @@ import type {
   CreateSubscriptionRequest,
   CreateSubscriptionResponse,
   GridCluster,
+  GridOverview,
+  GridRange,
   MaaSSubscription,
   ManagedModel,
   Organization,
@@ -146,6 +148,24 @@ export class HttpConsoleService implements ConsoleService {
 
   deleteSubscription(name: string, resourceVersion: string): Promise<void> {
     return this.request<void>('DELETE', `/subscriptions/${encodeURIComponent(name)}`, { ifMatch: resourceVersion });
+  }
+
+  async getGridOverview(
+    range: GridRange,
+    opts: { site?: string; includeMetrics?: boolean } = {},
+  ): Promise<GridOverview> {
+    const query = new URLSearchParams({ range });
+    if (opts.site) {
+      query.set('site', opts.site);
+    }
+    if (opts.includeMetrics === false) {
+      query.set('metrics', 'false');
+    }
+    const overview = await this.request<Omit<GridOverview, 'clusters'> & { clusters: ApiCluster[] }>(
+      'GET',
+      `/grid/overview?${query}`,
+    );
+    return { ...overview, clusters: overview.clusters.map(toGridCluster) };
   }
 
   /** Calls the BFF and unwraps its data envelope; `undefined` for 204. */

@@ -22,6 +22,7 @@
     "vite.config.ts",
     "vitest.setup.ts",
     "../mock/validation/*.json",
+    "../mock/golden/*.json",
     "../mock/examples/*.json"
   ]
 }

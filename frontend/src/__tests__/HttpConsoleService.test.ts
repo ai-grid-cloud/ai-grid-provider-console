@@ -198,6 +198,18 @@ describe('HttpConsoleService', () => {
     expect(fetchFn).toHaveBeenCalledWith('/api/v1/clusters', expect.objectContaining({ method: 'GET' }));
   });
 
+  it('maps the clusters the grid overview embeds', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse(200, {
+        data: { clusters: [{ name: 'site-madrid-1', aiGridEnabled: true, provisioned: true }], metrics: [] },
+      }),
+    );
+    const overview = await new HttpConsoleService(fetchFn).getGridOverview('1h');
+    expect(overview.clusters).toEqual([
+      expect.objectContaining({ name: 'site-madrid-1', status: 'Unknown', provisioningStatus: 'Provisioned' }),
+    ]);
+  });
+
   it('surfaces the BFF error message and status', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(401, { error: { code: '401', message: 'missing header' } }));
     const service = new HttpConsoleService(fetchFn);
@@ -228,6 +240,26 @@ describe('HttpConsoleService', () => {
     await service.deleteOrganization('t-9', '');
     const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
     expect(init.headers).not.toHaveProperty('If-Match');
+  });
+
+  it('reads the grid overview with the range, site and metrics query', async () => {
+    const fetchFn = vi.fn().mockImplementation(async () => jsonResponse(200, { data: { clusters: [], metrics: [] } }));
+    const service = new HttpConsoleService(fetchFn);
+    await service.getGridOverview('1h');
+    expect(fetchFn).toHaveBeenLastCalledWith(
+      '/api/v1/grid/overview?range=1h',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    await service.getGridOverview('24h', { site: 'new york', includeMetrics: false });
+    expect(fetchFn).toHaveBeenLastCalledWith(
+      '/api/v1/grid/overview?range=24h&site=new+york&metrics=false',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    await service.getGridOverview('6h', { site: '', includeMetrics: true });
+    expect(fetchFn).toHaveBeenLastCalledWith(
+      '/api/v1/grid/overview?range=6h',
+      expect.objectContaining({ method: 'GET' }),
+    );
   });
 
   it('carries field errors and flags conflicts', async () => {

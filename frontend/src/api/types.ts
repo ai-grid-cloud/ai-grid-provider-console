@@ -11,6 +11,7 @@ export type User = {
 export type ConsoleConfig = {
   gridEndpoint: string;
   mapTileUrl: string;
+  mapTileAttribution: string;
   billingUrl: string;
   version: string;
   /** The namespace the deploy wizard creates models in. */
@@ -75,6 +76,39 @@ export type GridCluster = {
   openshiftVersion?: string;
   resourceVersion?: string;
   labels: Record<string, string>;
+};
+
+// The PoC's grid overview (shared/grid-monitoring.mjs gridOverviewSchema at 62319b8).
+export type GridRange = '1h' | '6h' | '24h';
+
+export type MetricStatus = 'ok' | 'unavailable' | 'not-configured' | 'no-data';
+
+/** A sample at a Unix time in seconds. */
+export type MetricPoint = { timestamp: number; value: number };
+
+/** One fleet-wide series, such as `requests` in req/s. */
+export type GridMetric = {
+  key: string;
+  label: string;
+  unit: string;
+  /** Absent when the backend doesn't say. */
+  status?: MetricStatus;
+  /** Why there are no points, when status is not ok. */
+  message?: string;
+  points: MetricPoint[];
+};
+
+export type GridOverview = {
+  /** Absent when the backend doesn't send a time. */
+  updatedAt?: string;
+  /** Absent when the backend doesn't say. */
+  inventorySource?: 'acm' | 'git' | 'demo';
+  /** True only for the PoC's browser demo; the BFF always sends false. */
+  demo: boolean;
+  /** `demo`: simulated, because the backend has no Thanos configured. */
+  metricsSource?: 'thanos' | 'demo';
+  clusters: GridCluster[];
+  metrics: GridMetric[];
 };
 
 // The PoC's tenant types (src/app/types/tenants.ts at 62319b8) as organizations,

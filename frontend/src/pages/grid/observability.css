@@ -1,0 +1,155 @@
+/* Ported from krisv/ai-grid-cloud-provider-poc src/app/pages/grid/observability.css at 62319b8. */
+/* Adapted from the cloned prototype observability styles. */
+.observability-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--md);
+  padding-block-start: var(--pf-t--global--spacer--md);
+}
+
+.observability-stat-row {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+  flex-wrap: wrap;
+}
+
+.observability-stat-card {
+  min-width: 120px;
+  flex: 1 1 0;
+  padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+  background: var(--pf-t--global--background--color--primary--default);
+}
+
+.observability-stat-card--warn {
+  border-color: var(--pf-t--color--orange--default);
+}
+
+.observability-stat-card__label {
+  font-size: var(--pf-t--global--font--size--xs);
+  color: var(--pf-t--global--text--color--subtle);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.observability-stat-card__value {
+  font-size: var(--pf-t--global--font--size--heading--lg);
+  font-weight: var(--pf-t--global--font--weight--heading--default);
+  line-height: 1.3;
+}
+
+.observability-stat-card__unit {
+  font-size: var(--pf-t--global--font--size--body--sm);
+  color: var(--pf-t--global--text--color--subtle);
+  margin-inline-start: 2px;
+}
+
+.observability-metric-card.pf-v6-c-card {
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+}
+
+.observability-metric-card__title {
+  font-size: var(--pf-t--global--font--size--body--sm);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+  color: var(--pf-t--global--text--color--subtle);
+  margin-block-end: var(--pf-t--global--spacer--xs);
+}
+
+.observability-chart-grid {
+  display: grid;
+  gap: var(--pf-t--global--spacer--md);
+}
+
+.observability-chart-grid--2col {
+  grid-template-columns: 1fr 1fr;
+}
+
+.observability-chart-grid--3col {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+@media (max-width: 960px) {
+  .observability-chart-grid--3col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .observability-chart-grid--2col,
+  .observability-chart-grid--3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+.observability-timeframe-selector {
+  flex-shrink: 0;
+}
+.observability-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.observability-header h1 {
+  margin-bottom: 8px;
+}
+.observability-header p {
+  color: var(--pf-t--global--text--color--subtle);
+}
+.observability-time-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.observability-chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+.observability-chart-caption {
+  font-size: 11px;
+  color: var(--pf-t--global--text--color--subtle);
+  margin-top: 4px;
+}
+.observability-empty-metric {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pf-t--global--text--color--subtle);
+}
+.observability-metric-card__title.pf-v6-c-title {
+  font-size: 14px;
+}
+.observability-model-filter {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.observability-model-filter select {
+  max-width: 260px;
+}
+.observability-dashboard .pf-v6-c-expandable-section__content {
+  margin-top: 12px;
+}
+
+/* The PoC's table styles (src/style.css at 62319b8); only the Monitoring tables use them. */
+.grid-table-scroll {
+  overflow: auto;
+}
+.grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  text-align: left;
+}
+.grid-table th,
+.grid-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--pf-t--global--border--color--default);
+}

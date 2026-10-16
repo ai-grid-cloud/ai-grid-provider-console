@@ -1,0 +1,415 @@
+/* Ported from krisv/ai-grid-cloud-provider-poc src/app/pages/grid/grid-fleet.css at 62319b8. */
+/* Summary styling adapted from the provided ai-grid-prototype reference. */
+.vision-summary-strip {
+  display: flex;
+  gap: var(--pf-t--global--spacer--md);
+  padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
+  align-items: stretch;
+  min-height: 120px;
+}
+
+.vision-summary-strip__tiles {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+  flex-wrap: wrap;
+  flex: 1 1 0;
+  align-content: start;
+}
+
+.vision-summary-tile {
+  min-width: 90px;
+  padding: var(--pf-t--global--spacer--xs) var(--pf-t--global--spacer--sm);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+  background: var(--pf-t--global--background--color--primary--default);
+}
+
+.vision-summary-tile--warn {
+  border-color: var(--pf-t--color--orange--default);
+}
+
+.vision-summary-tile__label {
+  font-size: var(--pf-t--global--font--size--xs);
+  color: var(--pf-t--global--text--color--subtle);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.vision-summary-tile__value {
+  font-size: var(--pf-t--global--font--size--heading--md);
+  font-weight: var(--pf-t--global--font--weight--heading--default);
+  line-height: 1.3;
+  display: flex;
+  align-items: baseline;
+  gap: var(--pf-t--global--spacer--xs);
+}
+
+.vision-summary-tile__link.pf-v6-c-button {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.vision-summary-tile__delta {
+  font-size: var(--pf-t--global--font--size--xs);
+  font-weight: var(--pf-t--global--font--weight--body--default);
+}
+
+.vision-summary-tile__delta--up {
+  color: var(--pf-t--color--green--default);
+}
+
+.vision-summary-tile__delta--down {
+  color: var(--pf-t--color--red--default);
+}
+
+.vision-summary-tile__delta--flat {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
+.vision-summary-tile__sub {
+  font-size: var(--pf-t--global--font--size--xs);
+  color: var(--pf-t--global--text--color--subtle);
+  margin-block-start: 2px;
+}
+
+.vision-summary-strip__charts {
+  flex: 0 0 380px;
+  min-width: 280px;
+}
+
+.vision-fleet-charts__title {
+  font-size: var(--pf-t--global--font--size--body--sm);
+  font-weight: var(--pf-t--global--font--weight--body--bold);
+}
+
+.vision-fleet-charts__row {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
+.vision-fleet-charts__chart {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.vision-fleet-charts__chart-label {
+  font-size: var(--pf-t--global--font--size--xs);
+  color: var(--pf-t--global--text--color--subtle);
+  margin-block-end: 2px;
+}
+
+.ai-grid-future-vision {
+  min-width: 0;
+}
+.ai-grid-future-vision__fleet {
+  border: 1px solid var(--pf-t--global--border--color--default);
+  background: var(--pf-t--global--background--color--primary--default);
+}
+.ai-grid-future-vision__fleet .pf-v6-c-drawer__body {
+  min-width: 0;
+}
+.fleet-map-area {
+  position: relative;
+  height: clamp(380px, 55vh, 720px);
+  min-height: 380px;
+}
+.vision-fleet-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #eee;
+}
+.vision-fleet-map__leaflet {
+  position: absolute;
+  inset: 0;
+}
+.vision-fleet-map__legend {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 16px;
+  padding: 6px 12px;
+  background: white;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 500;
+}
+.vision-fleet-map__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vision-fleet-map__legend span::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--pin);
+  background: color-mix(in srgb, var(--pin) 35%, transparent);
+}
+.fleet-legend-ready {
+  --pin: #3d7317;
+}
+.fleet-legend-offline {
+  --pin: #ee0000;
+}
+.fleet-legend-unknown {
+  --pin: #6a6e73;
+}
+.vision-fleet-map__empty,
+.fleet-map-notice {
+  position: absolute;
+  top: 45%;
+  left: 15%;
+  right: 15%;
+  padding: 12px;
+  background: white;
+  z-index: 500;
+  text-align: center;
+}
+.fleet-map-notice {
+  top: auto;
+  bottom: 42px;
+  font-size: 12px;
+}
+.vision-attention-strip {
+  position: absolute;
+  top: 12px;
+  left: 55px;
+  right: 12px;
+  z-index: 500;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  pointer-events: none;
+}
+.vision-attention-strip .pf-v6-c-label {
+  pointer-events: auto;
+  box-shadow: 0 1px 3px #0002;
+}
+.fleet-drawer {
+  max-height: calc(55vh + 230px);
+  min-width: 310px;
+  overflow: auto;
+}
+.fleet-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.fleet-cluster-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.fleet-cluster-card {
+  text-align: left;
+  padding: 16px;
+  border: 1px solid var(--pf-t--global--border--color--default);
+  border-radius: 4px;
+  background: var(--pf-t--global--background--color--primary--default);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fleet-cluster-card:hover,
+.fleet-cluster-card:focus-visible {
+  border-color: #0066cc;
+  outline-color: #0066cc;
+}
+.fleet-cluster-card__heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.fleet-cluster-card__heading strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.fleet-cluster-card p {
+  color: var(--pf-t--global--text--color--subtle);
+  font-size: 13px;
+  margin: 8px 0 12px 24px;
+}
+.fleet-cluster-card dl > div,
+.fleet-details > div {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.fleet-cluster-card dt,
+.fleet-details dt {
+  color: var(--pf-t--global--text--color--subtle);
+}
+.fleet-cluster-card dd,
+.fleet-details dd {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.fleet-card-details {
+  display: block;
+  color: #0066cc;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.fleet-details {
+  margin: 20px 0;
+}
+.fleet-details-note {
+  color: var(--pf-t--global--text--color--subtle);
+  font-size: 12px;
+  margin-top: 20px;
+}
+.vision-summary-strip {
+  border-top: 1px solid var(--pf-t--global--border--color--default);
+  flex-wrap: wrap;
+}
+.vision-summary-strip__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.vision-summary-strip__charts {
+  flex: 1 1 280px;
+}
+.vision-summary-tile {
+  min-width: 0;
+}
+.vision-summary-tile__value {
+  font-size: 20px;
+  white-space: nowrap;
+}
+.fleet-chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.vision-fleet-charts__chart svg {
+  width: 100%;
+  height: 80px;
+  display: block;
+}
+.fleet-trend-time {
+  font-size: 10px;
+  color: var(--pf-t--global--text--color--subtle);
+}
+.fleet-trend-empty {
+  font-size: 12px;
+  margin: 16px 0;
+}
+@media (max-width: 1000px) {
+  .fleet-drawer {
+    min-width: 280px;
+  }
+}
+@media (max-width: 700px) {
+  .ai-grid-future-vision__fleet .pf-v6-c-drawer__content {
+    display: flex;
+    flex-direction: column;
+  }
+  .fleet-drawer {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    max-height: 480px;
+  }
+  .vision-summary-strip__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.fleet-panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.fleet-panel-toolbar .pf-v6-c-search-input {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+.fleet-detail-header {
+  width: 100%;
+}
+.fleet-detail-header h2 {
+  margin: 12px 0 4px;
+  overflow-wrap: anywhere;
+}
+.fleet-detail-header > span {
+  font-size: 13px;
+  color: var(--pf-t--global--text--color--subtle);
+}
+.fleet-detail-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.fleet-detail-section {
+  padding: 20px 0;
+  border-top: 1px solid var(--pf-t--global--border--color--default);
+}
+.fleet-detail-section .fleet-details {
+  margin: 12px 0 0;
+}
+.fleet-details > div {
+  gap: 12px;
+  align-items: baseline;
+}
+.fleet-details dt {
+  flex: 0 0 40%;
+}
+.fleet-details dd {
+  min-width: 0;
+}
+.fleet-related-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+}
+.fleet-related-links button {
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.fleet-card-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 16px;
+  text-transform: uppercase;
+  color: var(--pf-t--global--text--color--subtle);
+}
+.fleet-cluster-card > .pf-v6-c-label {
+  float: right;
+}
+.fleet-cluster-card > .pf-v6-c-button {
+  font-weight: 600;
+}
+.fleet-cluster-card .fleet-details-note {
+  margin: 8px 0;
+}
+.fleet-drawer {
+  max-height: calc(55vh + 160px);
+}
+
+/* The AI Grid page toolbar, from krisv/ai-grid-cloud-provider-poc src/style.css at 62319b8. */
+.grid-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.grid-source {
+  margin: 16px 0;
+  color: var(--pf-t--global--text--color--subtle);
+}
