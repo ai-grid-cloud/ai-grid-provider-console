@@ -80,7 +80,11 @@ export const App: React.FC<Props> = ({ service }) => {
   return (
     <Page masthead={header} sidebar={sidebar}>
       <PageSection>
-        {section === 'clusters' ? <ClustersPage service={service} /> : <TenantsPage service={service} />}
+        {section === 'clusters' ? (
+          <ClustersPage service={service} canEdit={user?.isProviderAdmin ?? false} />
+        ) : (
+          <TenantsPage service={service} />
+        )}
       </PageSection>
     </Page>
   );

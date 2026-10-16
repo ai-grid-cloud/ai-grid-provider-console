@@ -1,4 +1,5 @@
 {
-  "_comment": "latency is added to every RPC; a hub list from a pod on the hub takes tens of milliseconds, Keycloak a little more.",
-  "latency": "40ms"
+  "_comment": "latency is added to every RPC; a hub list from a pod on the hub takes tens of milliseconds, Keycloak a little more. speed multiplies the scenario clock (scenarios.json): 1 is real time, 10 plays a 5 minute scenario in 30 seconds.",
+  "latency": "40ms",
+  "speed": 1.0
 }

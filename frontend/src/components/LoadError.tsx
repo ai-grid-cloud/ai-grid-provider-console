@@ -5,6 +5,8 @@ type Props = {
   /** What was being loaded, e.g. "Clusters". */
   subject: string;
   error: Error;
+  /** What failed, "loaded" by default; "updated" for a failed write. */
+  verb?: string;
 };
 
 /**
@@ -14,7 +16,7 @@ type Props = {
  * informational empty state rather than an error. Everything else is an error
  * with the BFF's message.
  */
-export const LoadError: React.FC<Props> = ({ subject, error }) => {
+export const LoadError: React.FC<Props> = ({ subject, error, verb = 'loaded' }) => {
   if (error instanceof ServiceError && error.isNotImplemented) {
     return (
       <EmptyState titleText={`${subject} are not available on this backend yet`} headingLevel="h3" variant="sm">
@@ -26,7 +28,7 @@ export const LoadError: React.FC<Props> = ({ subject, error }) => {
     );
   }
   return (
-    <Alert variant="danger" isInline title={`${subject} could not be loaded`}>
+    <Alert variant="danger" isInline title={`${subject} could not be ${verb}`}>
       {error.message}
     </Alert>
   );

@@ -1,6 +1,6 @@
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
-import type { ConsoleConfig, GridCluster, Tenant, User } from './types';
+import type { ClusterPatch, ConsoleConfig, GridCluster, Tenant, User } from './types';
 
 const API_PREFIX = '/api/v1';
 
@@ -20,6 +20,14 @@ export class HttpConsoleService implements ConsoleService {
 
   listClusters(): Promise<GridCluster[]> {
     return this.request<GridCluster[]>('GET', '/clusters');
+  }
+
+  getCluster(name: string): Promise<GridCluster> {
+    return this.request<GridCluster>('GET', `/clusters/${encodeURIComponent(name)}`);
+  }
+
+  updateCluster(name: string, patch: ClusterPatch): Promise<GridCluster> {
+    return this.request<GridCluster>('PATCH', `/clusters/${encodeURIComponent(name)}`, patch);
   }
 
   listTenants(): Promise<Tenant[]> {

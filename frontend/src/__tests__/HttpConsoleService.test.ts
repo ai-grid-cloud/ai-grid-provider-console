@@ -18,6 +18,27 @@ describe('HttpConsoleService', () => {
     expect(fetchFn).toHaveBeenCalledWith('/api/v1/tenants', expect.objectContaining({ method: 'GET' }));
   });
 
+  it('gets one cluster by name', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { data: { name: 'site-paris-1', status: 'ready' } }));
+    const service = new HttpConsoleService(fetchFn);
+    await expect(service.getCluster('site-paris-1')).resolves.toMatchObject({ name: 'site-paris-1', status: 'ready' });
+    expect(fetchFn).toHaveBeenCalledWith('/api/v1/clusters/site-paris-1', expect.objectContaining({ method: 'GET' }));
+  });
+
+  it('patches a cluster with a JSON body', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { data: { name: 'site-paris-1', aiGridEnabled: true } }));
+    const service = new HttpConsoleService(fetchFn);
+    await expect(service.updateCluster('site-paris-1', { aiGridEnabled: true, latitude: null })).resolves.toMatchObject({ aiGridEnabled: true });
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/v1/clusters/site-paris-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aiGridEnabled: true, latitude: null }),
+      }),
+    );
+  });
+
   it('surfaces the BFF error message and status', async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse(401, { error: { code: '401', message: 'missing header' } }));
     const service = new HttpConsoleService(fetchFn);

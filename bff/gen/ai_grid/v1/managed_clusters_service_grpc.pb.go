@@ -45,10 +45,16 @@ const (
 type ManagedClustersClient interface {
 	// Lists ManagedClusters the caller may list.
 	ListManagedClusters(ctx context.Context, in *ListManagedClustersRequest, opts ...grpc.CallOption) (*ListManagedClustersResponse, error)
-	// Returns one ManagedCluster by name. NotFound when absent or not visible.
+	// Returns one ManagedCluster by name. NotFound, with the message
+	// `object with identifier '<name>' not found`, when absent or not visible.
+	// `status.state` and `status.state_message` are derived by the server from
+	// the conditions on every read; see ManagedClusterState.
 	GetManagedCluster(ctx context.Context, in *GetManagedClusterRequest, opts ...grpc.CallOption) (*GetManagedClusterResponse, error)
 	// Updates the mutable fields of a ManagedCluster: `labels`, `annotations`,
-	// `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument.
+	// `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument
+	// naming the path; an empty mask is InvalidArgument. Setting
+	// `hub_accepts_client` to false makes the hub flip `HubAcceptedManagedCluster`
+	// to False/`HubClusterAdminDenied`, so the cluster reads NOT_ACCEPTED.
 	// Requires `patch` on managedclusters for the caller.
 	UpdateManagedCluster(ctx context.Context, in *UpdateManagedClusterRequest, opts ...grpc.CallOption) (*UpdateManagedClusterResponse, error)
 }
@@ -100,10 +106,16 @@ func (c *managedClustersClient) UpdateManagedCluster(ctx context.Context, in *Up
 type ManagedClustersServer interface {
 	// Lists ManagedClusters the caller may list.
 	ListManagedClusters(context.Context, *ListManagedClustersRequest) (*ListManagedClustersResponse, error)
-	// Returns one ManagedCluster by name. NotFound when absent or not visible.
+	// Returns one ManagedCluster by name. NotFound, with the message
+	// `object with identifier '<name>' not found`, when absent or not visible.
+	// `status.state` and `status.state_message` are derived by the server from
+	// the conditions on every read; see ManagedClusterState.
 	GetManagedCluster(context.Context, *GetManagedClusterRequest) (*GetManagedClusterResponse, error)
 	// Updates the mutable fields of a ManagedCluster: `labels`, `annotations`,
-	// `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument.
+	// `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument
+	// naming the path; an empty mask is InvalidArgument. Setting
+	// `hub_accepts_client` to false makes the hub flip `HubAcceptedManagedCluster`
+	// to False/`HubClusterAdminDenied`, so the cluster reads NOT_ACCEPTED.
 	// Requires `patch` on managedclusters for the caller.
 	UpdateManagedCluster(context.Context, *UpdateManagedClusterRequest) (*UpdateManagedClusterResponse, error)
 	mustEmbedUnimplementedManagedClustersServer()

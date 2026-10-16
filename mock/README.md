@@ -110,22 +110,29 @@ working against the real server because the wire format is the same. When the ba
 shipped all of it, the console switches its import from `bff/gen/ai_grid/v1` back to the
 backend's generated package, deletes `proto/` and `bff/gen`, and the fake stays as it is.
 
-Fields from `research/acm.md`'s richer `ManagedCluster` proposal that are not in the draft
-(taints, add-on status, the flattened claim fields, `status_message`, the finer
-`ClusterStatus` enum) are left for the Clusters area to propose once the fake simulates them;
-the draft follows `backend-conventions.md` section 6 as written.
+The Clusters area added, additively, what `research/acm.md`'s richer `ManagedCluster`
+proposal needs and the fake now simulates: `taints` (with `time_added`), `generation`,
+`finalizers`, `status.state_message`, and the finer `ManagedClusterState` values
+(`PENDING_IMPORT`, `IMPORTING`, `IMPORT_FAILED`, `NOT_ACCEPTED`, `UNKNOWN`) with the ACM
+console's derivation order documented on the enum. The flattened claim fields and the
+`addon_status` map from that proposal were not added: the BFF derives them from
+`cluster_claims` and the `feature.open-cluster-management.io/addon-*` labels, which the proto
+already carries verbatim.
 
 ## Fixtures (`fixtures/`)
 
 | File | Shape | Notes |
 |---|---|---|
-| `managedclusters.json` | `ai_grid.v1.ManagedCluster[]` in protojson | Labels are exactly what ACM writes on an imported cluster (`name`, `cloud`, `vendor`, `clusterID`, `openshiftVersion*`, `clusterset=default`, `feature.open-cluster-management.io/addon-*`) plus the console's `ai-grid/*` conventions. Includes the hub's own `local-cluster` and one cluster whose add-ons are `unreachable`, as an unreachable cluster looks. |
-| `tenants.json` | `ai_grid.v1.Tenant[]` | Keycloak Organizations as the backend maps them. Replace with `{"unavailable": "..."}` to reproduce the dev hub, where the `ai-grid` realm does not exist. |
-| `access.json` | who is a provider admin | Drives the fake hub's access review. |
-| `settings.json` | latency | A hub list from a pod on the hub takes tens of milliseconds. |
+| `managedclusters.json` | `{"clusters": [ai_grid.v1.ManagedCluster...]}` in protojson | Full hub objects: labels exactly as ACM writes them (`name`, `cloud`, `vendor`, `clusterID`, `openshiftVersion*`, `clusterset=default`, `feature.open-cluster-management.io/addon-*`) plus the console's `ai-grid/*` labels and annotations, `uid`, `resourceVersion`, `creationTimestamp`, finalizers, taints, client configs, and a `status` with every condition's exact type, reason and message, name-sorted claims, capacity (`nvidia.com/gpu` on GPU clusters) and version. One cluster per state the ACM console distinguishes: `local-cluster`, `site-paris-1`, `site-frankfurt-1` ready (Paris enrolled with GPUs, Frankfurt not enrolled); `site-madrid-1` unknown (lease expired, taint `unreachable`, add-ons `unreachable`); `site-ashburn-1` offline (API server down, taint `unavailable`); `site-berlin-1` importing and `site-oslo-1` pending import (`auto-detect` labels, no claims); `site-dublin-1` import failed; `site-lisbon-1` not accepted (`hubAcceptsClient: false`, `HubClusterAdminDenied`); `edge-lyon-2` detaching (`deletionTimestamp`, `Deleting/ResourceRemaining`; the research verified that reason but not its message, which is left empty). `status.state` and `status.stateMessage` are derived by the server on every read and must not be written here. |
+| `tenants.json` | `{"tenants": [ai_grid.v1.Tenant...]}` | Keycloak Organizations as the backend maps them. Replace with `{"unavailable": "..."}` to reproduce the dev hub, where the `ai-grid` realm does not exist. |
+| `access.json` | who is a provider admin | Drives the fake hub's access review **and** the fake backend's answer to a mutating RPC: a token in `deniedTokens` (or any token when `defaultAllowed` is false) gets `PermissionDenied` with the API server's forbidden message from `UpdateManagedCluster`, a token in `rejectedTokens` gets `Unauthenticated` from every RPC, reads included, like an expired OpenShift token at the hub; so `AUTH_TOKEN=viewer-token` sees the clusters but cannot enrol one (the BFF answers 403 and the UI hides the actions) and `AUTH_TOKEN=expired-token` sees nothing but the signed-out path. |
+| `settings.json` | latency, speed | A hub list from a pod on the hub takes tens of milliseconds. `speed` multiplies the scenario clock (`10` plays the five-minute scenario in 30 seconds; default `1`). |
 
 Fixtures are protojson so they use the field names grpcurl shows and fail to load on any
-unknown field. A test loads the shipped directory and checks the ACM labels are present.
+unknown field. Tests load the shipped directory and check the ACM labels, that every
+condition uses only a type, reason and message the research verified, that claims are
+sorted, that hub taints match the Available condition, and that each cluster derives the
+state it was seeded for.
 
 ## What the research found, in one paragraph each
 
@@ -193,16 +200,29 @@ of work.
 
 ### 1. Clusters (ACM ManagedCluster)
 
-Fake: grow `ManagedCluster` with annotations, conditions, claims, capacity, taints and a
-derived status enum; seed clusters in every state (ready with GPUs, ready but not enrolled,
-unknown with the `unreachable` taint, offline, pending import, detaching); simulate enrol
-(accepted, joined, imported, add-ons appear over about a minute), lease loss and recovery,
-label and annotation updates, and detach with finalizers.
-Frontend: cluster status badges from the derived enum, console link from the claim, GPU
-capacity, a map from the `ai-grid/*` annotations, enrol and location editing.
-Backend ask: the `GetManagedCluster` and `UpdateManagedCluster` RPCs and the richer message
-drafted in `research/backend-conventions.md` section 6.4, derived status computed server-side
-as in `research/acm.md`.
+Implemented. Fake: `ManagedCluster` carries annotations, conditions, claims, capacity,
+taints, finalizers and a derived `status.state`/`state_message` computed on every read in
+the ACM console's order; the fixtures seed one cluster per state (ten clusters, every enum
+value but the superseded `PENDING`); `scenarios.json` drives import (joined, imported,
+add-ons), lease loss and recovery, API-server outage, detaching (with `Deleting`) and removal
+against an injectable clock with a `speed` factor; `GetManagedCluster` answers `NotFound`
+with the conventions' message; `UpdateManagedCluster` validates the field mask (`labels`,
+`annotations`, `hub_accepts_client`), replaces maps as a whole, honours `lock` with
+`Aborted`, bumps `resource_version` (and `generation` on a spec change), flips
+`HubAcceptedManagedCluster` to `HubClusterAdminDenied` when acceptance is withdrawn, and
+answers `PermissionDenied` for a token `access.json` denies; every RPC but `Ping` needs
+`authorization` metadata (`Unauthenticated` otherwise).
+BFF: `GET /api/v1/clusters/{name}` uses the Get RPC; `PATCH /api/v1/clusters/{name}` writes
+labels and annotations through the Update RPC under optimistic locking; `GridCluster` exposes
+`status`, `statusMessage`, `consoleUrl`, `kubernetesVersion`, `platform`, `product`,
+`gpuCapacity`, `siteName`, `latitude`, `longitude`, `addons`, `conditions`, `resourceVersion`.
+Frontend: status labels per state, GPU column, console link, enrol and remove per row for
+provider admins only (hidden otherwise); the browser mock mirrors the fixture file and a test
+keeps the two in step.
+Remaining here: location and coordinate editing in the UI (the PATCH exists) and the map
+(area 5). Placement recomputation and ManifestWorkReplicaSet belong to area 3.
+Backend ask: ship the draft's `GetManagedCluster`, `UpdateManagedCluster` and richer
+message (`proto/ai_grid/v1/managed_cluster*.proto`), with the state derived server-side.
 
 ### 2. Tenants (Keycloak Organizations)
 

@@ -17,7 +17,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +53,16 @@ type Server struct {
 	clusters map[string]*aigridv1.ManagedCluster
 	tenants  map[string]*aigridv1.Tenant
 	access   Access
+	// resourceVersion is the last value handed out, like etcd's revision:
+	// one counter for the whole store, bumped on every write.
+	resourceVersion int64
+	// Scenario state: timed transitions evaluated lazily against Clock.
+	scenarios []*scenario
+	start     time.Time
+	speed     float64
+	// clock is the time source for scenarios, condition transition times
+	// and taint stamps; time.Now unless SetClock replaced it.
+	clock func() time.Time
 	// Latency is added to every RPC to resemble a hub round trip.
 	Latency time.Duration
 	// TenantsErr, when set, makes every Tenants RPC fail with it. It models a
@@ -79,8 +91,13 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 		clusters: map[string]*aigridv1.ManagedCluster{},
 		tenants:  map[string]*aigridv1.Tenant{},
 		access:   fx.Access,
+		speed:    fx.Speed,
+		clock:    time.Now,
 		Latency:  fx.Latency.Duration(),
 		logger:   logger,
+	}
+	if s.speed <= 0 {
+		s.speed = 1
 	}
 	for _, c := range fx.Clusters {
 		if c.GetName() == "" {
@@ -89,8 +106,29 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 		if _, dup := s.clusters[c.GetName()]; dup {
 			return nil, fmt.Errorf("fixture cluster %q listed twice", c.GetName())
 		}
-		s.clusters[c.GetName()] = cloneCluster(c)
+		c = cloneCluster(c)
+		sortClaims(c)
+		if rv, err := strconv.ParseInt(c.GetResourceVersion(), 10, 64); err == nil && rv > s.resourceVersion {
+			s.resourceVersion = rv
+		}
+		s.clusters[c.GetName()] = c
 	}
+	names := make([]string, 0, len(s.clusters))
+	for name := range s.clusters {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if c := s.clusters[name]; c.GetResourceVersion() == "" {
+			s.bumpResourceVersion(c)
+		}
+	}
+	scenarios, err := parseScenarios(fx.Scenarios, s.clusters)
+	if err != nil {
+		return nil, err
+	}
+	s.scenarios = scenarios
+	s.start = s.clock()
 	for _, t := range fx.Tenants {
 		if t.GetId() == "" || t.GetName() == "" {
 			return nil, fmt.Errorf("fixture tenant needs id and name: %v", t)
@@ -104,6 +142,15 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 		s.TenantsErr = status.Error(codes.Unknown, fx.TenantsUnavailable)
 	}
 	return s, nil
+}
+
+// SetClock replaces the time source and restarts the scenario clock from it,
+// so tests drive transitions deterministically.
+func (s *Server) SetClock(clock func() time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.clock = clock
+	s.start = clock()
 }
 
 // Register attaches every service of the draft proto, the health service and
@@ -187,6 +234,75 @@ func (s *Server) logCalls(ctx context.Context, req any, info *grpc.UnaryServerIn
 	return resp, err
 }
 
+// bumpResourceVersion stamps a written object with the next store revision.
+// Must be called under s.mu.
+func (s *Server) bumpResourceVersion(c *aigridv1.ManagedCluster) {
+	s.resourceVersion++
+	c.ResourceVersion = strconv.FormatInt(s.resourceVersion, 10)
+}
+
+// authenticate enforces the identity contract of
+// mock/research/backend-conventions.md section 5.6: every RPC except Ping,
+// health and reflection needs an `authorization` metadata value of the form
+// `Bearer <token>`; the x-forwarded-* headers are advisory and only logged.
+// It returns the bearer token.
+func authenticate(ctx context.Context) (string, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	values := md.Get("authorization")
+	if len(values) != 1 {
+		return "", status.Error(codes.Unauthenticated, "missing authorization metadata")
+	}
+	token, ok := strings.CutPrefix(values[0], "Bearer ")
+	if !ok || strings.TrimSpace(token) == "" {
+		return "", status.Error(codes.Unauthenticated, "authorization metadata must be 'Bearer <token>'")
+	}
+	return token, nil
+}
+
+// authorizePatch is the hub's RBAC answer for a mutating RPC, taken from the
+// same access fixture the fake hub uses for the BFF's SelfSubjectAccessReview,
+// so a token that is not a provider admin there cannot write here either
+// (backend-conventions.md section 5.6: hub 401 -> Unauthenticated, hub 403 ->
+// PermissionDenied). The message is shaped like the API server's Forbidden
+// status; the user name comes from the advisory x-forwarded-user header.
+func (s *Server) authorizePatch(ctx context.Context, token, name string) error {
+	if err := s.rejected(token); err != nil {
+		return err
+	}
+	if !s.access.DefaultAllowed || slices.Contains(s.access.DeniedTokens, token) {
+		md, _ := metadata.FromIncomingContext(ctx)
+		user := strings.Join(md.Get("x-forwarded-user"), ",")
+		return status.Errorf(codes.PermissionDenied,
+			"managedclusters.cluster.open-cluster-management.io %q is forbidden: User %q cannot patch resource \"managedclusters\" in API group \"cluster.open-cluster-management.io\" at the cluster scope", name, user)
+	}
+	return nil
+}
+
+// rejected is the hub's 401 for a token in access.json's rejectedTokens (an
+// expired or revoked OpenShift token), which the backend reports as
+// Unauthenticated on any call, reads included; a merely denied token still
+// reads and fails only on writes (authorizePatch).
+func (s *Server) rejected(token string) error {
+	if slices.Contains(s.access.RejectedTokens, token) {
+		return status.Error(codes.Unauthenticated, "the hub rejected the token: Unauthorized")
+	}
+	return nil
+}
+
+// begin is what every authenticated RPC does first: check the caller's
+// bearer token is present and not rejected, then take the hub round trip.
+// It returns the token for the RBAC check a mutating RPC adds.
+func (s *Server) begin(ctx context.Context) (string, error) {
+	token, err := authenticate(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err := s.rejected(token); err != nil {
+		return "", err
+	}
+	return token, s.wait(ctx)
+}
+
 // wait simulates the hub round trip and honours cancellation like a real call.
 func (s *Server) wait(ctx context.Context) error {
 	if s.Latency <= 0 {
@@ -208,26 +324,10 @@ func (s *Server) Ping(ctx context.Context, req *aigridv1.PingRequest) (*aigridv1
 	return &aigridv1.PingResponse{Message: fmt.Sprintf("Hello, %s!", req.GetName())}, nil
 }
 
-// ListManagedClusters implements ManagedClusters. Like a hub list, the result
-// is sorted by name and every cluster carries the labels ACM sets.
-func (s *Server) ListManagedClusters(ctx context.Context, _ *aigridv1.ListManagedClustersRequest) (*aigridv1.ListManagedClustersResponse, error) {
-	if err := s.wait(ctx); err != nil {
-		return nil, err
-	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]*aigridv1.ManagedCluster, 0, len(s.clusters))
-	for _, c := range s.clusters {
-		out = append(out, cloneCluster(c))
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].GetName() < out[j].GetName() })
-	return &aigridv1.ListManagedClustersResponse{Clusters: out}, nil
-}
-
 // ListTenants implements Tenants. Keycloak returns organizations ordered by
 // name; the real backend passes that order through.
 func (s *Server) ListTenants(ctx context.Context, _ *aigridv1.ListTenantsRequest) (*aigridv1.ListTenantsResponse, error) {
-	if err := s.wait(ctx); err != nil {
+	if _, err := s.begin(ctx); err != nil {
 		return nil, err
 	}
 	s.mu.RLock()

@@ -75,24 +75,72 @@ Paths are under `/api/v1`.
 | GET | `/api/v1/user` | `{username, email, groups, isProviderAdmin}` | none; from the proxy headers |
 | GET | `/api/v1/config` | `{gridEndpoint, mapTileUrl, billingUrl, version}` | none; env `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `BILLING_URL` |
 | GET | `/api/v1/clusters` | `GridCluster[]` sorted by name | `ManagedClusters/ListManagedClusters` |
-| GET | `/api/v1/clusters/{name}` | `GridCluster` | same RPC, filtered; 404 when absent |
+| GET | `/api/v1/clusters/{name}` | `GridCluster` | `ManagedClusters/GetManagedCluster`; 404 with the backend's message when absent. Against a backend without that RPC (the shipped one answers `Unimplemented`) the BFF filters `ListManagedClusters` by name instead, so the detail works either way |
+| PATCH | `/api/v1/clusters/{name}` | `GridCluster` after the write | `GetManagedCluster` then `UpdateManagedCluster` with mask `labels` and/or `annotations` and `lock: true` on the fetched `resource_version`; 409 when the hub object changed in between, 422 on a bad body, 413 over 1 MiB |
 | GET | `/api/v1/tenants` | `Tenant[]` sorted by name | `Tenants/ListTenants` |
 
-`GridCluster`:
+`GridCluster` (fields the shipped backend does not fill are omitted or empty, so the page
+also works against a backend that only returns `name`, `labels`, `hubAcceptsClient`):
 
 ```json
 {
-  "name": "site-1",
+  "name": "site-paris-1",
   "aiGridEnabled": true,
   "provisioned": true,
   "hubAcceptsClient": true,
-  "location": "brussels",
-  "site": "brussels-dc1",
+  "location": "paris",
+  "site": "paris-dc1",
   "region": "europe-west",
   "openshiftVersion": "4.22.15",
-  "labels": {"ai-grid/enabled": "true", "...": "..."}
+  "status": "ready",
+  "statusMessage": "Managed cluster is available",
+  "consoleUrl": "https://console-openshift-console.apps.site-paris-1.example.com",
+  "kubernetesVersion": "v1.35.6",
+  "platform": "BareMetal",
+  "product": "OpenShift",
+  "gpuCapacity": 16,
+  "siteName": "Paris DC1",
+  "latitude": 48.8566,
+  "longitude": 2.3522,
+  "addons": {"work-manager": "available", "cluster-proxy": "unreachable"},
+  "conditions": [{"type": "ManagedClusterConditionAvailable", "status": "True", "reason": "ManagedClusterAvailable", "message": "Managed cluster is available", "lastTransitionTime": "2026-10-01T09:00:08Z"}],
+  "resourceVersion": "48811204",
+  "labels": {"ai-grid/enabled": "true", "...": "..."},
+  "annotations": {"ai-grid/site-name": "Paris DC1", "...": "..."}
 }
 ```
+
+- `status` is the backend's `status.state`, derived server-side from the conditions in the
+  ACM console's order (`mock/research/acm.md` section 1), in the ACM console's words:
+  `ready | offline | unknown | pendingimport | importing | importfailed | detaching | notaccepted`.
+  `statusMessage` is the message of the condition that decided it. When the backend reports
+  no state (`MANAGED_CLUSTER_STATE_UNSPECIFIED`: a cluster with no conditions, or today's
+  backend that sends no status at all) `status` is omitted and the UI shows a grey
+  "No status". The ACM console shows `failed` for a cluster with no conditions; the console
+  deliberately does not, because the same value also means "the backend did not derive one".
+- `consoleUrl`, `platform`, `product` come from the claims
+  `consoleurl.cluster.open-cluster-management.io`, `platform.open-cluster-management.io`,
+  `product.open-cluster-management.io`; `gpuCapacity` from `status.capacity["nvidia.com/gpu"]`
+  (0 when absent); `addons` from the `feature.open-cluster-management.io/addon-*` labels.
+- `siteName`, `latitude`, `longitude` come from the `ai-grid/site-name`, `ai-grid/latitude`,
+  `ai-grid/longitude` annotations; coordinates are omitted when absent or not a finite number
+  in range (`NaN` and `Inf` parse but cannot be encoded, so they count as absent).
+- `conditions[].lastTransitionTime` is omitted when the hub recorded none; it is never the
+  Unix epoch.
+
+`PATCH /api/v1/clusters/{name}` body, every field optional:
+
+```json
+{"aiGridEnabled": true, "provisioned": false, "location": "paris", "site": "paris-dc1", "region": "europe-west",
+ "siteName": "Paris DC1", "latitude": 48.8566, "longitude": 2.3522}
+```
+
+An absent field is left alone; an empty string removes that label or annotation; `null`
+removes a coordinate. Latitude must be within -90..90 and longitude within -180..180, and
+unknown fields are rejected (422). The body is exactly one JSON object of at most 1 MiB:
+anything after the object is 422, more than 1 MiB is 413, and the body is validated in full
+before the backend is called. The BFF sends the whole `labels` and `annotations` maps
+back (field masks replace a map as a whole) and only the maps it changed are in the mask.
 
 `Tenant`: `{"id": "<keycloak org id>", "name": "tenant-a", "domains": ["a.example.com"]}`.
 
@@ -104,8 +152,7 @@ exists; the frontend uses the mock service meanwhile.
 | Method | Path | Needs in the proto | Feature plan |
 |---|---|---|---|
 | GET | `/api/v1/user` (`isProviderAdmin`) | Optional: `AiGrid/GetCurrentUser` returning roles, once the backend acts as the caller; today the BFF asks the hub directly | Step 1 |
-| GET | `/api/v1/clusters` (`status`, `consoleUrl`, `siteName`, `latitude`, `longitude`) | `ManagedCluster` gains the Available condition, the `consoleurl` claim and annotations | Steps 2, 10 |
-| PATCH | `/api/v1/clusters/{name}` | `ManagedClusters/UpdateManagedCluster` for `ai-grid/enabled` and `location`; `patch` in the backend's ClusterRole | Step 2 |
+| GET/PATCH | `/api/v1/clusters[/{name}]` (implemented against the draft) | The backend has to ship the draft's `GetManagedCluster`, `UpdateManagedCluster` and the richer `ManagedCluster` (`mock/proto/ai_grid/v1/managed_cluster*.proto`), with `status.state` derived server-side; `patch` on managedclusters in its ClusterRole | Steps 2, 10 |
 | GET | `/api/v1/grid/overview?range=1h|6h|24h&site=&metrics=false` | `Grid/GetOverview` with the POC's metric contract: requests, errors, latency, gpu from Thanos with a `cluster` label; `metricsSource: thanos|demo` | Steps 5, 10 |
 | GET/POST/PATCH/PUT/DELETE | `/api/v1/models[/{name}]` | `Models/*` over Placement and ManifestWorkReplicaSet (feature plan 3a: `feedbackRules`, `SelectivelyOrphan`); needs the `ManifestWorkReplicaSet` feature gate on the hub | Steps 3, 4 |
 | GET/POST/PUT/DELETE | `/api/v1/catalog[/{name}]` | `Catalog/*` on ConfigMaps | Step 9 |
@@ -121,10 +168,11 @@ exists; the frontend uses the mock service meanwhile.
 | Hub rejects the token in the access review | 401 |
 | Hub unreachable or failing during the access review | 502, generic message, detail in the BFF log |
 | Backend `Unauthenticated` | 401 |
-| Backend `PermissionDenied` | 403, backend message kept |
-| Backend `NotFound`, or cluster not in the list | 404 |
+| Backend `PermissionDenied` (the hub's RBAC denies the caller, e.g. a PATCH by a user who may not patch ManagedClusters) | 403, backend message kept |
+| Backend `NotFound` | 404, backend message kept (`object with identifier '<name>' not found`) |
+| Invalid PATCH body (unknown field, wrong type, coordinate out of range) | 422, BFF message |
 | Backend `InvalidArgument`, `OutOfRange` | 422, backend message kept |
-| Backend `AlreadyExists`, `Aborted` | 409 |
+| Backend `AlreadyExists`, `Aborted` (the cluster changed between the BFF's read and write) | 409 |
 | Backend `FailedPrecondition` | 412 |
 | Backend `ResourceExhausted` | 429 |
 | Backend `Unimplemented` | 501 |

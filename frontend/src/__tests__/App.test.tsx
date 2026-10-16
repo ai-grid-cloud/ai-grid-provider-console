@@ -10,8 +10,8 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user (provider admin)'));
     expect(await screen.findByText('local-cluster')).toBeInTheDocument();
-    expect(screen.getByText('brussels-dc1')).toBeInTheDocument();
-    expect(screen.getAllByText('Member')).toHaveLength(2);
+    expect(screen.getByText('Paris DC1')).toBeInTheDocument();
+    expect(screen.getAllByText('Member')).toHaveLength(3);
   });
 
   it('does not call a viewer a provider admin', async () => {

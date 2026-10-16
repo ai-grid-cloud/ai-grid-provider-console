@@ -53,6 +53,31 @@ message ManagedCluster {
   repeated ClientConfig managed_cluster_client_configs = 10;
   // Observed state. Output only.
   ManagedClusterStatus status = 11;
+  // `spec.taints`. The hub's taint controller adds
+  // `cluster.open-cluster-management.io/unavailable` (Available False) and
+  // `cluster.open-cluster-management.io/unreachable` (Available Unknown or
+  // missing), both with effect `NoSelect`, and removes them when Available is
+  // True. Placements must tolerate them to select the cluster. Output only
+  // for the console: users may add taints with other tooling.
+  repeated Taint taints = 12;
+  // Generation of the desired state (`metadata.generation`); the hub bumps
+  // it on every spec change. Output only.
+  int64 generation = 13;
+  // Finalizers still blocking deletion. Output only.
+  repeated string finalizers = 14;
+}
+
+// `spec.taints[]`, as defined by `cluster.open-cluster-management.io/v1`.
+message Taint {
+  // Taint key, for example `cluster.open-cluster-management.io/unreachable`.
+  string key = 1;
+  // Taint value. Empty for the hub's own taints.
+  string value = 2;
+  // One of `NoSelect`, `PreferNoSelect`, `NoSelectIfNew`.
+  string effect = 3;
+  // When the taint was added; stamped by the ManagedCluster mutating webhook
+  // so `tolerationSeconds` can count from it.
+  google.protobuf.Timestamp time_added = 4;
 }
 
 // `spec.managedClusterClientConfigs[]`.
@@ -63,19 +88,56 @@ message ClientConfig {
   bytes ca_bundle = 2;
 }
 
-// Summary of the cluster's availability, derived from the
-// `ManagedClusterConditionAvailable` and `HubAcceptedManagedCluster` conditions.
+// Summary of the cluster's lifecycle, derived server-side from the conditions
+// in the same order as the ACM console
+// (`console:frontend/src/resources/utils/get-cluster.ts`, see
+// mock/research/acm.md section 1). A condition counts as "not True" when it is
+// False or absent:
+//
+//  1. `deletion_timestamp` set                        -> DETACHING
+//  2. no conditions at all                            -> UNSPECIFIED (the ACM console calls this `failed`;
+//                                                        the shipped backend, which sends no status, lands here too)
+//  3. `HubAcceptedManagedCluster` not True            -> NOT_ACCEPTED
+//  4. `ManagedClusterJoined` not True                 -> by `ManagedClusterImportSucceeded` reason:
+//        `ManagedClusterImporting`                    -> IMPORTING
+//        `ManagedClusterImportFailed`                 -> IMPORT_FAILED
+//        anything else                                -> PENDING_IMPORT
+//  5. `ManagedClusterConditionAvailable` True         -> AVAILABLE (the ACM console's "ready")
+//                                       False        -> UNAVAILABLE ("offline")
+//                                       Unknown/absent -> UNKNOWN
+//
+// Values 1-4 keep their original meaning; 1 (PENDING) is kept for
+// compatibility but a server implementing this derivation never returns it,
+// because PENDING_IMPORT, IMPORTING and IMPORT_FAILED are finer.
 enum ManagedClusterState {
-  // The conditions do not allow a summary yet.
+  // The conditions do not allow a summary yet (no conditions at all, or a
+  // backend that does not derive one). The ACM console shows `failed` for a
+  // cluster with no conditions; the console shows "No status" instead.
   MANAGED_CLUSTER_STATE_UNSPECIFIED = 0;
   // Accepted by the hub but the agent has not reported availability yet.
+  // Superseded by PENDING_IMPORT / IMPORTING / IMPORT_FAILED.
   MANAGED_CLUSTER_STATE_PENDING = 1;
-  // `ManagedClusterConditionAvailable` is True.
+  // Joined and `ManagedClusterConditionAvailable` is True. ACM console: `ready`.
   MANAGED_CLUSTER_STATE_AVAILABLE = 2;
-  // `ManagedClusterConditionAvailable` is False.
+  // Joined and `ManagedClusterConditionAvailable` is False. ACM console: `offline`.
   MANAGED_CLUSTER_STATE_UNAVAILABLE = 3;
-  // `deletion_timestamp` is set.
+  // `deletion_timestamp` is set. ACM console: `detaching`.
   MANAGED_CLUSTER_STATE_DETACHING = 4;
+  // Accepted but `ManagedClusterJoined` is not True and the import controller
+  // reports no progress. ACM console: `pendingimport`.
+  MANAGED_CLUSTER_STATE_PENDING_IMPORT = 5;
+  // Not joined; `ManagedClusterImportSucceeded` is False with reason
+  // `ManagedClusterImporting`. ACM console: `importing`.
+  MANAGED_CLUSTER_STATE_IMPORTING = 6;
+  // Not joined; `ManagedClusterImportSucceeded` is False with reason
+  // `ManagedClusterImportFailed`. ACM console: `importfailed`.
+  MANAGED_CLUSTER_STATE_IMPORT_FAILED = 7;
+  // `HubAcceptedManagedCluster` is False or absent (for example
+  // `HubClusterAdminDenied`). ACM console: `notaccepted`.
+  MANAGED_CLUSTER_STATE_NOT_ACCEPTED = 8;
+  // Joined but `ManagedClusterConditionAvailable` is Unknown or absent: the
+  // agent stopped renewing its lease. ACM console: `unknown`.
+  MANAGED_CLUSTER_STATE_UNKNOWN = 9;
 }
 
 // `status` of the ManagedCluster.
@@ -94,7 +156,13 @@ message ManagedClusterStatus {
   map<string, string> allocatable = 5;
   // `status.clusterClaims`. The console reads `consoleurl.cluster.open-cluster-management.io`,
   // `version.openshift.io`, `platform.open-cluster-management.io`, `product.open-cluster-management.io`.
+  // One list sorted by claim name, as the hub reports it.
   repeated ClusterClaim cluster_claims = 6;
+  // Message of the condition that decided `state`, verbatim (for example
+  // "Registration agent stopped updating its lease."). Empty when no
+  // condition decided it (DETACHING with no ImportSucceeded condition, or
+  // UNKNOWN with the Available condition absent).
+  string state_message = 7;
 }
 
 // `status.clusterClaims[]`.

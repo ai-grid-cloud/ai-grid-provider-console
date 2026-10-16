@@ -20,7 +20,8 @@ import (
 //	                      {"unavailable": "<error text>"} to simulate a backend
 //	                      whose Keycloak cannot be reached
 //	access.json           who the fake hub treats as provider admin
-//	settings.json         latency and other knobs
+//	settings.json         latency, scenario speed and other knobs
+//	scenarios.json        {"events": [ScenarioEvent...]} timed transitions
 //
 // Proto messages are decoded with protojson so the files use the same field
 // names (lowerCamelCase) that grpcurl and the real backend's JSON logs show.
@@ -30,6 +31,10 @@ type Fixtures struct {
 	TenantsUnavailable string
 	Access             Access
 	Latency            Duration
+	// Speed multiplies the scenario clock; 2 fires a "20s" event after 10s.
+	// Zero (not set) means 1.
+	Speed     float64
+	Scenarios []ScenarioEvent
 }
 
 // Access decides the fake hub's SelfSubjectAccessReview answers.
@@ -133,11 +138,30 @@ func Load(dir string) (*Fixtures, error) {
 	} else if ok {
 		var doc struct {
 			Latency Duration `json:"latency"`
+			Speed   *float64 `json:"speed"`
 		}
 		if err := json.Unmarshal(raw, &doc); err != nil {
 			return nil, fmt.Errorf("settings.json: %w", err)
 		}
 		fx.Latency = doc.Latency
+		if doc.Speed != nil {
+			if *doc.Speed <= 0 {
+				return nil, fmt.Errorf("settings.json: speed must be greater than zero, got %v", *doc.Speed)
+			}
+			fx.Speed = *doc.Speed
+		}
+	}
+
+	if raw, ok, err := readFile(filepath.Join(dir, "scenarios.json")); err != nil {
+		return nil, err
+	} else if ok {
+		var doc struct {
+			Events []ScenarioEvent `json:"events"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			return nil, fmt.Errorf("scenarios.json: %w", err)
+		}
+		fx.Scenarios = doc.Events
 	}
 	return fx, nil
 }

@@ -24,10 +24,16 @@ option go_package = "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/a
 service ManagedClusters {
   // Lists ManagedClusters the caller may list.
   rpc ListManagedClusters(ListManagedClustersRequest) returns (ListManagedClustersResponse);
-  // Returns one ManagedCluster by name. NotFound when absent or not visible.
+  // Returns one ManagedCluster by name. NotFound, with the message
+  // `object with identifier '<name>' not found`, when absent or not visible.
+  // `status.state` and `status.state_message` are derived by the server from
+  // the conditions on every read; see ManagedClusterState.
   rpc GetManagedCluster(GetManagedClusterRequest) returns (GetManagedClusterResponse);
   // Updates the mutable fields of a ManagedCluster: `labels`, `annotations`,
-  // `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument.
+  // `hub_accepts_client`. Any other path in `update_mask` is InvalidArgument
+  // naming the path; an empty mask is InvalidArgument. Setting
+  // `hub_accepts_client` to false makes the hub flip `HubAcceptedManagedCluster`
+  // to False/`HubClusterAdminDenied`, so the cluster reads NOT_ACCEPTED.
   // Requires `patch` on managedclusters for the caller.
   rpc UpdateManagedCluster(UpdateManagedClusterRequest) returns (UpdateManagedClusterResponse);
 }

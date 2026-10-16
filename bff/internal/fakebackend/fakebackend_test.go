@@ -27,8 +27,8 @@ import (
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
 
-// repoFixtures is the directory the console ships; the test proves it loads
-// and that every cluster carries the labels ACM sets on a real hub.
+// repoFixtures is the directory the console ships; the tests prove it loads
+// and that every cluster looks like one on a real hub.
 const repoFixtures = "../../../mock/fixtures"
 
 func TestRepoFixturesLoad(t *testing.T) {
@@ -36,21 +36,188 @@ func TestRepoFixturesLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(fx.Clusters) < 2 {
-		t.Fatalf("expected several clusters, got %d", len(fx.Clusters))
+	if len(fx.Clusters) < 6 {
+		t.Fatalf("expected a cluster per state, got %d", len(fx.Clusters))
 	}
 	for _, c := range fx.Clusters {
-		for _, want := range []string{"name", "cloud", "vendor", "openshiftVersion", "openshiftVersion-major-minor", "clusterID", "cluster.open-cluster-management.io/clusterset"} {
+		for _, want := range []string{LabelName, LabelCloud, LabelVendor, LabelClusterSet} {
 			if _, ok := c.GetLabels()[want]; !ok {
 				t.Errorf("cluster %s lacks the ACM label %q", c.GetName(), want)
 			}
 		}
-		if c.GetLabels()["name"] != c.GetName() {
+		if c.GetLabels()[LabelName] != c.GetName() {
 			t.Errorf("cluster %s: ACM sets label name=<cluster name>", c.GetName())
+		}
+		if isTrue(c, CondJoined) {
+			for _, want := range []string{LabelClusterID, LabelOpenShiftVersion, LabelOpenShiftMajor, LabelOpenShiftMajorMin} {
+				if _, ok := c.GetLabels()[want]; !ok {
+					t.Errorf("joined cluster %s lacks the autodetect label %q", c.GetName(), want)
+				}
+			}
+		} else if c.GetLabels()[LabelCloud] != LabelAutoDetect || len(c.GetStatus().GetClusterClaims()) != 0 {
+			t.Errorf("cluster %s has not joined: cloud must still be auto-detect and claims empty", c.GetName())
+		}
+		if c.GetUid() == "" || c.GetResourceVersion() == "" || c.GetCreationTimestamp() == nil {
+			t.Errorf("cluster %s lacks uid, resourceVersion or creationTimestamp", c.GetName())
+		}
+		if c.GetStatus().GetState() != aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_UNSPECIFIED || c.GetStatus().GetStateMessage() != "" {
+			t.Errorf("cluster %s: state is derived by the server and must not be in the fixture", c.GetName())
 		}
 	}
 	if _, err := New(fx, slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// knownConditions is the table of condition strings mock/research/acm.md
+// section 1 verified against the controllers' source: type -> reason ->
+// message prefixes. A fixture may only use these.
+var knownConditions = map[string]map[string][]string{
+	CondHubAccepted: {ReasonHubAccepted: {MessageHubAccepted}, ReasonHubDenied: {MessageHubDenied}, "Error": {""}},
+	CondJoined:      {ReasonJoined: {MessageJoined}},
+	CondAvailable: {
+		ReasonAvailable:        {MessageAvailable},
+		ReasonAPIServerUnavail: {"The kube-apiserver is not ok, status code: "},
+		ReasonLeaseStopped:     {MessageLeaseStopped},
+	},
+	CondClockSynced: {ReasonClockSynced: {MessageClockSynced}, ReasonClockOutOfSync: {MessageClockOutOfSync}},
+	CondImportSucceeded: {
+		ReasonWaitForImporting: {MessageWaitForImporting},
+		ReasonImporting:        {MessageImportStart, MessageImportWaitSecret, MessageImportApplied, MessageImportNoWorks, MessageImportWaitSecretH},
+		ReasonImportFailed:     {"Try to import managed cluster, error: ", "Try to import managed cluster, apply resources error: ", "AutoImportSecretInvalid "},
+		ReasonImported:         {MessageImported},
+		ReasonDetaching:        {MessageDetaching},
+		ReasonForceDetaching:   {MessageForceDetaching},
+	},
+	// Deleting messages are not verified by the research; the fake keeps them empty.
+	CondDeleting: {ReasonResourceRemaining: {""}, ReasonNoResource: {""}, ReasonDeletingError: {""}},
+}
+
+// knownAddonValues are the values the addon discovery controller writes.
+var knownAddonValues = map[string]bool{AddonAvailable: true, AddonUnhealthy: true, AddonUnreachable: true}
+
+func TestRepoFixturesUseOnlyHubStrings(t *testing.T) {
+	fx, err := Load(repoFixtures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range fx.Clusters {
+		for _, cond := range c.GetStatus().GetConditions() {
+			reasons, ok := knownConditions[cond.GetType()]
+			if !ok {
+				t.Errorf("%s: unknown condition type %q", c.GetName(), cond.GetType())
+				continue
+			}
+			prefixes, ok := reasons[cond.GetReason()]
+			if !ok {
+				t.Errorf("%s/%s: unknown reason %q", c.GetName(), cond.GetType(), cond.GetReason())
+				continue
+			}
+			matched := false
+			for _, p := range prefixes {
+				if strings.HasPrefix(cond.GetMessage(), p) {
+					matched = true
+				}
+			}
+			if !matched {
+				t.Errorf("%s/%s/%s: message %q is not one the controller writes", c.GetName(), cond.GetType(), cond.GetReason(), cond.GetMessage())
+			}
+			if cond.GetLastTransitionTime() == nil {
+				t.Errorf("%s/%s: lastTransitionTime missing", c.GetName(), cond.GetType())
+			}
+		}
+		claims := c.GetStatus().GetClusterClaims()
+		for i := 1; i < len(claims); i++ {
+			if claims[i-1].GetName() >= claims[i].GetName() {
+				t.Errorf("%s: claims must be one name-sorted list, %q before %q", c.GetName(), claims[i-1].GetName(), claims[i].GetName())
+			}
+		}
+		for _, taint := range c.GetTaints() {
+			if (taint.GetKey() == TaintUnreachable || taint.GetKey() == TaintUnavailable) && (taint.GetEffect() != TaintNoSelect || taint.GetTimeAdded() == nil) {
+				t.Errorf("%s: hub taint %s must be NoSelect with timeAdded", c.GetName(), taint.GetKey())
+			}
+		}
+		for k, v := range c.GetLabels() {
+			if strings.HasPrefix(k, LabelAddonPrefix) && !knownAddonValues[v] {
+				t.Errorf("%s: addon label %s=%q is not available|unhealthy|unreachable", c.GetName(), k, v)
+			}
+		}
+		// The taint and the addon labels follow the Available condition.
+		avail := findCondition(c, CondAvailable)
+		switch {
+		case avail.GetStatus() == aigridv1.ConditionStatus_CONDITION_STATUS_FALSE && !hasTaint(c, TaintUnavailable):
+			t.Errorf("%s: Available=False needs the unavailable taint", c.GetName())
+		case isTrue(c, CondJoined) && avail.GetStatus() == aigridv1.ConditionStatus_CONDITION_STATUS_UNSPECIFIED && !hasTaint(c, TaintUnreachable):
+			t.Errorf("%s: Available=Unknown needs the unreachable taint", c.GetName())
+		case isTrue(c, CondAvailable) && (hasTaint(c, TaintUnreachable) || hasTaint(c, TaintUnavailable)):
+			t.Errorf("%s: Available=True removes the hub taints", c.GetName())
+		}
+	}
+}
+
+// TestRepoFixturesCoverEveryState pins the state each shipped cluster is
+// seeded in, recomputed from its conditions, so a fixture edit that changes a
+// state is noticed.
+func TestRepoFixturesCoverEveryState(t *testing.T) {
+	fx, err := Load(repoFixtures)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]aigridv1.ManagedClusterState{
+		"local-cluster":    aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_AVAILABLE,
+		"site-paris-1":     aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_AVAILABLE,
+		"site-frankfurt-1": aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_AVAILABLE,
+		"site-madrid-1":    aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_UNKNOWN,
+		"site-ashburn-1":   aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_UNAVAILABLE,
+		"site-berlin-1":    aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_IMPORTING,
+		"site-oslo-1":      aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_PENDING_IMPORT,
+		"site-dublin-1":    aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_IMPORT_FAILED,
+		"site-lisbon-1":    aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_NOT_ACCEPTED,
+		"edge-lyon-2":      aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_DETACHING,
+	}
+	// Every value of the enum except UNSPECIFIED and the superseded PENDING is seeded.
+	seededStates := map[aigridv1.ManagedClusterState]bool{}
+	for _, st := range want {
+		seededStates[st] = true
+	}
+	for v := range aigridv1.ManagedClusterState_name {
+		st := aigridv1.ManagedClusterState(v)
+		if st == aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_UNSPECIFIED || st == aigridv1.ManagedClusterState_MANAGED_CLUSTER_STATE_PENDING {
+			continue
+		}
+		if !seededStates[st] {
+			t.Errorf("no fixture cluster derives %s", st)
+		}
+	}
+	s, err := New(fx, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.SetClock(func() time.Time { return time.Date(2026, 10, 15, 12, 0, 0, 0, time.UTC) }) // before any scenario fires
+	resp, err := s.ListManagedClusters(authed(context.Background()), &aigridv1.ListManagedClustersRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, c := range resp.GetClusters() {
+		seen[c.GetName()] = true
+		if c.GetName() == "site-paris-1" && c.GetStatus().GetCapacity()["nvidia.com/gpu"] == "" {
+			t.Error("the ready GPU cluster must advertise nvidia.com/gpu")
+		}
+		if got := c.GetStatus().GetState(); got != want[c.GetName()] {
+			t.Errorf("%s: state %s, want %s", c.GetName(), got, want[c.GetName()])
+		}
+		if c.GetStatus().GetStateMessage() == "" {
+			t.Errorf("%s: a decided state carries the deciding condition's message", c.GetName())
+		}
+		if c.GetName() == "edge-lyon-2" && findCondition(c, CondDeleting).GetReason() != ReasonResourceRemaining {
+			t.Error("the detaching cluster carries Deleting/ResourceRemaining while its finalizers drain")
+		}
+	}
+	for name := range want {
+		if !seen[name] {
+			t.Errorf("fixture cluster %s missing from the list", name)
+		}
 	}
 }
 
@@ -84,8 +251,16 @@ func TestLoadRejectsBadFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fx.Latency.Duration() != 15*time.Millisecond || fx.TenantsUnavailable == "" {
+	if fx.Latency.Duration() != 15*time.Millisecond || fx.TenantsUnavailable == "" || fx.Speed != 0 {
 		t.Errorf("fixtures = %+v", fx)
+	}
+	write("settings.json", `{"speed": 0}`)
+	if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), "speed") {
+		t.Errorf("speed 0 must be rejected, got %v", err)
+	}
+	write("settings.json", `{"speed": 2.5}`)
+	if fx, err := Load(dir); err != nil || fx.Speed != 2.5 {
+		t.Errorf("speed = %v, %v", fx, err)
 	}
 }
 

@@ -34,21 +34,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Summary of the cluster's availability, derived from the
-// `ManagedClusterConditionAvailable` and `HubAcceptedManagedCluster` conditions.
+// Summary of the cluster's lifecycle, derived server-side from the conditions
+// in the same order as the ACM console
+// (`console:frontend/src/resources/utils/get-cluster.ts`, see
+// mock/research/acm.md section 1). A condition counts as "not True" when it is
+// False or absent:
+//
+//  1. `deletion_timestamp` set                        -> DETACHING
+//  2. no conditions at all                            -> UNSPECIFIED (the ACM console calls this `failed`;
+//     the shipped backend, which sends no status, lands here too)
+//  3. `HubAcceptedManagedCluster` not True            -> NOT_ACCEPTED
+//  4. `ManagedClusterJoined` not True                 -> by `ManagedClusterImportSucceeded` reason:
+//     `ManagedClusterImporting`                    -> IMPORTING
+//     `ManagedClusterImportFailed`                 -> IMPORT_FAILED
+//     anything else                                -> PENDING_IMPORT
+//  5. `ManagedClusterConditionAvailable` True         -> AVAILABLE (the ACM console's "ready")
+//     False        -> UNAVAILABLE ("offline")
+//     Unknown/absent -> UNKNOWN
+//
+// Values 1-4 keep their original meaning; 1 (PENDING) is kept for
+// compatibility but a server implementing this derivation never returns it,
+// because PENDING_IMPORT, IMPORTING and IMPORT_FAILED are finer.
 type ManagedClusterState int32
 
 const (
-	// The conditions do not allow a summary yet.
+	// The conditions do not allow a summary yet (no conditions at all, or a
+	// backend that does not derive one). The ACM console shows `failed` for a
+	// cluster with no conditions; the console shows "No status" instead.
 	ManagedClusterState_MANAGED_CLUSTER_STATE_UNSPECIFIED ManagedClusterState = 0
 	// Accepted by the hub but the agent has not reported availability yet.
+	// Superseded by PENDING_IMPORT / IMPORTING / IMPORT_FAILED.
 	ManagedClusterState_MANAGED_CLUSTER_STATE_PENDING ManagedClusterState = 1
-	// `ManagedClusterConditionAvailable` is True.
+	// Joined and `ManagedClusterConditionAvailable` is True. ACM console: `ready`.
 	ManagedClusterState_MANAGED_CLUSTER_STATE_AVAILABLE ManagedClusterState = 2
-	// `ManagedClusterConditionAvailable` is False.
+	// Joined and `ManagedClusterConditionAvailable` is False. ACM console: `offline`.
 	ManagedClusterState_MANAGED_CLUSTER_STATE_UNAVAILABLE ManagedClusterState = 3
-	// `deletion_timestamp` is set.
+	// `deletion_timestamp` is set. ACM console: `detaching`.
 	ManagedClusterState_MANAGED_CLUSTER_STATE_DETACHING ManagedClusterState = 4
+	// Accepted but `ManagedClusterJoined` is not True and the import controller
+	// reports no progress. ACM console: `pendingimport`.
+	ManagedClusterState_MANAGED_CLUSTER_STATE_PENDING_IMPORT ManagedClusterState = 5
+	// Not joined; `ManagedClusterImportSucceeded` is False with reason
+	// `ManagedClusterImporting`. ACM console: `importing`.
+	ManagedClusterState_MANAGED_CLUSTER_STATE_IMPORTING ManagedClusterState = 6
+	// Not joined; `ManagedClusterImportSucceeded` is False with reason
+	// `ManagedClusterImportFailed`. ACM console: `importfailed`.
+	ManagedClusterState_MANAGED_CLUSTER_STATE_IMPORT_FAILED ManagedClusterState = 7
+	// `HubAcceptedManagedCluster` is False or absent (for example
+	// `HubClusterAdminDenied`). ACM console: `notaccepted`.
+	ManagedClusterState_MANAGED_CLUSTER_STATE_NOT_ACCEPTED ManagedClusterState = 8
+	// Joined but `ManagedClusterConditionAvailable` is Unknown or absent: the
+	// agent stopped renewing its lease. ACM console: `unknown`.
+	ManagedClusterState_MANAGED_CLUSTER_STATE_UNKNOWN ManagedClusterState = 9
 )
 
 // Enum value maps for ManagedClusterState.
@@ -59,13 +96,23 @@ var (
 		2: "MANAGED_CLUSTER_STATE_AVAILABLE",
 		3: "MANAGED_CLUSTER_STATE_UNAVAILABLE",
 		4: "MANAGED_CLUSTER_STATE_DETACHING",
+		5: "MANAGED_CLUSTER_STATE_PENDING_IMPORT",
+		6: "MANAGED_CLUSTER_STATE_IMPORTING",
+		7: "MANAGED_CLUSTER_STATE_IMPORT_FAILED",
+		8: "MANAGED_CLUSTER_STATE_NOT_ACCEPTED",
+		9: "MANAGED_CLUSTER_STATE_UNKNOWN",
 	}
 	ManagedClusterState_value = map[string]int32{
-		"MANAGED_CLUSTER_STATE_UNSPECIFIED": 0,
-		"MANAGED_CLUSTER_STATE_PENDING":     1,
-		"MANAGED_CLUSTER_STATE_AVAILABLE":   2,
-		"MANAGED_CLUSTER_STATE_UNAVAILABLE": 3,
-		"MANAGED_CLUSTER_STATE_DETACHING":   4,
+		"MANAGED_CLUSTER_STATE_UNSPECIFIED":    0,
+		"MANAGED_CLUSTER_STATE_PENDING":        1,
+		"MANAGED_CLUSTER_STATE_AVAILABLE":      2,
+		"MANAGED_CLUSTER_STATE_UNAVAILABLE":    3,
+		"MANAGED_CLUSTER_STATE_DETACHING":      4,
+		"MANAGED_CLUSTER_STATE_PENDING_IMPORT": 5,
+		"MANAGED_CLUSTER_STATE_IMPORTING":      6,
+		"MANAGED_CLUSTER_STATE_IMPORT_FAILED":  7,
+		"MANAGED_CLUSTER_STATE_NOT_ACCEPTED":   8,
+		"MANAGED_CLUSTER_STATE_UNKNOWN":        9,
 	}
 )
 
@@ -129,7 +176,19 @@ type ManagedCluster struct {
 	// `spec.managedClusterClientConfigs`.
 	ManagedClusterClientConfigs []*ClientConfig `protobuf:"bytes,10,rep,name=managed_cluster_client_configs,json=managedClusterClientConfigs,proto3" json:"managed_cluster_client_configs,omitempty"`
 	// Observed state. Output only.
-	Status        *ManagedClusterStatus `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
+	Status *ManagedClusterStatus `protobuf:"bytes,11,opt,name=status,proto3" json:"status,omitempty"`
+	// `spec.taints`. The hub's taint controller adds
+	// `cluster.open-cluster-management.io/unavailable` (Available False) and
+	// `cluster.open-cluster-management.io/unreachable` (Available Unknown or
+	// missing), both with effect `NoSelect`, and removes them when Available is
+	// True. Placements must tolerate them to select the cluster. Output only
+	// for the console: users may add taints with other tooling.
+	Taints []*Taint `protobuf:"bytes,12,rep,name=taints,proto3" json:"taints,omitempty"`
+	// Generation of the desired state (`metadata.generation`); the hub bumps
+	// it on every spec change. Output only.
+	Generation int64 `protobuf:"varint,13,opt,name=generation,proto3" json:"generation,omitempty"`
+	// Finalizers still blocking deletion. Output only.
+	Finalizers    []string `protobuf:"bytes,14,rep,name=finalizers,proto3" json:"finalizers,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -241,6 +300,101 @@ func (x *ManagedCluster) GetStatus() *ManagedClusterStatus {
 	return nil
 }
 
+func (x *ManagedCluster) GetTaints() []*Taint {
+	if x != nil {
+		return x.Taints
+	}
+	return nil
+}
+
+func (x *ManagedCluster) GetGeneration() int64 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *ManagedCluster) GetFinalizers() []string {
+	if x != nil {
+		return x.Finalizers
+	}
+	return nil
+}
+
+// `spec.taints[]`, as defined by `cluster.open-cluster-management.io/v1`.
+type Taint struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Taint key, for example `cluster.open-cluster-management.io/unreachable`.
+	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	// Taint value. Empty for the hub's own taints.
+	Value string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	// One of `NoSelect`, `PreferNoSelect`, `NoSelectIfNew`.
+	Effect string `protobuf:"bytes,3,opt,name=effect,proto3" json:"effect,omitempty"`
+	// When the taint was added; stamped by the ManagedCluster mutating webhook
+	// so `tolerationSeconds` can count from it.
+	TimeAdded     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=time_added,json=timeAdded,proto3" json:"time_added,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Taint) Reset() {
+	*x = Taint{}
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Taint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Taint) ProtoMessage() {}
+
+func (x *Taint) ProtoReflect() protoreflect.Message {
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Taint.ProtoReflect.Descriptor instead.
+func (*Taint) Descriptor() ([]byte, []int) {
+	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Taint) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Taint) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *Taint) GetEffect() string {
+	if x != nil {
+		return x.Effect
+	}
+	return ""
+}
+
+func (x *Taint) GetTimeAdded() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TimeAdded
+	}
+	return nil
+}
+
 // `spec.managedClusterClientConfigs[]`.
 type ClientConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -254,7 +408,7 @@ type ClientConfig struct {
 
 func (x *ClientConfig) Reset() {
 	*x = ClientConfig{}
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[1]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -266,7 +420,7 @@ func (x *ClientConfig) String() string {
 func (*ClientConfig) ProtoMessage() {}
 
 func (x *ClientConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[1]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -279,7 +433,7 @@ func (x *ClientConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClientConfig.ProtoReflect.Descriptor instead.
 func (*ClientConfig) Descriptor() ([]byte, []int) {
-	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{1}
+	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ClientConfig) GetUrl() string {
@@ -313,14 +467,20 @@ type ManagedClusterStatus struct {
 	Allocatable map[string]string `protobuf:"bytes,5,rep,name=allocatable,proto3" json:"allocatable,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// `status.clusterClaims`. The console reads `consoleurl.cluster.open-cluster-management.io`,
 	// `version.openshift.io`, `platform.open-cluster-management.io`, `product.open-cluster-management.io`.
+	// One list sorted by claim name, as the hub reports it.
 	ClusterClaims []*ClusterClaim `protobuf:"bytes,6,rep,name=cluster_claims,json=clusterClaims,proto3" json:"cluster_claims,omitempty"`
+	// Message of the condition that decided `state`, verbatim (for example
+	// "Registration agent stopped updating its lease."). Empty when no
+	// condition decided it (DETACHING with no ImportSucceeded condition, or
+	// UNKNOWN with the Available condition absent).
+	StateMessage  string `protobuf:"bytes,7,opt,name=state_message,json=stateMessage,proto3" json:"state_message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ManagedClusterStatus) Reset() {
 	*x = ManagedClusterStatus{}
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[2]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -332,7 +492,7 @@ func (x *ManagedClusterStatus) String() string {
 func (*ManagedClusterStatus) ProtoMessage() {}
 
 func (x *ManagedClusterStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[2]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -345,7 +505,7 @@ func (x *ManagedClusterStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ManagedClusterStatus.ProtoReflect.Descriptor instead.
 func (*ManagedClusterStatus) Descriptor() ([]byte, []int) {
-	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{2}
+	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ManagedClusterStatus) GetState() ManagedClusterState {
@@ -390,6 +550,13 @@ func (x *ManagedClusterStatus) GetClusterClaims() []*ClusterClaim {
 	return nil
 }
 
+func (x *ManagedClusterStatus) GetStateMessage() string {
+	if x != nil {
+		return x.StateMessage
+	}
+	return ""
+}
+
 // `status.clusterClaims[]`.
 type ClusterClaim struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -403,7 +570,7 @@ type ClusterClaim struct {
 
 func (x *ClusterClaim) Reset() {
 	*x = ClusterClaim{}
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[3]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +582,7 @@ func (x *ClusterClaim) String() string {
 func (*ClusterClaim) ProtoMessage() {}
 
 func (x *ClusterClaim) ProtoReflect() protoreflect.Message {
-	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[3]
+	mi := &file_ai_grid_v1_managed_cluster_type_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +595,7 @@ func (x *ClusterClaim) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClusterClaim.ProtoReflect.Descriptor instead.
 func (*ClusterClaim) Descriptor() ([]byte, []int) {
-	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{3}
+	return file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ClusterClaim) GetName() string {
@@ -450,7 +617,7 @@ var File_ai_grid_v1_managed_cluster_type_proto protoreflect.FileDescriptor
 const file_ai_grid_v1_managed_cluster_type_proto_rawDesc = "" +
 	"\n" +
 	"%ai_grid/v1/managed_cluster_type.proto\x12\n" +
-	"ai_grid.v1\x1a\x1fai_grid/v1/condition_type.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfe\x05\n" +
+	"ai_grid.v1\x1a\x1fai_grid/v1/condition_type.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe9\x06\n" +
 	"\x0eManagedCluster\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12>\n" +
 	"\x06labels\x18\x02 \x03(\v2&.ai_grid.v1.ManagedCluster.LabelsEntryR\x06labels\x12,\n" +
@@ -463,16 +630,29 @@ const file_ai_grid_v1_managed_cluster_type_proto_rawDesc = "" +
 	"\x16lease_duration_seconds\x18\t \x01(\x05R\x14leaseDurationSeconds\x12]\n" +
 	"\x1emanaged_cluster_client_configs\x18\n" +
 	" \x03(\v2\x18.ai_grid.v1.ClientConfigR\x1bmanagedClusterClientConfigs\x128\n" +
-	"\x06status\x18\v \x01(\v2 .ai_grid.v1.ManagedClusterStatusR\x06status\x1a9\n" +
+	"\x06status\x18\v \x01(\v2 .ai_grid.v1.ManagedClusterStatusR\x06status\x12)\n" +
+	"\x06taints\x18\f \x03(\v2\x11.ai_grid.v1.TaintR\x06taints\x12\x1e\n" +
+	"\n" +
+	"generation\x18\r \x01(\x03R\n" +
+	"generation\x12\x1e\n" +
+	"\n" +
+	"finalizers\x18\x0e \x03(\tR\n" +
+	"finalizers\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
 	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"=\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x82\x01\n" +
+	"\x05Taint\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x16\n" +
+	"\x06effect\x18\x03 \x01(\tR\x06effect\x129\n" +
+	"\n" +
+	"time_added\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\ttimeAdded\"=\n" +
 	"\fClientConfig\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1b\n" +
-	"\tca_bundle\x18\x02 \x01(\fR\bcaBundle\"\x92\x04\n" +
+	"\tca_bundle\x18\x02 \x01(\fR\bcaBundle\"\xb7\x04\n" +
 	"\x14ManagedClusterStatus\x125\n" +
 	"\x05state\x18\x01 \x01(\x0e2\x1f.ai_grid.v1.ManagedClusterStateR\x05state\x125\n" +
 	"\n" +
@@ -481,7 +661,8 @@ const file_ai_grid_v1_managed_cluster_type_proto_rawDesc = "" +
 	"\x12kubernetes_version\x18\x03 \x01(\tR\x11kubernetesVersion\x12J\n" +
 	"\bcapacity\x18\x04 \x03(\v2..ai_grid.v1.ManagedClusterStatus.CapacityEntryR\bcapacity\x12S\n" +
 	"\vallocatable\x18\x05 \x03(\v21.ai_grid.v1.ManagedClusterStatus.AllocatableEntryR\vallocatable\x12?\n" +
-	"\x0ecluster_claims\x18\x06 \x03(\v2\x18.ai_grid.v1.ClusterClaimR\rclusterClaims\x1a;\n" +
+	"\x0ecluster_claims\x18\x06 \x03(\v2\x18.ai_grid.v1.ClusterClaimR\rclusterClaims\x12#\n" +
+	"\rstate_message\x18\a \x01(\tR\fstateMessage\x1a;\n" +
 	"\rCapacityEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
@@ -490,13 +671,18 @@ const file_ai_grid_v1_managed_cluster_type_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
 	"\fClusterClaim\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value*\xd0\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value*\x93\x03\n" +
 	"\x13ManagedClusterState\x12%\n" +
 	"!MANAGED_CLUSTER_STATE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dMANAGED_CLUSTER_STATE_PENDING\x10\x01\x12#\n" +
 	"\x1fMANAGED_CLUSTER_STATE_AVAILABLE\x10\x02\x12%\n" +
 	"!MANAGED_CLUSTER_STATE_UNAVAILABLE\x10\x03\x12#\n" +
-	"\x1fMANAGED_CLUSTER_STATE_DETACHING\x10\x04BOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
+	"\x1fMANAGED_CLUSTER_STATE_DETACHING\x10\x04\x12(\n" +
+	"$MANAGED_CLUSTER_STATE_PENDING_IMPORT\x10\x05\x12#\n" +
+	"\x1fMANAGED_CLUSTER_STATE_IMPORTING\x10\x06\x12'\n" +
+	"#MANAGED_CLUSTER_STATE_IMPORT_FAILED\x10\a\x12&\n" +
+	"\"MANAGED_CLUSTER_STATE_NOT_ACCEPTED\x10\b\x12!\n" +
+	"\x1dMANAGED_CLUSTER_STATE_UNKNOWN\x10\tBOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
 
 var (
 	file_ai_grid_v1_managed_cluster_type_proto_rawDescOnce sync.Once
@@ -511,37 +697,40 @@ func file_ai_grid_v1_managed_cluster_type_proto_rawDescGZIP() []byte {
 }
 
 var file_ai_grid_v1_managed_cluster_type_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ai_grid_v1_managed_cluster_type_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_ai_grid_v1_managed_cluster_type_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_ai_grid_v1_managed_cluster_type_proto_goTypes = []any{
 	(ManagedClusterState)(0),      // 0: ai_grid.v1.ManagedClusterState
 	(*ManagedCluster)(nil),        // 1: ai_grid.v1.ManagedCluster
-	(*ClientConfig)(nil),          // 2: ai_grid.v1.ClientConfig
-	(*ManagedClusterStatus)(nil),  // 3: ai_grid.v1.ManagedClusterStatus
-	(*ClusterClaim)(nil),          // 4: ai_grid.v1.ClusterClaim
-	nil,                           // 5: ai_grid.v1.ManagedCluster.LabelsEntry
-	nil,                           // 6: ai_grid.v1.ManagedCluster.AnnotationsEntry
-	nil,                           // 7: ai_grid.v1.ManagedClusterStatus.CapacityEntry
-	nil,                           // 8: ai_grid.v1.ManagedClusterStatus.AllocatableEntry
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(*Condition)(nil),             // 10: ai_grid.v1.Condition
+	(*Taint)(nil),                 // 2: ai_grid.v1.Taint
+	(*ClientConfig)(nil),          // 3: ai_grid.v1.ClientConfig
+	(*ManagedClusterStatus)(nil),  // 4: ai_grid.v1.ManagedClusterStatus
+	(*ClusterClaim)(nil),          // 5: ai_grid.v1.ClusterClaim
+	nil,                           // 6: ai_grid.v1.ManagedCluster.LabelsEntry
+	nil,                           // 7: ai_grid.v1.ManagedCluster.AnnotationsEntry
+	nil,                           // 8: ai_grid.v1.ManagedClusterStatus.CapacityEntry
+	nil,                           // 9: ai_grid.v1.ManagedClusterStatus.AllocatableEntry
+	(*timestamppb.Timestamp)(nil), // 10: google.protobuf.Timestamp
+	(*Condition)(nil),             // 11: ai_grid.v1.Condition
 }
 var file_ai_grid_v1_managed_cluster_type_proto_depIdxs = []int32{
-	5,  // 0: ai_grid.v1.ManagedCluster.labels:type_name -> ai_grid.v1.ManagedCluster.LabelsEntry
-	6,  // 1: ai_grid.v1.ManagedCluster.annotations:type_name -> ai_grid.v1.ManagedCluster.AnnotationsEntry
-	9,  // 2: ai_grid.v1.ManagedCluster.creation_timestamp:type_name -> google.protobuf.Timestamp
-	9,  // 3: ai_grid.v1.ManagedCluster.deletion_timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 4: ai_grid.v1.ManagedCluster.managed_cluster_client_configs:type_name -> ai_grid.v1.ClientConfig
-	3,  // 5: ai_grid.v1.ManagedCluster.status:type_name -> ai_grid.v1.ManagedClusterStatus
-	0,  // 6: ai_grid.v1.ManagedClusterStatus.state:type_name -> ai_grid.v1.ManagedClusterState
-	10, // 7: ai_grid.v1.ManagedClusterStatus.conditions:type_name -> ai_grid.v1.Condition
-	7,  // 8: ai_grid.v1.ManagedClusterStatus.capacity:type_name -> ai_grid.v1.ManagedClusterStatus.CapacityEntry
-	8,  // 9: ai_grid.v1.ManagedClusterStatus.allocatable:type_name -> ai_grid.v1.ManagedClusterStatus.AllocatableEntry
-	4,  // 10: ai_grid.v1.ManagedClusterStatus.cluster_claims:type_name -> ai_grid.v1.ClusterClaim
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	6,  // 0: ai_grid.v1.ManagedCluster.labels:type_name -> ai_grid.v1.ManagedCluster.LabelsEntry
+	7,  // 1: ai_grid.v1.ManagedCluster.annotations:type_name -> ai_grid.v1.ManagedCluster.AnnotationsEntry
+	10, // 2: ai_grid.v1.ManagedCluster.creation_timestamp:type_name -> google.protobuf.Timestamp
+	10, // 3: ai_grid.v1.ManagedCluster.deletion_timestamp:type_name -> google.protobuf.Timestamp
+	3,  // 4: ai_grid.v1.ManagedCluster.managed_cluster_client_configs:type_name -> ai_grid.v1.ClientConfig
+	4,  // 5: ai_grid.v1.ManagedCluster.status:type_name -> ai_grid.v1.ManagedClusterStatus
+	2,  // 6: ai_grid.v1.ManagedCluster.taints:type_name -> ai_grid.v1.Taint
+	10, // 7: ai_grid.v1.Taint.time_added:type_name -> google.protobuf.Timestamp
+	0,  // 8: ai_grid.v1.ManagedClusterStatus.state:type_name -> ai_grid.v1.ManagedClusterState
+	11, // 9: ai_grid.v1.ManagedClusterStatus.conditions:type_name -> ai_grid.v1.Condition
+	8,  // 10: ai_grid.v1.ManagedClusterStatus.capacity:type_name -> ai_grid.v1.ManagedClusterStatus.CapacityEntry
+	9,  // 11: ai_grid.v1.ManagedClusterStatus.allocatable:type_name -> ai_grid.v1.ManagedClusterStatus.AllocatableEntry
+	5,  // 12: ai_grid.v1.ManagedClusterStatus.cluster_claims:type_name -> ai_grid.v1.ClusterClaim
+	13, // [13:13] is the sub-list for method output_type
+	13, // [13:13] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_ai_grid_v1_managed_cluster_type_proto_init() }
@@ -556,7 +745,7 @@ func file_ai_grid_v1_managed_cluster_type_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_grid_v1_managed_cluster_type_proto_rawDesc), len(file_ai_grid_v1_managed_cluster_type_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

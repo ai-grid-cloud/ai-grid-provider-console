@@ -21,11 +21,19 @@ type errorPayload struct {
 	Message string `json:"message"`
 }
 
+// writeJSON encodes v before it commits the status, so an encoding failure
+// (a value JSON cannot carry, such as a NaN) is a 500 with an error body, not
+// a 200 with a truncated one.
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	body, err := json.Marshal(v)
+	if err != nil {
+		status = http.StatusInternalServerError
+		body, _ = json.Marshal(errorBody{Error: errorPayload{Code: strconv.Itoa(status), Message: "internal server error"}})
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(append(body, '\n'))
 }
 
 func writeData(w http.ResponseWriter, status int, v any) {
