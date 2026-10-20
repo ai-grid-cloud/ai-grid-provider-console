@@ -10,6 +10,21 @@ It keeps four jobs: relaying Connect calls with the caller's token attached, ser
 answering `/healthcheck` and `/readyz`, and serving the console's own configuration. Its
 ~2,550 lines of request mapping go away.
 
+**Relaying means proxying, not re-implementing.** The BFF is an `httputil.ReverseProxy` with a
+Director that attaches the caller's identity. It does not compile against the contract at all,
+which is the strongest form of "transport only": a new RPC needs no change here.
+
+The first implementation got this wrong and is worth recording, because the failure mode is
+easy to repeat. Before the backend served Connect, the BFF terminated Connect itself and
+forwarded over gRPC using generated connect-go handlers. That works, and it unblocked the
+frontend without waiting for another repository — but it needs **one hand-written passthrough
+method per RPC**: seven at the time, around twenty-five once Models, Subscriptions and Grid
+land. That is the same duplication this whole migration exists to remove, just relocated. A
+proxy has no per-RPC cost at all.
+
+It was cheap to reverse for one reason worth remembering: the browser's Connect calls are
+byte-identical either way, so nothing in the frontend had to change.
+
 It is not deleted, for a reason that is not about this console: **OSAC's UI has a proxy layer
 of its own, and this BFF is the seam that layer later replaces.** Deleting it now would mean
 rebuilding it to integrate with OSAC.

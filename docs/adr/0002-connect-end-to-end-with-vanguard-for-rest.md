@@ -30,10 +30,34 @@ transcoder, and vanguard honours all of that. The committed OpenAPI document is 
 `protoc-gen-openapiv2` from the same annotations and is unaffected by which transcoder serves
 them, which removes the strongest argument for keeping the gateway.
 
-Vanguard is Alpha and mid-rewrite onto connect-go v2. We accept that because the decision is
-cheap to reverse: both read the same annotations, so falling back to grpc-gateway over loopback
-is a change to `main.go`, not a re-architecture. **grpc-gateway over loopback is the named
-fallback.**
+Vanguard is Alpha — its README says so verbatim, "undergoing initial development and is not yet
+stable". We accept that because the decision is cheap to reverse: both read the same
+annotations, so falling back to grpc-gateway is a change to `main.go`, not a re-architecture.
+**grpc-gateway is the named fallback.**
+
+## Versions, checked 2026-10-20
+
+The rewrite onto connect-go v2 has landed, and that makes the transcoder and the major version
+one decision rather than two:
+
+- **vanguard v0.5.0** (2026-10-13) requires `connectrpc.com/connect/v2`. v0.4.0, the last v1
+  release, is from March.
+- **connect-go v2.0.1** shipped 2026-10-14 alongside v1.21.1, with an official
+  `connect-go-v2-migrate` tool. v1 is maintained but superseded.
+
+So: **connect-go v2**. Adopting Connect from scratch on the superseded major would buy a second
+migration with a tool that exists precisely because the change is breaking.
+
+Two things keep the blast radius small. Vanguard is mounted on the ports that exist today
+(gRPC and REST), so nothing in `deploy/`, `hack/` or the Makefile moves. And the OpenAPI
+document is produced by `protoc-gen-openapiv2` from the same annotations, independently of what
+serves them — an unchanged `ai_grid.swagger.json` is the evidence that REST did not shift.
+
+The grpc-go plugin stays even though the gateway goes: `client/client.go` and
+`integration/kind_test.go` use the generated gRPC client, and `hack/smoke-apis.sh` calls the
+server with `grpcurl`, including `grpcurl list`, which needs reflection. A connect-go handler
+serves Connect, gRPC and gRPC-Web together, so those consumers keep working — this adds a
+protocol rather than swapping one.
 
 ## The frontend
 
