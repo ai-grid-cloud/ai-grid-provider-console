@@ -34,10 +34,21 @@ A cluster that has been enrolled in the grid and provisioned for it. The distinc
 the console lists every cluster the hub manages, but only members can host models.
 _Avoid_: enrolled cluster, participating cluster, active cluster
 
-**Tenant**:
-An organization that consumes models through the grid. Keycloak stores one as an Organization
-and the console has called it that in places; the contract calls it a tenant and so do we.
-_Avoid_: Organization, org, customer, account
+**Organization**, **Tenant** — _unsettled, do not standardise yet_:
+A customer that consumes models through the grid. Two words are in active use and a rename is
+under discussion elsewhere, so this entry records the split rather than resolving it.
+
+- The UI says **Organization** for the Keycloak object the console creates, lists and edits —
+  including the user-visible copy ("Create organization") and the `/organizations` route.
+- The contract and the BFF say **Tenant**: the `Tenants` service, which manages exactly those
+  Keycloak Organizations.
+- Separately, `metadata.tenant` is an OSAC field on *every* object, naming who a resource
+  belongs to. That is a scope, not the resource the console manages, and it may or may not
+  turn out to be the same idea. Nothing populates it while the product is single-tenant, so
+  the two have not yet collided.
+
+Until the rename is settled: match the layer you are editing, and do not convert existing
+usages in passing.
 
 **Model**:
 A deployed inference service, either on the hub alone or placed across grid members.
