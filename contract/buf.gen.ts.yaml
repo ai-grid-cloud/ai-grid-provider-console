@@ -9,13 +9,13 @@
 version: v2
 
 plugins:
-  - remote: buf.build/bufbuild/es:v2.2.3
+  - remote: buf.build/bufbuild/es:v2.16.0
     out: ../frontend/src/gen
     opt:
       - target=ts
       - import_extension=js
 
-  - remote: buf.build/connectrpc/query-es:v2.0.1
+  - remote: buf.build/connectrpc/query-es:v2.3.1
     out: ../frontend/src/gen
     opt:
       - target=ts

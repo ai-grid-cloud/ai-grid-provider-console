@@ -4,12 +4,23 @@
 > how you build a page today. But under
 > [ADR-0001](../docs/adr/0001-the-contract-lives-in-the-backend.md) the contract moves to
 > `ai-grid-cloud/ai-grid-provider-backend` and is reconciled to OSAC conventions
-> (`Clusters/List`, `id + metadata + spec + status`), the fake moves with it, and under
+> (`Clusters/List`, `id + metadata + spec + status`), and under
 > [ADR-0002](../docs/adr/0002-connect-end-to-end-with-vanguard-for-rest.md) the browser speaks
 > Connect — so the JSON envelope, the `ETag`/`If-Match` protocol and the HTTP status table on
-> this page all go away. `mock/fixtures/` and `mock/fixtures-poc/` stay in this repository and
-> keep working. Don't invest in the parts marked for deletion; do read ADR-0001 before adding
-> an RPC.
+> this page all go away. Don't invest in the parts marked for deletion; do read ADR-0001
+> before adding an RPC.
+>
+> **This fake is being deleted, not relocated** (updated 2026-10-20). The backend now has
+> `ai-grid-fake-infra`, which fakes the *hub and Keycloak* and runs the real backend against
+> them — a reimplementation of the contract can drift from the real server, a fake hub cannot.
+> Deletion waits until the backend implements Models, Subscriptions and Grid: it serves
+> `AiGrid`, `Clusters` and `Tenants` only, so those three areas have no fake but this one.
+>
+> **The fixtures now exist in two places and will drift.** The backend converted the cluster
+> and tenant objects from `mock/fixtures*/` into its own `fixtures/default/` and
+> `fixtures/poc/` (`hack/convert-console-fixtures`). `models.json`, `subscriptions.json` and
+> `presets.json` were not converted, because nothing there serves them. Which copy is
+> canonical is undecided; check both before changing either.
 
 The entry point for a coding agent (or a person) building console pages against the fake
 `ai-grid-backend`. It says what runs, what the BFF answers and what the fixtures seed, and

@@ -58,8 +58,16 @@ rather than silently skipped.
   deciding which is canonical is outstanding.
 - Deleted from this repository: `mock/proto/`, `bff/gen/`, `bff/internal/protodrift`,
   `mock/proto/upstream/`, and `.github/workflows/drift.yaml`.
-- `hack/sync-upstream-proto.sh` survives, repointed at the real backend, because the frontend
-  still needs the `.proto` files locally to generate TypeScript (ADR-0002).
+- The frontend still needs the `.proto` files locally to generate TypeScript (ADR-0002), so
+  fetching them survives — but as a new `hack/fetch-backend-proto.sh`, not by repointing
+  `hack/sync-upstream-proto.sh`. The old script fetches a single vendored file for the drift
+  test; the new one fetches a whole directory to generate from. Different jobs, and the old
+  one goes with the drift test.
+- **Until that lands, `mock/proto/upstream/COMMIT` still names
+  `https://github.com/yuvalturg/ai-grid-backend`** — not the backend. The nightly drift
+  workflow is therefore green against a repository nobody ships, which is worse than it
+  failing. Deleting it is part of this work; leaving it pointed at the wrong place in the
+  meantime is a known, accepted gap.
 - The standard has first-class `metadata.display_name` and `metadata.description`, which would
   remove one of the BFF's derivations — display name and description would stop being
   `openshift.io/*` annotations read by `toModel`. The backend's `Metadata` does **not** carry
