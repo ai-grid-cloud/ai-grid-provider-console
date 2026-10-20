@@ -137,6 +137,14 @@ when the RPCs allow it.
 
 ## Agent skills
 
+Configuration for coding-agent workflows, in `docs/agents/` — not general documentation. Each
+file answers a question a skill asks, in the form that skill expects, so changing one changes
+agent behaviour. See [docs/agents/README.md](docs/agents/README.md).
+
+`GLOSSARY.md` and `docs/adr/` are the exception: ordinary engineering documents, for people
+first. Agents read them, and `docs/agents/domain.md` says how, but they are not written for
+agents.
+
 ### Issue tracker
 
 Issues live as GitHub issues in `ai-grid-cloud/ai-grid-provider-console`, driven through the
