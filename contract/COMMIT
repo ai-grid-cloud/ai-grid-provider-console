@@ -1,0 +1,6 @@
+# Source of contract/ai_grid/v1: the backend's protobuf contract, vendored unchanged.
+# The console does not author it (docs/adr/0001-the-contract-lives-in-the-backend.md).
+# Refresh with hack/fetch-backend-proto.sh <ref>, then run make generate-contract.
+repo=https://github.com/ai-grid-cloud/ai-grid-provider-backend
+commit=ca9703c87740b01492890c49f1e1152308ae8912
+path=proto/ai_grid/v1

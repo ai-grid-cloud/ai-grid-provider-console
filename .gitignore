@@ -24,3 +24,8 @@ frontend/.pnpm-store/
 # Playwright output
 frontend/test-results/
 frontend/playwright-report/
+
+# Generated from the vendored contract (contract/, make generate-contract).
+# The protos are committed; their output is not.
+frontend/src/gen/
+bff/gen/contract/

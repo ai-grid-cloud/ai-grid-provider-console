@@ -5,7 +5,9 @@ TAG ?= dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker)
 
-.PHONY: help dev dev-fake dev-fake-poc dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
+BUF ?= go run github.com/bufbuild/buf/cmd/buf@v1.47.2
+
+.PHONY: help fetch-contract generate-contract dev dev-fake dev-fake-poc dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
 
 help: ## Show targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -51,6 +53,16 @@ dev-frontend: ## Run the Vite dev server, which injects `oc whoami -t`
 
 install: ## Install frontend dependencies
 	cd frontend && pnpm install
+
+##@ Contract (the backend's protobuf, vendored in contract/ — see docs/adr/0001)
+
+fetch-contract: ## Refresh contract/ai_grid/v1 from the backend (REF=<branch|tag|sha>, default: the pinned commit)
+	hack/fetch-backend-proto.sh $(REF)
+
+generate-contract: ## Generate TypeScript for the browser and connect-go for the BFF relay
+	rm -rf frontend/src/gen bff/gen/contract
+	cd contract && $(BUF) generate --template buf.gen.ts.yaml --include-imports
+	cd contract && $(BUF) generate --template buf.gen.go.yaml
 
 ##@ Quality
 

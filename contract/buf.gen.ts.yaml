@@ -1,0 +1,22 @@
+# TypeScript for the browser, from the vendored backend contract (see COMMIT).
+#
+# Generated into frontend/src/gen and not committed. Run `make generate-contract`.
+#
+# This template is run with --include-imports: the contract imports google/api/annotations
+# and buf/validate, and protobuf-es emits imports for them, so their TypeScript has to exist
+# too. The Go side does not need that — those are already Go modules — which is why the two
+# templates are separate.
+version: v2
+
+plugins:
+  - remote: buf.build/bufbuild/es:v2.2.3
+    out: ../frontend/src/gen
+    opt:
+      - target=ts
+      - import_extension=js
+
+  - remote: buf.build/connectrpc/query-es:v2.0.1
+    out: ../frontend/src/gen
+    opt:
+      - target=ts
+      - import_extension=js

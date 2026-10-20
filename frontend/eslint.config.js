@@ -7,7 +7,20 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default defineConfig(
-  { ignores: ['dist', 'node_modules', '.pnpm-store', 'playwright-report', 'test-results', 'coverage', '.vite'] },
+  // src/gen is generated from the backend's contract (make generate-contract); it is not
+  // ours to lint or format.
+  {
+    ignores: [
+      'dist',
+      'node_modules',
+      '.pnpm-store',
+      'playwright-report',
+      'test-results',
+      'coverage',
+      '.vite',
+      'src/gen',
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended, prettier],
     files: ['**/*.{ts,tsx}'],

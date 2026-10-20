@@ -1,0 +1,37 @@
+# Go for the BFF relay, from the vendored backend contract (see COMMIT).
+#
+# The BFF terminates Connect from the browser and forwards to the backend over gRPC
+# (docs/adr/0004-the-bff-is-a-thin-relay.md), so it needs connect-go handlers for the same
+# services the backend serves.
+#
+# Managed mode rewrites go_package: the vendored files declare the backend's module path,
+# which is not where this output lives.
+#
+# Generated into bff/gen/contract and not committed. Run `make generate-contract`.
+version: v2
+
+managed:
+  enabled: true
+
+  # Only the contract's own files are relocated. The dependencies already exist as Go
+  # modules (genproto, protovalidate-go, grpc-gateway), so rewriting their go_package
+  # would point the generated imports at packages nothing provides.
+  disable:
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/bufbuild/protovalidate
+    - module: buf.build/grpc-ecosystem/grpc-gateway
+
+  override:
+    - file_option: go_package_prefix
+      value: github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/contract
+
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.5
+    out: ../bff/gen/contract
+    opt:
+      - paths=source_relative
+
+  - remote: buf.build/connectrpc/go:v1.18.1
+    out: ../bff/gen/contract
+    opt:
+      - paths=source_relative

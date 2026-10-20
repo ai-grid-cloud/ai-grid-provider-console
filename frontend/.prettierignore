@@ -7,3 +7,6 @@ test-results
 .playwright-cli
 .vite
 coverage
+
+# Generated from the backend contract (make generate-contract).
+src/gen
