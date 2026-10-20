@@ -5,7 +5,7 @@ TAG ?= dev
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || command -v docker)
 
-BUF ?= go run github.com/bufbuild/buf/cmd/buf@v1.47.2
+BUF ?= go run github.com/bufbuild/buf/cmd/buf@v1.57.2
 
 .PHONY: help fetch-contract generate-contract dev dev-fake dev-fake-poc dev-backend dev-fake-backend dev-bff dev-bff-fake dev-frontend dev-frontend-fake install lint test build e2e image manifests deploy undeploy
 

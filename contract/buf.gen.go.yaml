@@ -5,7 +5,12 @@
 # services the backend serves.
 #
 # Managed mode rewrites go_package: the vendored files declare the backend's module path,
-# which is not where this output lives.
+# which is not where this output lives. It is disabled for the dependency modules, which
+# already exist as Go modules — rewriting those would point the generated imports at
+# packages nothing provides.
+#
+# Plugins run through `go run` at pinned versions, as mock/proto/buf.gen.yaml does: nothing
+# to install, no Buf Schema Registry round trip, and so no rate limiting.
 #
 # Generated into bff/gen/contract and not committed. Run `make generate-contract`.
 version: v2
@@ -13,9 +18,6 @@ version: v2
 managed:
   enabled: true
 
-  # Only the contract's own files are relocated. The dependencies already exist as Go
-  # modules (genproto, protovalidate-go, grpc-gateway), so rewriting their go_package
-  # would point the generated imports at packages nothing provides.
   disable:
     - module: buf.build/googleapis/googleapis
     - module: buf.build/bufbuild/protovalidate
@@ -26,12 +28,10 @@ managed:
       value: github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/contract
 
 plugins:
-  - remote: buf.build/protocolbuffers/go:v1.36.5
+  - local: ["go", "run", "google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12"]
     out: ../bff/gen/contract
-    opt:
-      - paths=source_relative
+    opt: paths=source_relative
 
-  - remote: buf.build/connectrpc/go:v1.18.1
+  - local: ["go", "run", "connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.18.1"]
     out: ../bff/gen/contract
-    opt:
-      - paths=source_relative
+    opt: paths=source_relative

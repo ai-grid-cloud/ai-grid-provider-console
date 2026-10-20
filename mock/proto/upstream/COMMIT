@@ -1,5 +1,0 @@
-# Source of upstream/ai_grid.proto: the backend's real proto, vendored unchanged.
-# Update with hack/sync-upstream-proto.sh <ref>; hack/dev-backend.sh checks out this commit.
-repo=https://github.com/yuvalturg/ai-grid-backend
-commit=fb419b32653dbb0ccc723531df20e4cb02b417f2
-path=proto/ai_grid/v1/ai_grid.proto

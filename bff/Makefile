@@ -29,8 +29,12 @@ fmt: ## gofmt all packages
 vet:
 	go vet ./...
 
-lint: ## golangci-lint (install: brew install golangci-lint)
-	golangci-lint run
+lint: ## golangci-lint when installed (install: brew install golangci-lint); CI always runs it
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "==> golangci-lint not installed, skipping. CI runs it, so a clean local lint is not a clean CI lint."; \
+	fi
 
 test:
 	go test -race -count=1 ./...

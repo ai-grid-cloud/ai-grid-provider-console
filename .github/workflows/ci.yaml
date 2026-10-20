@@ -89,6 +89,36 @@ jobs:
           path: frontend/playwright-report
           retention-days: 7
 
+  contract:
+    name: Contract pointer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # contract/ai_grid/v1 is vendored, so it can be hand-edited or drift from its pin
+      # without anything noticing. This refetches at the pinned commit and diffs.
+      #
+      # It cannot tell you the pin names the RIGHT repository: a valid pointer at the wrong
+      # backend passes, which is exactly how the old drift job stayed green for weeks.
+      # That one is a review question, not a check (CODING_STANDARDS.md, "Documentation").
+      - name: vendored contract matches its pinned commit
+        run: |
+          repo="$(sed -n 's|^repo=||p' contract/COMMIT)"
+          commit="$(sed -n 's|^commit=||p' contract/COMMIT)"
+          path="$(sed -n 's|^path=||p' contract/COMMIT)"
+          slug="${repo#https://github.com/}"
+          echo "::notice::vendored from ${slug} @ ${commit}"
+          mkdir -p /tmp/upstream
+          gh api "repos/${slug}/contents/${path}?ref=${commit}" \
+            --jq '.[] | select(.name | endswith(".proto")) | .name' > /tmp/names
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            gh api -H "Accept: application/vnd.github.raw" \
+              "repos/${slug}/contents/${path}/${f}?ref=${commit}" > "/tmp/upstream/${f}"
+          done < /tmp/names
+          diff -r /tmp/upstream contract/ai_grid/v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   manifests:
     name: Manifests
     runs-on: ubuntu-latest

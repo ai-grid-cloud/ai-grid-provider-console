@@ -2,20 +2,25 @@
 #
 # Generated into frontend/src/gen and not committed. Run `make generate-contract`.
 #
-# This template is run with --include-imports: the contract imports google/api/annotations
-# and buf/validate, and protobuf-es emits imports for them, so their TypeScript has to exist
-# too. The Go side does not need that — those are already Go modules — which is why the two
-# templates are separate.
+# Run with --include-imports: the contract imports google/api/annotations and buf/validate,
+# and protobuf-es emits imports for them, so their TypeScript has to exist too. The Go side
+# does not need that — those are already Go modules — which is why the two templates are
+# separate.
+#
+# The plugins are pnpm devDependencies of frontend/, pinned in its lockfile and kept in step
+# with the runtime that consumes their output (@bufbuild/protobuf, @connectrpc/connect-query).
+# Local rather than remote: no Buf Schema Registry round trip, so no rate limiting, and the
+# generator version cannot drift from the runtime version.
 version: v2
 
 plugins:
-  - remote: buf.build/bufbuild/es:v2.16.0
+  - local: ../frontend/node_modules/.bin/protoc-gen-es
     out: ../frontend/src/gen
     opt:
       - target=ts
       - import_extension=js
 
-  - remote: buf.build/connectrpc/query-es:v2.3.1
+  - local: ../frontend/node_modules/.bin/protoc-gen-connect-query
     out: ../frontend/src/gen
     opt:
       - target=ts
