@@ -1,5 +1,16 @@
 # Building UI against the fake backend
 
+> **The contract below is being replaced.** Everything on this page is accurate today and is
+> how you build a page today. But under
+> [ADR-0001](../docs/adr/0001-the-contract-lives-in-the-backend.md) the contract moves to
+> `ai-grid-cloud/ai-grid-provider-backend` and is reconciled to OSAC conventions
+> (`Clusters/List`, `id + metadata + spec + status`), the fake moves with it, and under
+> [ADR-0002](../docs/adr/0002-connect-end-to-end-with-vanguard-for-rest.md) the browser speaks
+> Connect — so the JSON envelope, the `ETag`/`If-Match` protocol and the HTTP status table on
+> this page all go away. `mock/fixtures/` and `mock/fixtures-poc/` stay in this repository and
+> keep working. Don't invest in the parts marked for deletion; do read ADR-0001 before adding
+> an RPC.
+
 The entry point for a coding agent (or a person) building console pages against the fake
 `ai-grid-backend`. It says what runs, what the BFF answers and what the fixtures seed, and
 points to the detail:

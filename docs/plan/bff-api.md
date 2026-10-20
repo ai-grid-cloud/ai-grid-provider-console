@@ -1,5 +1,22 @@
 # BFF plan
 
+> **Most of this page is scheduled for deletion.** It documents a hand-written REST API that
+> [ADR-0002](../adr/0002-connect-end-to-end-with-vanguard-for-rest.md) replaces with Connect:
+> the `{"data"}`/`{"meta"}` envelope, the `ETag`/`If-Match`/428 protocol, the error-status
+> table and the endpoint table all go. What survives is the deployment topology and the
+> identity flow. See also [ADR-0001](../adr/0001-the-contract-lives-in-the-backend.md)
+> (the contract moves to the backend) and
+> [ADR-0004](../adr/0004-the-bff-is-a-thin-relay.md) (what the BFF keeps doing).
+>
+> Two corrections to what follows, both verified on 2026-10-19:
+>
+> - The backend is **`ai-grid-cloud/ai-grid-provider-backend`**, not `yuvalturg/ai-grid-backend`.
+>   The repository referenced below, and vendored in `mock/proto/upstream/COMMIT`, is a
+>   different one — so the nightly drift job has been green while real divergence accumulated.
+> - "The backend decides what the caller may do" is **aspirational, not current**. The backend
+>   builds its gRPC server with no interceptors and talks to Kubernetes with its own
+>   ServiceAccount, so the forwarded token is read by nothing. ADR-0004 has the agreed fix.
+
 The console is a React and PatternFly frontend served by a thin Go backend-for-frontend
 (BFF). The BFF owns login, static assets and the JSON API the browser uses. Everything
 else, every call to the ACM hub, to Keycloak and to metrics, is the job of
