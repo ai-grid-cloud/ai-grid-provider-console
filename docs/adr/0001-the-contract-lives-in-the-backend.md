@@ -43,25 +43,36 @@ rather than silently skipped.
 
 ## Consequences
 
-- All 29 draft RPCs are reshaped and gain `option (google.api.http)` annotations, which the
-  draft has none of today. Each annotation forces a URL design decision.
-- The fake backend (`bff/internal/fakebackend`, ~6,900 lines) is **deleted, not relocated**.
-  Superseded on 2026-10-20 by the backend's own `ai-grid-fake-infra`, which fakes the *hub and
-  Keycloak* and runs the real backend against them — a reimplementation of the contract can
-  drift from the real server, a fake hub cannot. Deletion waits until the backend implements
-  Models, Subscriptions and Grid; until then those three areas have no fake but the console's
-  own, and it stays.
-- `mock/fixtures/` and `mock/fixtures-poc/` no longer stay put unchanged: the backend has
-  converted their cluster and tenant objects into its own `fixtures/default/` and
-  `fixtures/poc/` via `hack/convert-console-fixtures`. Models, subscriptions and presets were
-  not converted, because nothing serves them. **Both copies now exist and will drift**;
-  deciding which is canonical is outstanding.
-- Deleted from this repository: `mock/proto/`, `bff/gen/`, `bff/internal/protodrift`,
-  `mock/proto/upstream/`, and `.github/workflows/drift.yaml`.
-- `hack/sync-upstream-proto.sh` survives, repointed at the real backend, because the frontend
-  still needs the `.proto` files locally to generate TypeScript (ADR-0002).
+- All 29 draft RPCs eventually gain `option (google.api.http)` annotations, which the draft has
+  none of today. Each annotation forces a URL design decision.
+- The draft moves to the backend and the console stops carrying it: `mock/proto/`, `bff/gen/`
+  and `bff/internal/fakebackend` go, and the console imports the contract from the backend at a
+  pinned commit.
 - The standard has first-class `metadata.display_name` and `metadata.description`, which would
   remove one of the BFF's derivations — display name and description would stop being
   `openshift.io/*` annotations read by `toModel`. The backend's `Metadata` does **not** carry
   them yet (it has `creation_timestamp`, `deletion_timestamp`, `creator`, `tenant`, `name`,
   `labels`, `annotations`, `version`), so this is a field to add, not a field to adopt.
+
+## How it is actually being delivered (2026-10-22)
+
+The decision stands; the route to it is not the one sketched above, and the differences are
+worth recording because each is a better answer than the original.
+
+- **The draft is not reshaped up front.** Backend PR #10 lands it as a separate
+  `ai_grid.draft.v1` package served on its own port, and deletes it **area by area** as the
+  real backend implements each. Reconciling all 29 RPCs to OSAC conventions before anything
+  works would have blocked every page on one large change; this keeps the other pages running
+  meanwhile.
+- **The fake is relocated, not deleted.** It moves to `internal/fakeinfra/draft/` and the
+  fixtures to `fixtures/draft/{default,poc}`. An earlier move (backend PR #7) already converted
+  the cluster and tenant fixtures for `ai-grid-fake-infra`, which fakes the *hub and Keycloak*
+  and runs the real backend against them. The two coexist deliberately: the fake infrastructure
+  serves the areas the backend implements, the draft fake serves the ones it does not.
+- **The drift guard was repaired, not removed.** It had been pointed at
+  `yuvalturg/ai-grid-backend` and was green against a repository nobody ships. Rather than
+  delete it, the console repointed it at `ai-grid-cloud/ai-grid-provider-backend`,
+  `path=proto/ai_grid/v1`. A guard aimed at the right target earns its place; deleting it would
+  have removed the signal along with the false assurance.
+- `hack/dev-backend.sh` is gone, replaced by `hack/forward-backend.sh`, which forwards to the
+  backend deployed on the hub instead of cloning and running it locally.
