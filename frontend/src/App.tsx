@@ -24,7 +24,9 @@ import { AppRoutes } from './AppRoutes';
 import { FakeBackendBanner } from './components/FakeBackendBanner';
 import { NoticeToast } from './components/NoticeToast';
 import { AboutConsoleModal } from './components/AboutConsoleModal';
+import { ThemeToggle } from './components/ThemeToggle';
 import { UserMenu } from './components/UserMenu';
+import { ThemeProvider } from './context/ThemeContext';
 import { useServiceData } from './hooks/useServiceData';
 
 type Props = { service: ConsoleService };
@@ -70,7 +72,11 @@ export const App: React.FC<Props> = ({ service }) => {
       <MastheadContent>
         <Toolbar isFullHeight isStatic>
           <ToolbarContent>
-            <ToolbarItem align={{ default: 'alignEnd' }}>
+            {/* A phone has no room for it beside the user menu, which offers the theme there instead. */}
+            <ToolbarItem align={{ default: 'alignEnd' }} visibility={{ default: 'hidden', md: 'visible' }}>
+              <ThemeToggle />
+            </ToolbarItem>
+            <ToolbarItem align={{ default: 'alignEnd', md: 'alignStart' }}>
               <UserMenu
                 user={user}
                 loaded={userLoaded}
@@ -102,10 +108,12 @@ export const App: React.FC<Props> = ({ service }) => {
   );
 
   return (
-    <Page isContentFilled masthead={header} sidebar={sidebar} banner={<FakeBackendBanner service={service} />}>
-      <NoticeToast />
-      <AppRoutes service={service} />
-      <AboutConsoleModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} config={config} user={user} />
-    </Page>
+    <ThemeProvider>
+      <Page isContentFilled masthead={header} sidebar={sidebar} banner={<FakeBackendBanner service={service} />}>
+        <NoticeToast />
+        <AppRoutes service={service} />
+        <AboutConsoleModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} config={config} user={user} />
+      </Page>
+    </ThemeProvider>
   );
 };
