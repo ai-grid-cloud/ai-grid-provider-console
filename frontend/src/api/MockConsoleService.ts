@@ -1,3 +1,4 @@
+import type { DashboardResource } from '@perses-dev/client';
 import {
   consolePlacement,
   consolePlacementLocations,
@@ -64,6 +65,12 @@ export class MockConsoleService implements ConsoleService {
       monitoring: { enabled: false, persesProject: '' },
     },
   ) {}
+
+  /** The hub's Perses dashboards, for the Monitoring page; none until a test sets them. */
+  monitoringDashboards: DashboardResource[] = [];
+
+  listMonitoringDashboards = async (project: string): Promise<DashboardResource[]> =>
+    this.monitoringDashboards.filter((d) => !project || d.metadata.project === project);
 
   getUser = async (): Promise<User> => this.user;
 

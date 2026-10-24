@@ -1,3 +1,4 @@
+import type { DashboardResource } from '@perses-dev/client';
 import {
   toGridCluster,
   toManagedModel,
@@ -9,6 +10,7 @@ import {
 import type { GridMembership } from './clusters';
 import type { ConsoleService } from './ConsoleService';
 import { ServiceError } from './ConsoleService';
+import { PERSES_API } from './monitoring';
 import type {
   ApiCluster,
   ApiModel,
@@ -74,6 +76,35 @@ export class HttpConsoleService implements ConsoleService {
       ifMatch: cluster.resourceVersion,
     });
     return toGridCluster(updated);
+  }
+
+  /**
+   * GET /perses/api/api/v1/[projects/<project>/]dashboards through the BFF's relay. The relay passes
+   * Perses's answers on unchanged, so a failure carries Perses's message, or the BFF's own for the
+   * relay's checks (401, 403, 404 when monitoring isn't configured).
+   */
+  async listMonitoringDashboards(project: string): Promise<DashboardResource[]> {
+    const path = project ? `/api/v1/projects/${encodeURIComponent(project)}/dashboards` : '/api/v1/dashboards';
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${PERSES_API}${path}`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+    } catch {
+      throw new ServiceError(0, 'The console backend could not be reached.');
+    }
+    if (!response.ok) {
+      let message = `Request failed with status ${response.status}.`;
+      try {
+        const payload = (await response.json()) as ErrorBody & { message?: string };
+        message = payload.error?.message || payload.message || message;
+      } catch {
+        // keep the generic message
+      }
+      throw new ServiceError(response.status, message);
+    }
+    return (await response.json()) as DashboardResource[];
   }
 
   async listOrganizations(): Promise<Organization[]> {

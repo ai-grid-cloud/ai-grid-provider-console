@@ -532,8 +532,21 @@ port-forward to `127.0.0.1`), `PERSES_TIMEOUT` (30s, at most 50s, for the exchan
 `https://perses.openshift-cluster-observability-operator.svc:8080` and `PERSES_CA_FILE` to the
 service CA (`/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt` in an OpenShift pod):
 the operator's Perses has a service-CA certificate, so without the CA file the relay answers 502.
-`manifests/base` sets neither yet, so a deployed console has Monitoring off. `make start` forwards
+The chart sets them from `console.perses` (`url`, `project`, and `caFile`, which defaults to that
+service CA); its default `url` is empty, as `manifests/base` sets neither, so a deployed console
+has Monitoring off until its values set `url`. `make start` forwards
 that Service when your login may (`hack/forward-perses.sh`).
+
+The page (`frontend/src/pages/monitoring`): with `monitoring.enabled`, `/monitoring` lists the
+dashboards of `monitoring.persesProject` (or every project the caller may read) through the relay
+and shows each `dashboard-*` one as a tab, ordered by name and selected with `?dashboard=` (the
+name, or `<project>/<name>` without a configured project). It renders the selected one with
+Perses's own React components and the plugins bundled in `persesPlugins.ts` (Prometheus and
+Loki datasources and queries; time series, stat, table, gauge, pie and markdown panels), loaded
+with the page only. Not the bar chart: its tooltip is HTML built from unescaped series names, which
+are label values. Not the logs table either: its 0.54-compatible package imports a stylesheet it
+doesn't ship. Without
+`monitoring.enabled`, `/monitoring` keeps the AI Grid overview's metrics (`Grid/GetOverview`).
 
 ### Waiting on backend RPCs
 

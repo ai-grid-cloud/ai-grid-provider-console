@@ -136,6 +136,19 @@ spec:
               value: {{ .Values.console.billingUrl | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.console.logLevel | quote }}
+            {{- with .Values.console.perses }}
+            {{- if .url }}
+            # The Monitoring page: the BFF relays /perses/api to this Perses with the caller's token.
+            - name: PERSES_URL
+              value: {{ .url | quote }}
+            - name: PERSES_PROJECT
+              value: {{ .project | quote }}
+            {{- with .caFile }}
+            - name: PERSES_CA_FILE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
           # Probed through the proxy (same pod, port 8443): the kubelet cannot
           # reach a loopback port. /readyz also pings the backend, so this one
           # probe gates traffic for all three containers. No liveness probe:

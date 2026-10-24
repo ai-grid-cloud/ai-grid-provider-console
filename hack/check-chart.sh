@@ -11,7 +11,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CHART="${ROOT}/charts/ai-grid-provider-console"
 ALL=(--set backend.clusterWrites=true --set route.host=console.apps.example.com --set tls.serviceCA=false
   --set images.console.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000
-  --set 'imagePullSecrets[0].name=pull' --set imagePullPolicy=Always)
+  --set 'imagePullSecrets[0].name=pull' --set imagePullPolicy=Always
+  --set console.perses.url=https://perses.openshift-cluster-observability-operator.svc:8080
+  --set console.perses.project=ai-grid)
 
 helm lint --strict "${CHART}" >/dev/null
 helm lint --strict "${CHART}" "${ALL[@]}" >/dev/null

@@ -55,6 +55,19 @@ console:
   mapTileAttribution: ""
   billingUrl: ""
   logLevel: info
+  # The Monitoring page's Perses (docs/plan/bff-api.md, "The Perses relay"): its dashboard-*
+  # dashboards are the page's tabs. Empty url: Monitoring keeps its page without Perses.
+  perses:
+    # The hub's Perses server, such as the Cluster Observability Operator's:
+    # https://perses.openshift-cluster-observability-operator.svc:8080
+    url: ""
+    # The Perses project whose dashboard-* dashboards are the tabs; empty for every project the
+    # signed-in user may read.
+    project: ""
+    # The CA that verifies the server's certificate. The default is OpenShift's service CA, which
+    # every pod gets next to its ServiceAccount token and which issues the Cluster Observability
+    # Operator's Perses certificate. Empty: the system roots.
+    caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
   resources:
     requests: { cpu: 50m, memory: 64Mi }
     limits: { memory: 256Mi }
