@@ -27,12 +27,21 @@ export const ModelStatusDetails: React.FC<{ model: ModelView }> = ({ model }) =>
 };
 
 /**
- * The model's phase as an outline StatusLabel, the backend's message (else its reason) in a tooltip.
- * A model's status opens nothing: its locations are in the row's expanded content and on its page,
- * where each cluster's status opens what that cluster reported.
+ * The model's phase. Ready is an outline label and opens nothing. On the Models list, every other
+ * phase is filled and `onOpen` opens ModelStatusModal. Without `onOpen` (the model page), the
+ * backend's message stays in a tooltip; the page explains it in the alert.
  */
-export const ModelStatusLabel: React.FC<{ model: ModelView }> = ({ model }) => (
-  <span data-testid="model-phase">
-    <StatusLabel isCompact status={modelPhase(model)} reason={model.statusMessage ?? model.reason} />
-  </span>
-);
+export const ModelStatusLabel: React.FC<{ model: ModelView; onOpen?: () => void }> = ({ model, onOpen }) => {
+  const phase = modelPhase(model);
+  const opens = phase !== 'Ready' && !!onOpen;
+  return (
+    <span data-testid="model-phase">
+      <StatusLabel
+        isCompact
+        status={phase}
+        reason={opens ? undefined : (model.statusMessage ?? model.reason)}
+        onClick={opens ? onOpen : undefined}
+      />
+    </span>
+  );
+};

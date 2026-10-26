@@ -76,7 +76,13 @@ export const ModelDetailsPage: React.FC = () => {
             // the clusters the placement chose until then.
             <Stack hasGutter data-testid="model-locations">
               {model.clusters.length || model.selectedClusters.length ? (
-                <ModelLocationsTable model={model} clusters={clusters} siteNames={siteNames} onEdit={edit} />
+                <ModelLocationsTable
+                  model={model}
+                  clusters={clusters}
+                  siteNames={siteNames}
+                  onEdit={edit}
+                  onDelete={user?.isProviderAdmin ? () => confirmDelete(model) : undefined}
+                />
               ) : (
                 <List>
                   {model.locations.map((location) => (

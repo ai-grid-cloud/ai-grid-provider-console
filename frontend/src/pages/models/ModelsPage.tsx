@@ -24,6 +24,8 @@ import { locationLabel, modelPath, siteNamesOf } from './modelUtils';
 import { ModelLocationsTable } from './ModelLocationsTable';
 import { NotPlaced } from './NotPlaced';
 import { ModelStatusLabel } from './ModelStatus';
+import { ModelStatusModal } from './ModelStatusModal';
+import { PARTIALLY_AVAILABLE } from './modelStatusInfo';
 import { titleOf, type ModelView } from './modelView';
 import { useDeleteModel } from './useDeleteModel';
 import { useModelList } from './useModels';
@@ -61,6 +63,7 @@ export const ModelsPage: React.FC = () => {
       }
       return next;
     });
+  const [statusModelId, setStatusModelId] = useState<string>();
   const [confirmDelete, deleteModal] = useDeleteModel({
     refresh: () => void refresh(),
     onDeleted: () => {
@@ -78,6 +81,7 @@ export const ModelsPage: React.FC = () => {
       )
       .sort((a, b) => (sortBy.direction === 'asc' ? compare(a, b) : compare(b, a)));
   }, [models, filter, sortBy]);
+  const statusModel = models.find((model) => model.id === statusModelId);
 
   const deployButton = canWrite ? (
     <Button component={(props) => <Link {...props} to="/models/deploy" />}>Deploy model</Button>
@@ -185,7 +189,7 @@ export const ModelsPage: React.FC = () => {
                         <RelativeTime time={model.creationTimestamp} />
                       </Td>
                       <Td dataLabel="Status">
-                        <ModelStatusLabel model={model} />
+                        <ModelStatusLabel model={model} onOpen={() => setStatusModelId(model.id)} />
                       </Td>
                       {canWrite && (
                         <Td isActionCell>
@@ -218,6 +222,7 @@ export const ModelsPage: React.FC = () => {
                                 clusters={clusters}
                                 siteNames={siteNames}
                                 onEdit={edit}
+                                onDelete={canWrite ? () => confirmDelete(model) : undefined}
                                 isNested
                               />
                             ) : (
@@ -250,6 +255,20 @@ export const ModelsPage: React.FC = () => {
         {body()}
       </PageStateSection>
       {deleteModal}
+      {statusModel && (
+        <ModelStatusModal
+          model={statusModel}
+          onClose={() => setStatusModelId(undefined)}
+          onViewDeployments={
+            statusModel.phase === PARTIALLY_AVAILABLE
+              ? () => {
+                  setRowExpanded(statusModel.id, true);
+                  setStatusModelId(undefined);
+                }
+              : undefined
+          }
+        />
+      )}
     </>
   );
 };

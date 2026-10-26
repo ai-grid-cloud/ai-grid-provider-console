@@ -1090,6 +1090,27 @@ func TestAllRolloutAndClusterChanges(t *testing.T) {
 	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
 }
 
+func TestFailApplyNamedModelOnly(t *testing.T) {
+	// fail-apply naming a model fails only that model's work; others on the
+	// same cluster apply normally (Granite Ready on Madrid, Mistral Failed).
+	site := enrolled("site-a")
+	site.Labels[LabelFailApply] = "broken"
+	s, advance := modelServer(t, &Fixtures{Clusters: []*aigridv1.ManagedCluster{site}})
+	createModel(t, s, placedModel("ok", nil))
+	createModel(t, s, placedModel("broken", nil))
+	advance(2 * time.Minute)
+	ok := getModel(t, s, "ok")
+	wantPhase(t, ok, aigridv1.ModelPhase_MODEL_PHASE_READY, ReasonRolloutComplete)
+	if w := ok.GetStatus().GetRollout().GetWorks()[0]; condition(w.GetConditions(), CondWorkApplied).GetStatus() != cTrue {
+		t.Errorf("ok work applied = %v", w.GetConditions())
+	}
+	bad := getModel(t, s, "broken")
+	wantPhase(t, bad, aigridv1.ModelPhase_MODEL_PHASE_FAILED, ReasonNotAsExpected)
+	if w := bad.GetStatus().GetRollout().GetWorks()[0]; condition(w.GetConditions(), CondWorkApplied).GetStatus() != cFalse {
+		t.Errorf("broken work applied = %v", w.GetConditions())
+	}
+}
+
 func TestFailApplyAndTimeouts(t *testing.T) {
 	t.Parallel()
 	broken := enrolled("site-b")

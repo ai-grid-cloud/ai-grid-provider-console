@@ -407,7 +407,7 @@ describe('the phase', () => {
     return service;
   };
 
-  it('words each phase, in outline labels that open nothing, the message in a tooltip', async () => {
+  it('words each phase; Ready stays outline, and any other status opens its message', async () => {
     const user = userEvent.setup();
     renderAt('/models', phases());
     const phase = async (id: string) => within(await rowOf(id)).getByTestId('model-phase');
@@ -418,13 +418,14 @@ describe('the phase', () => {
     expect(await phase('saved')).toHaveTextContent(/^Saved to Git$/);
     // An unspecified phase without SavedToGit isn't Pending: the console doesn't know.
     expect(await phase('unknown')).toHaveTextContent(/^Unknown$/);
-    for (const id of ['ready', 'partial', 'saved']) {
-      const label = (await phase(id)).querySelector('.pf-v6-c-label');
-      expect(label).toHaveClass('pf-m-outline');
-      expect(within(await phase(id)).queryByRole('button')).not.toBeInTheDocument();
+    const ready = (await phase('ready')).querySelector('.pf-v6-c-label');
+    expect(ready).toHaveClass('pf-m-outline');
+    expect(within(await phase('ready')).queryByRole('button')).not.toBeInTheDocument();
+    for (const id of ['pending', 'failed', 'partial', 'saved', 'unknown']) {
+      expect(within(await phase(id)).getByRole('button')).toBeInTheDocument();
     }
-    await user.hover(within(await phase('partial')).getByText('Partially available'));
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Not ready on site2; ready on site1');
+    await user.click(within(await phase('partial')).getByRole('button', { name: 'Partially available' }));
+    expect(await screen.findByTestId('model-status-modal')).toHaveTextContent('Not ready on site2; ready on site1');
   });
 
   it("explains a failure on the model's page, the backend's own words folded away", async () => {
@@ -604,14 +605,14 @@ describe('a background poll', () => {
     renderAt('/models', service);
     await user.click(within(await rowOf('granite-3-8b')).getByRole('button', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: `Pending at ${site1}` }));
-    const modal = await screen.findByTestId('cluster-status-modal');
+    const modal = await screen.findByTestId('deployment-status-modal');
     expect(within(modal).getByRole('heading', { name: /status/ })).toHaveTextContent('Pending');
     granite.status!.clusters[0].phase = ModelPhase.READY;
     await act(() => vi.advanceTimersByTimeAsync(30000));
     await waitFor(() => expect(within(modal).getByRole('heading', { name: /status/ })).toHaveTextContent('Ready'));
     granite.status!.clusters = [];
     await act(() => vi.advanceTimersByTimeAsync(30000));
-    await waitFor(() => expect(screen.queryByTestId('cluster-status-modal')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId('deployment-status-modal')).not.toBeInTheDocument());
   });
 });
 
@@ -744,7 +745,7 @@ it("opens a model page with its configuration, its endpoint and each cluster's s
     '/ai-grid?model=granite-3-8b',
   );
   await user.click(await within(locations).findByRole('button', { name: `Ready at ${site1}` }));
-  const modal = await screen.findByTestId('cluster-status-modal');
+  const modal = await screen.findByTestId('deployment-status-modal');
   expect(modal).toHaveTextContent('LLMInferenceService ready');
   expect(modal).toHaveTextContent('Ready');
 });
@@ -1357,7 +1358,7 @@ describe('each cluster of a placed model (status.clusters, proposal P13)', () =>
     renderAt('/models', partial());
     await user.click(within(await rowOf('mistral-7b-instruct')).getByRole('button', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: `Pending at ${site2}` }));
-    const modal = await screen.findByTestId('cluster-status-modal');
+    const modal = await screen.findByTestId('deployment-status-modal');
     expect(within(modal).getByRole('heading', { name: /Mistral 7B Instruct status/ })).toBeVisible();
     expect(modal).toHaveTextContent(site2);
     expect(modal).toHaveTextContent('on cluster site2');

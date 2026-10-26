@@ -133,7 +133,7 @@ event changes in the BFF's `GridCluster`:
 | 70s | `site-berlin-1` | `imported` | only the `ManagedClusterImportSucceeded` entry of `conditions` (False/Importing to True/Imported) and `resourceVersion`; `status` is already ready |
 | 90s | `site-berlin-1` | `addons-available` | `addons`: work-manager, cluster-proxy, managed-serviceaccount |
 | 130s | `site-berlin-1` | `addons-available` | `addons`: the seven default add-ons |
-| 300s | `site-madrid-1` | `lease-recovered` | `status` unknown to ready, `statusMessage`, add-ons `available` |
+| 300s | `site-madrid-1` | `lease-recovered` | `status` unknown to ready, `statusMessage`, add-ons `available`; `ai-grid-mock/fail-apply=mistral-7b-instruct` fails only Mistral's work there |
 
 ## Deviations from the real hub
 
