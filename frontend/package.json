@@ -54,7 +54,7 @@
     "react-router-dom": "^7.18.4",
     "use-query-params": "2.2.1",
     "use-resize-observer": "9.1.0",
-    "zod": "3.25.76"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
