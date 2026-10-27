@@ -1,14 +1,17 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -168,6 +171,122 @@ func TestUnknownAPIPathIsJSON404(t *testing.T) {
 	}
 }
 
+// A known path asked with a method it has no route for is 405 with Allow and
+// the JSON error shape, not the unknown-path 404.
+func TestWrongMethodIsJSON405(t *testing.T) {
+	app := newTestApp(t, testConfig(t), nil)
+	cases := map[string]string{
+		"POST /api/v1/clusters":                 "GET, HEAD",
+		"DELETE /api/v1/clusters/site-1":        "GET, HEAD, PATCH",
+		"PUT /api/v1/tenants/t-1":               "GET, HEAD, PATCH, DELETE",
+		"PATCH /api/v1/subscriptions/s":         "GET, HEAD, PUT, DELETE",
+		"DELETE /api/v1/models":                 "GET, HEAD, POST",
+		"POST /api/v1/models/ai-grid-models/m1": "GET, HEAD, PATCH, DELETE",
+	}
+	for req, allow := range cases {
+		method, path, _ := strings.Cut(req, " ")
+		rec := serve(app, asUser(method, path))
+		if rec.Code != http.StatusMethodNotAllowed || rec.Header().Get("Allow") != allow {
+			t.Errorf("%s: %d Allow=%q, want 405 Allow=%q", req, rec.Code, rec.Header().Get("Allow"), allow)
+			continue
+		}
+		if body := decodeError(t, rec); body.Error.Code != "405" || !strings.Contains(body.Error.Message, allow) {
+			t.Errorf("%s: body %+v", req, body)
+		}
+	}
+	if rec := serve(app, asUser(http.MethodPost, "/api/v1/nope")); rec.Code != http.StatusNotFound || rec.Header().Get("Allow") != "" {
+		t.Errorf("unknown path: %d %v", rec.Code, rec.Header())
+	}
+}
+
+// HEAD is GET without the body: open on /user and /config like GET, so the
+// provider-admin check doesn't refuse a viewer's HEAD that its GET passes.
+func TestHeadUserAndConfigAreOpenLikeGet(t *testing.T) {
+	denied := newTestAppWithHub(t, testConfig(t), nil, &fakeHub{allowed: false})
+	if rec := serve(denied, asUser(http.MethodHead, "/api/v1/config")); rec.Code != http.StatusOK {
+		t.Errorf("HEAD /config by a non-admin: %d", rec.Code)
+	}
+	if rec := serve(denied, asUser(http.MethodHead, "/api/v1/user")); rec.Code != http.StatusOK {
+		t.Errorf("HEAD /user by a non-admin: %d", rec.Code)
+	}
+	if rec := serve(denied, asUser(http.MethodHead, "/api/v1/clusters")); rec.Code != http.StatusForbidden {
+		t.Errorf("HEAD /clusters by a non-admin: %d, want 403", rec.Code)
+	}
+}
+
+// The subscriptions list takes no query parameters and refuses them instead
+// of answering the whole list as if it were filtered or paged; clusters,
+// tenants and models refuse a repeated offset or limit as they refuse a
+// repeated filter.
+func TestListQueryParameters(t *testing.T) {
+	fake := &backendtest.Fake{Clusters: []*aigridv1.ManagedCluster{{Name: "site-1", ResourceVersion: "1"}}}
+	app := newTestApp(t, testConfig(t), fake)
+	for _, path := range []string{
+		"/api/v1/clusters?limit=1&limit=2",
+		"/api/v1/clusters?offset=-1",
+		"/api/v1/subscriptions?filter=false&limit=1",
+		"/api/v1/subscriptions?offset=0",
+		"/api/v1/tenants?offset=1&offset=2",
+		"/api/v1/tenants?limit=1&limit=1",
+		"/api/v1/models?limit=5&limit=10",
+	} {
+		rec := serve(app, asUser(http.MethodGet, path))
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("GET %s: %d %s, want 422", path, rec.Code, rec.Body.String())
+		}
+	}
+	for _, path := range []string{"/api/v1/clusters", "/api/v1/clusters?offset=0&limit=10", "/api/v1/subscriptions", "/api/v1/tenants?offset=0&limit=10"} {
+		if rec := serve(app, asUser(http.MethodGet, path)); rec.Code != http.StatusOK {
+			t.Errorf("GET %s: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// The clusters list forwards offset and limit as the request's page and
+// `filter` as sent; meta carries the backend's total over the whole list.
+func TestListClustersPages(t *testing.T) {
+	fake := &backendtest.Fake{Clusters: []*aigridv1.ManagedCluster{
+		{Name: "site-3", ResourceVersion: "1"}, {Name: "site-1", ResourceVersion: "1"}, {Name: "site-2", ResourceVersion: "1"},
+	}}
+	app := newTestApp(t, testConfig(t), fake)
+
+	var list []GridCluster
+	rec := serve(app, asUser(http.MethodGet, "/api/v1/clusters"))
+	meta := decodeList(t, rec, &list)
+	if len(list) != 3 || list[0].Name != "site-1" || meta.Size != 3 || total(meta) != 3 {
+		t.Fatalf("list = %+v, meta = %+v", list, meta)
+	}
+	if r := fake.LastListClusters; r.Offset != nil || r.Limit != nil || r.Filter != nil {
+		t.Errorf("no query means an empty request: %v", r)
+	}
+
+	rec = serve(app, asUser(http.MethodGet, "/api/v1/clusters?offset=1&limit=1"))
+	meta = decodeList(t, rec, &list)
+	if len(list) != 1 || list[0].Name != "site-2" || meta.Offset != 1 || meta.Limit == nil || *meta.Limit != 1 || total(meta) != 3 {
+		t.Fatalf("page = %+v, meta = %+v", list, meta)
+	}
+	if r := fake.LastListClusters; r.GetOffset() != 1 || r.GetLimit() != 1 {
+		t.Errorf("page not forwarded: %v", r)
+	}
+
+	// limit=0 counts only; an offset past the end is an empty page with the count.
+	for _, q := range []string{"limit=0", "offset=10"} {
+		rec = serve(app, asUser(http.MethodGet, "/api/v1/clusters?"+q))
+		meta = decodeList(t, rec, &list)
+		if len(list) != 0 || meta.Size != 0 || total(meta) != 3 {
+			t.Errorf("%s: list = %+v, meta = %+v", q, list, meta)
+		}
+	}
+
+	// The filter is forwarded as sent; this fake, like the console's fake
+	// backend, doesn't evaluate one yet and answers InvalidArgument.
+	const enabled = `this.labels["ai-grid/enabled"] == "true"`
+	rec = serve(app, asUser(http.MethodGet, "/api/v1/clusters?filter="+url.QueryEscape(enabled)))
+	if rec.Code != http.StatusUnprocessableEntity || fake.LastListClusters.GetFilter() != enabled {
+		t.Errorf("filter: %d %s, forwarded %q", rec.Code, rec.Body.String(), fake.LastListClusters.GetFilter())
+	}
+}
+
 func TestUserFromProxyHeaders(t *testing.T) {
 	cfg := testConfig(t)
 	h := &fakeHub{allowed: true}
@@ -198,6 +317,26 @@ func TestUserFromProxyHeaders(t *testing.T) {
 	}
 }
 
+// A proxy header with a name outside ASCII (an OpenShift group `équipe-ops`)
+// used to make every backend call 502: grpc-go refuses such metadata values.
+func TestNonASCIIIdentityReachesTheBackend(t *testing.T) {
+	fake := &backendtest.Fake{Tenants: []*aigridv1.Tenant{{Id: "t-1", Name: "acme"}}}
+	app := newTestApp(t, testConfig(t), fake)
+	req := asUser(http.MethodGet, "/api/v1/tenants")
+	req.Header.Set(config.DefaultAuthUserHeader, "rené")
+	req.Header.Set(config.DefaultAuthGroupsHeader, "équipe-ops,cluster-admins")
+	rec := serve(app, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /tenants as rené in équipe-ops: %d %s", rec.Code, rec.Body.String())
+	}
+	if got := fake.Metadata.Get("x-forwarded-user"); len(got) != 1 || got[0] != "ren%C3%A9" {
+		t.Fatalf("x-forwarded-user = %q, want it percent-encoded", got)
+	}
+	if got := fake.Metadata.Get("x-forwarded-groups"); len(got) != 1 || got[0] != "%C3%A9quipe-ops,cluster-admins" {
+		t.Fatalf("x-forwarded-groups = %q", got)
+	}
+}
+
 func TestOnlyProviderAdminsReachTheAPI(t *testing.T) {
 	cfg := testConfig(t)
 	patch := func() *http.Request {
@@ -206,8 +345,14 @@ func TestOnlyProviderAdminsReachTheAPI(t *testing.T) {
 	fake := &backendtest.Fake{Clusters: []*aigridv1.ManagedCluster{{Name: "site-1", ResourceVersion: "7"}}}
 	denied := newTestAppWithHub(t, cfg, fake, &fakeHub{allowed: false})
 	for _, req := range []*http.Request{patch(), asUser(http.MethodGet, "/api/v1/clusters"), asUser(http.MethodGet, "/api/v1/tenants")} {
-		if rec := serve(denied, req); rec.Code != http.StatusForbidden {
+		rec := serve(denied, req)
+		if rec.Code != http.StatusForbidden {
 			t.Fatalf("%s %s by a non-admin: got %d %s, want 403", req.Method, req.URL.Path, rec.Code, rec.Body.String())
+		}
+		// The same words for a read and a write: who the console is for, not
+		// the one verb the check asks about.
+		if got := decodeError(t, rec).Error.Message; got != "this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one" {
+			t.Fatalf("%s %s by a non-admin: message %q", req.Method, req.URL.Path, got)
 		}
 	}
 	if fake.Metadata != nil {
@@ -319,6 +464,100 @@ func TestBackendErrorsMapToHTTP(t *testing.T) {
 	}
 }
 
+// A hub slower than the access review's timeout is the hub's failure (502
+// with the hub message), not the backend's 504; a slow backend stays 504.
+func TestSlowHubIs502AndSlowBackendIs504(t *testing.T) {
+	release := make(chan struct{})
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	defer slow.Close()
+	defer close(release) // before Close, which waits for the handler
+	hubClient, err := hub.New(hub.Config{URL: slow.URL, Timeout: 50 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(testConfig(t), slog.New(slog.DiscardHandler), backendtest.Start(t, &backendtest.Fake{}), hubClient)
+	for _, path := range []string{"/api/v1/user", "/api/v1/tenants"} {
+		rec := serve(app, asUser(http.MethodGet, path))
+		if rec.Code != http.StatusBadGateway {
+			t.Fatalf("GET %s with a slow hub: %d %s, want 502", path, rec.Code, rec.Body.String())
+		}
+		if got := decodeError(t, rec).Error.Message; got != "the hub could not confirm the caller's permissions; try again" {
+			t.Fatalf("GET %s with a slow hub: message %q", path, got)
+		}
+	}
+
+	fake := &backendtest.Fake{Err: backendtest.Status(codes.DeadlineExceeded, "slow")}
+	rec := serve(newTestApp(t, testConfig(t), fake), asUser(http.MethodGet, "/api/v1/tenants"))
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("slow backend: %d %s, want 504", rec.Code, rec.Body.String())
+	}
+}
+
+// The request line and the handler's own line ("cluster updated") say which
+// request and which admin, so an audit can tell who changed what; the token
+// never reaches the log.
+func TestLogsNameTheRequestAndTheUser(t *testing.T) {
+	var logs bytes.Buffer
+	fake := &backendtest.Fake{Clusters: []*aigridv1.ManagedCluster{{Name: "site-1", ResourceVersion: "7"}}}
+	app := NewApp(testConfig(t), slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})), backendtest.Start(t, fake), startHub(t, &fakeHub{allowed: true}))
+
+	rec := serve(app, withIfMatch(patchRequest("site-1", `{"labels":{"ai-grid/enabled":"true"}}`), `"7"`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PATCH: %d %s", rec.Code, rec.Body.String())
+	}
+	id := rec.Header().Get("X-Request-Id")
+	var request, updated string
+	for line := range strings.SplitSeq(logs.String(), "\n") {
+		switch {
+		case strings.Contains(line, "msg=request "):
+			request = line
+		case strings.Contains(line, `msg="cluster updated"`):
+			updated = line
+		}
+	}
+	for what, line := range map[string]string{"request line": request, "handler line": updated} {
+		if !strings.Contains(line, "id="+id) || !strings.Contains(line, "user=alice") {
+			t.Errorf("%s = %q, want id=%s and user=alice", what, line, id)
+		}
+	}
+	if strings.Contains(logs.String(), "sha256~token") {
+		t.Fatalf("the token reached the log:\n%s", logs.String())
+	}
+
+	// A request refused before the identity is known has no user.
+	logs.Reset()
+	serve(app, httptest.NewRequest(http.MethodGet, "/api/v1/clusters", nil))
+	if !strings.Contains(logs.String(), "msg=request ") || strings.Contains(logs.String(), "user=") {
+		t.Errorf("anonymous request: %q", logs.String())
+	}
+}
+
+// The kubelet's probes log at Debug when they succeed (thousands of lines a
+// day); a failed probe is still a request line at Info.
+func TestSuccessfulProbesLogAtDebug(t *testing.T) {
+	var logs bytes.Buffer
+	fake := &backendtest.Fake{}
+	app := NewApp(testConfig(t), slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})), backendtest.Start(t, fake), startHub(t, &fakeHub{allowed: true}))
+	for _, path := range []string{"/readyz", "/healthcheck"} {
+		if rec := serve(app, httptest.NewRequest(http.MethodGet, path, nil)); rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d", path, rec.Code)
+		}
+	}
+	if logs.Len() != 0 {
+		t.Fatalf("successful probes logged at Info:\n%s", logs.String())
+	}
+	fake.Err = backendtest.Status(codes.Unavailable, "down")
+	serve(app, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if !strings.Contains(logs.String(), "msg=request ") || !strings.Contains(logs.String(), "status=503") || !strings.Contains(logs.String(), `"backend not ready"`) {
+		t.Fatalf("a failed probe must still log:\n%s", logs.String())
+	}
+}
+
 func TestPanicBecomes500(t *testing.T) {
 	app := newTestApp(t, testConfig(t), nil)
 	h := app.recoverPanic(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("boom") }))
@@ -329,6 +568,22 @@ func TestPanicBecomes500(t *testing.T) {
 	}
 }
 
+func TestAbortedAnswerIsNotA500(t *testing.T) {
+	app := newTestApp(t, testConfig(t), nil)
+	h := app.recoverPanic(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) }))
+	rec := httptest.NewRecorder()
+	defer func() {
+		if got, _ := recover().(error); !errors.Is(got, http.ErrAbortHandler) {
+			t.Fatalf("recovered %v, want http.ErrAbortHandler passed on to net/http", got)
+		}
+		if rec.Code == http.StatusInternalServerError {
+			t.Fatal("wrote a 500 over an aborted answer")
+		}
+	}()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	t.Fatal("recoverPanic swallowed http.ErrAbortHandler")
+}
+
 func TestClassify(t *testing.T) {
 	cases := []struct {
 		err  error
@@ -336,6 +591,7 @@ func TestClassify(t *testing.T) {
 	}{
 		{Errorf(http.StatusTeapot, "x"), http.StatusTeapot},
 		{context.DeadlineExceeded, http.StatusGatewayTimeout},
+		{fmt.Errorf("%w: provider-admin check: %w", errHub, context.DeadlineExceeded), http.StatusBadGateway},
 		{backendtest.Status(codes.InvalidArgument, "x"), http.StatusUnprocessableEntity},
 		{backendtest.Status(codes.AlreadyExists, "x"), http.StatusConflict},
 		{backendtest.Status(codes.FailedPrecondition, "x"), http.StatusPreconditionFailed},
@@ -358,8 +614,17 @@ func TestSPAHandler(t *testing.T) {
 		}
 	}
 	must(os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>index</html>"), 0o644))
+	must(os.WriteFile(filepath.Join(dir, "favicon.svg"), []byte("<svg/>"), 0o644))
 	must(os.MkdirAll(filepath.Join(dir, "assets"), 0o755))
-	must(os.WriteFile(filepath.Join(dir, "assets", "app-0123abcdef.js"), []byte("js"), 0o644))
+	// Names from a real `vite build`: the hash is base64url, so it may hold
+	// upper case, `-` and `_`, and a name may have a double `-`.
+	assets := []string{
+		"index-yimuxjpv.js", "index-BPyNsiKc.css", "index--abzHtFK.js",
+		"RedHatDisplayVF-D7m-OdR-.woff2", "ne_110m_land-BX_3ioGi.js", "ne_110m_land-BX_3ioGi.js.map",
+	}
+	for _, name := range assets {
+		must(os.WriteFile(filepath.Join(dir, "assets", name), []byte("asset"), 0o644))
+	}
 
 	cfg := testConfig(t)
 	cfg.StaticAssetsDir = dir
@@ -370,24 +635,50 @@ func TestSPAHandler(t *testing.T) {
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, p, nil))
 		return rec
 	}
-	if rec := get("/"); rec.Code != 200 || rec.Body.String() != "<html>index</html>" {
-		t.Fatalf("/ -> %d %q", rec.Code, rec.Body.String())
+	secure := func(what string, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		for header, want := range map[string]string{
+			"Content-Security-Policy": "frame-ancestors 'none'",
+			"X-Frame-Options":         "DENY",
+			"X-Content-Type-Options":  "nosniff",
+			"Referrer-Policy":         "same-origin",
+		} {
+			if got := rec.Header().Get(header); got != want {
+				t.Errorf("%s: %s = %q, want %q", what, header, got, want)
+			}
+		}
 	}
-	if rec := get("/clusters/local-cluster"); rec.Code != 200 || rec.Body.String() != "<html>index</html>" {
-		t.Fatalf("client route -> %d %q", rec.Code, rec.Body.String())
+	for _, route := range []string{"/", "/clusters/local-cluster", "/subscriptions/view/engineering"} {
+		rec := get(route)
+		if rec.Code != 200 || rec.Body.String() != "<html>index</html>" {
+			t.Fatalf("%s -> %d %q", route, rec.Code, rec.Body.String())
+		}
+		if got := rec.Header().Get("Cache-Control"); got != "no-cache" {
+			t.Errorf("%s: Cache-Control = %q, want no-cache: index.html names the current bundle", route, got)
+		}
+		secure(route, rec)
 	}
-	if rec := get("/subscriptions/view/engineering"); rec.Code != 200 || rec.Body.String() != "<html>index</html>" {
-		t.Fatalf("deep client route -> %d %q", rec.Code, rec.Body.String())
+	for _, name := range assets {
+		rec := get("/assets/" + name)
+		if rec.Code != 200 || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+			t.Errorf("asset %s -> %d %q, want immutable", name, rec.Code, rec.Header().Get("Cache-Control"))
+		}
+		secure(name, rec)
 	}
-	if rec := get("/assets/app-0123abcdef.js"); rec.Code != 200 || rec.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
-		t.Fatalf("hashed asset -> %d %q", rec.Code, rec.Header().Get("Cache-Control"))
+	if rec := get("/favicon.svg"); rec.Code != 200 || rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Errorf("a root file -> %d %q, want no-cache: its name has no hash", rec.Code, rec.Header().Get("Cache-Control"))
 	}
 	if rec := get("/assets/missing.js"); rec.Code != 404 {
 		t.Fatalf("missing asset -> %d", rec.Code)
 	}
+	// The JSON API is not a page: nosniff, but no frame or referrer policy of the SPA.
+	rec := serve(newTestApp(t, cfg, nil), asUser(http.MethodGet, "/api/v1/config"))
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Content-Security-Policy") != "" {
+		t.Errorf("API headers = %v", rec.Header())
+	}
 	raw := httptest.NewRequest(http.MethodGet, "/", nil)
 	raw.URL.Path = "/../../etc/passwd"
-	rec := httptest.NewRecorder()
+	rec = httptest.NewRecorder()
 	newSPAHandler(dir).ServeHTTP(rec, raw)
 	if rec.Code != 200 || rec.Body.String() != "<html>index</html>" {
 		t.Fatalf("traversal should be cleaned to a client route, got %d %q", rec.Code, rec.Body.String())

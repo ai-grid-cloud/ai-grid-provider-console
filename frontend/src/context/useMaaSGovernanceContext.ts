@@ -3,22 +3,22 @@
 // provider (ruling A4). The context also carries the organizations and the signed-in user,
 // which the subscription pages need for the Organization field and to hide write actions.
 import { createContext, useContext } from 'react';
-import type { UserService } from '../api/ConsoleService';
 import type { ModelsService } from '../api/models';
 import type { OrganizationsService } from '../api/organizations';
 import type { SubscriptionsService } from '../api/subscriptions';
-import type { MaaSModelRefSummary, MaaSSubscription, Organization } from '../api/types';
+import type { MaaSSubscription, ManagedModel, Organization } from '../api/types';
 import { useServiceData } from '../hooks/useServiceData';
+import { useConsoleSession } from './useConsoleSession';
 
 /** What the subscription pages call. */
-export type GovernanceService = SubscriptionsService & ModelsService & OrganizationsService & UserService;
+export type GovernanceService = SubscriptionsService & ModelsService & OrganizationsService;
 
 /** Polls the subscriptions and the models, as the PoC's provider does. */
 export const useMaaSGovernanceData = (service: GovernanceService) => {
   const [subscriptions, subscriptionsLoaded, subscriptionsError, refreshSubscriptions] = useServiceData<
     MaaSSubscription[]
   >(() => service.listSubscriptions(), []);
-  const [modelRefs, modelRefsLoaded, modelRefsError, refreshModels] = useServiceData<MaaSModelRefSummary[]>(
+  const [modelRefs, modelRefsLoaded, modelRefsError, refreshModels] = useServiceData<ManagedModel[]>(
     () => service.listModels(),
     [],
   );
@@ -26,7 +26,7 @@ export const useMaaSGovernanceData = (service: GovernanceService) => {
     () => service.listOrganizations(),
     [],
   );
-  const [user] = useServiceData(() => service.getUser(), undefined, 0);
+  const { user } = useConsoleSession();
   const refresh = () => {
     void refreshSubscriptions();
     void refreshModels();
@@ -40,6 +40,8 @@ export const useMaaSGovernanceData = (service: GovernanceService) => {
     organizationsError,
     subscriptionsLoaded,
     subscriptionsError,
+    modelRefsLoaded,
+    modelRefsError,
     overviewLoaded,
     loaded: overviewLoaded,
     error: subscriptionsError ?? modelRefsError,

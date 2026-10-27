@@ -29,7 +29,7 @@
   "body": {
     "error": {
       "code": "403",
-      "message": "the console is for provider admins: the hub says you may not patch ManagedClusters"
+      "message": "this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one"
     }
   }
 }

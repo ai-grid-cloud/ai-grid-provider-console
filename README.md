@@ -19,8 +19,9 @@ the caller's own token: may this user patch ManagedClusters? That answer is `isP
 |---|---|
 | `bff/` | Go backend-for-frontend: `/api/v1/*` as JSON over the backend's gRPC, plus the built frontend |
 | `frontend/` | Vite, React 18, PatternFly 6 |
-| `manifests/` | Kustomize deployment: kube-auth-proxy, bff and ai-grid-backend in one pod |
-| `hack/` | `forward-backend.sh` (the hub's backend for `make start`), `hub-ca.sh`, `deploy.sh`, `undeploy.sh`, `api.sh` (curl as you), `smoke.sh` |
+| `charts/ai-grid-provider-console/` | Helm chart: kube-auth-proxy, bff and ai-grid-backend in one pod, one per ACM hub |
+| `manifests/` | The same pod as kustomize. Not an install path: the chart is (ai-grid-env-setup deploys it, and so does `make deploy`). `manifests/base` is kept for `hack/undeploy.sh`'s fallback, which removes a console deployed before the chart, and for the takeover test in `make chart-test`; `make chart-check` keeps it equal to the chart's defaults |
+| `hack/` | `forward-backend.sh` (the hub's backend for `make start`), `forward-perses.sh` (the hub's Perses for `make start`), `hub-ca.sh`, `service-ca.sh` (the hub's service CA, for Perses), `deploy.sh`, `undeploy.sh`, `chart-takeover.sh`, `check-chart.sh`, `test-chart-kind.sh`, `api.sh` (curl as you), `smoke.sh`, `sync-upstream-proto.sh` (vendors the backend's proto), `test-image-workflows.sh` (tests the PR-image workflows' delete logic) |
 | `docs/dev-setup.md` | Running against a real cluster, checks, deploying |
 | `docs/plan/bff-api.md` | API decisions, endpoint list, RPCs still needed from the backend |
 | `docs/plan/work-breakdown.md` | Work split across backend, BFF and frontend |
@@ -49,7 +50,11 @@ the attributions. Run them all against the fake backend with `make dev-fake`, as
 
 Implemented in the BFF and the fake backend: login, user, config, clusters (list, get,
 enroll), organizations, models, subscriptions, locations and the grid overview, with readiness
-tied to the backend. The shipped `ai-grid-backend` answers only the cluster and tenant lists:
-against it, `/user` and `/config` still work (neither calls the backend), a single cluster is
-found in the list, and every other endpoint is 501, which the pages show as not available on
-this backend yet. See the "Waiting on backend RPCs" table in `docs/plan/bff-api.md`.
+tied to the backend. The shipped `ai-grid-backend` serves clusters (list, get, and the update
+behind Add to AI Grid and Remove) and tenants, the console's organizations (list, get, create,
+update, delete). A tenant create or update that sets a field the backend's tenant doesn't have
+answers 501 instead of dropping it. Against it, models, subscriptions, the grid overview and
+capabilities are 501, and so is a list request with `filter`, `offset` or `limit`, which it
+doesn't apply; the pages show these as not available on this backend yet. `/user` and
+`/config` work on any backend (neither calls it). See the "Waiting on backend RPCs" table in
+`docs/plan/bff-api.md`.

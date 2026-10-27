@@ -49,6 +49,8 @@ type MultiSelectionProps = {
   toggleId?: string;
   inputId?: string;
   ariaLabel?: string;
+  /** The menu button's name, when "<ariaLabel> options" doesn't read ("Enter groups" is an instruction). */
+  toggleAriaLabel?: string;
   placeholder?: string;
   isDisabled?: boolean;
   selectionRequired?: boolean;
@@ -131,6 +133,7 @@ export const MultiSelection: React.FC<MultiSelectionProps> = ({
   placeholder,
   isDisabled,
   ariaLabel = 'Options menu',
+  toggleAriaLabel,
   id,
   toggleId,
   inputId,
@@ -490,6 +493,8 @@ export const MultiSelection: React.FC<MultiSelectionProps> = ({
       id={toggleId}
       data-testid={toggleTestId}
       variant="typeahead"
+      // Names the menu's open button after the field, not PatternFly's "Menu toggle".
+      aria-label={toggleAriaLabel ?? `${ariaLabel} options`}
       status={showSelectionError ? 'danger' : undefined}
       onClick={onToggleClick}
       innerRef={toggleRef}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"slices"
@@ -75,6 +76,16 @@ type accessReview struct {
 	} `json:"status"`
 }
 
+// providerAdminQuestion is the one access review the BFF asks
+// (docs/plan/bff-api.md, `isProviderAdmin`): may the caller patch
+// ManagedClusters? Spelled out here, not taken from the BFF's hub package,
+// so that a change there fails against the fake.
+var providerAdminQuestion = map[string]string{
+	"group":    "cluster.open-cluster-management.io",
+	"resource": "managedclusters",
+	"verb":     "patch",
+}
+
 func (h *Hub) selfSubjectAccessReview(w http.ResponseWriter, r *http.Request) {
 	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok || token == "" || slices.Contains(h.access.RejectedTokens, token) {
@@ -86,9 +97,18 @@ func (h *Hub) selfSubjectAccessReview(w http.ResponseWriter, r *http.Request) {
 		writeStatus(w, http.StatusBadRequest, "BadRequest", err.Error())
 		return
 	}
+	attrs := review.Spec.ResourceAttributes
+	if !maps.Equal(attrs, providerAdminQuestion) {
+		// access.json answers one question only, so any other one is refused
+		// rather than answered by token: a BFF that asked something else (a
+		// `get` instead of a `patch`) would otherwise pass every test.
+		msg := fmt.Sprintf("the fake hub answers only the provider-admin access review %v; the BFF asked %v", providerAdminQuestion, attrs)
+		h.logger.Warn("access review refused", "error", msg)
+		writeStatus(w, http.StatusBadRequest, "BadRequest", msg)
+		return
+	}
 	allowed := h.access.DefaultAllowed && !slices.Contains(h.access.DeniedTokens, token)
 	review.Status.Allowed = allowed
-	attrs := review.Spec.ResourceAttributes
 	if allowed {
 		review.Status.Reason = fmt.Sprintf("RBAC: allowed by ClusterRoleBinding %q of ClusterRole %q to User %q", "ai-grid-provider-admins", "ai-grid-provider-admin", "dev-user")
 	}

@@ -1,0 +1,143 @@
+{
+  "title": "ai-grid-provider-console values",
+  "description": "values.yaml documents each key. Unknown keys are errors, so a misspelled --set or values file fails the install instead of being dropped.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "global": {
+      "description": "Helm passes a parent chart's globals here; the chart reads none.",
+      "type": "object"
+    },
+    "fullnameOverride": { "type": "string", "minLength": 1 },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authProxy": { "$ref": "#/definitions/image" },
+        "console": { "$ref": "#/definitions/image" },
+        "backend": { "$ref": "#/definitions/image" }
+      }
+    },
+    "imagePullPolicy": {
+      "description": "Empty: the cluster default.",
+      "type": "string",
+      "enum": ["", "Always", "IfNotPresent", "Never"]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "oauth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "secretName": { "type": "string" },
+        "cookieName": { "type": "string", "minLength": 1 }
+      }
+    },
+    "tls": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "serviceCA": { "type": "boolean" },
+        "secretName": { "type": "string" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "destinationCACertificate": { "type": "string" }
+      }
+    },
+    "console": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gridConsumerUrl": { "type": "string" },
+        "mapTileUrl": { "type": "string" },
+        "mapTileAttribution": { "type": "string" },
+        "billingUrl": { "type": "string" },
+        "logLevel": {
+          "description": "The BFF's LOG_LEVEL, which it reads in either case.",
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error", "DEBUG", "INFO", "WARN", "ERROR"]
+        },
+        "perses": {
+          "description": "The Monitoring page's Perses server.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": { "type": "string" },
+            "project": { "type": "string" },
+            "caFile": { "type": "string" }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keycloakSecretName": { "type": "string", "minLength": 1 },
+        "clusterWrites": { "type": "boolean" },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": { "type": "string", "pattern": "^(https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?/.*)?$" },
+            "branch": { "type": "string", "minLength": 1 },
+            "tokenSecretName": { "type": "string", "minLength": 1 },
+            "gridNamespace": { "type": "string", "pattern": "^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)?$" }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "authProxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "description": "repository:tag, repository@digest, or repository:tag@digest when both are set.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
+        "digest": {
+          "description": "algorithm:hex, such as sha256:<64 hex digits>; empty for none.",
+          "type": "string",
+          "pattern": "^([a-z0-9]+:[a-f0-9]+)?$"
+        }
+      }
+    },
+    "quantities": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number"] }
+    },
+    "resources": {
+      "description": "A container's resources (requests, limits, claims), as in a Pod spec.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requests": { "$ref": "#/definitions/quantities" },
+        "limits": { "$ref": "#/definitions/quantities" },
+        "claims": { "type": "array", "items": { "type": "object" } }
+      }
+    }
+  }
+}

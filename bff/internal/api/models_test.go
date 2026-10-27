@@ -251,6 +251,7 @@ func TestCreateModel(t *testing.T) {
 		{"negative gpu", `{"name": "x", "namespace": "n", "modelUri": "hf://x", "gpuCount": -1}`, http.StatusUnprocessableEntity, "gpuCount must not be negative"},
 		{"malformed", `{"name": `, http.StatusUnprocessableEntity, "invalid request body: malformed JSON"},
 		{"null", `null`, http.StatusUnprocessableEntity, "invalid request body: must be a JSON object"},
+		{"nested type", `{"name": "x", "placement": {"clusterSets": "x"}}`, http.StatusUnprocessableEntity, `invalid request body: field "placement.clusterSets" must be an array`},
 	} {
 		rec := serve(app, jsonRequest(http.MethodPost, "/api/v1/models", tc.body))
 		if rec.Code != tc.code || decodeError(t, rec).Error.Message != tc.message {
@@ -341,9 +342,13 @@ func TestPatchModel(t *testing.T) {
 		{`{"description": "x"}`, `invalid request body: json: unknown field "description"`},
 		{`{"rollout": {"strategy": "Blue"}}`, "rollout.strategy must be All, Progressive or ProgressivePerGroup"},
 		{`{"placement": {"nope": 1}}`, `invalid request body: json: unknown field "nope"`},
+		// A nested field is named by its whole path, as on POST.
+		{`{"placement": {"clusterSets": "x"}}`, `invalid request body: field "placement.clusterSets" must be an array`},
+		// Go 1.27 names an array element by its index; Go 1.26 (the CI toolchain) leaves it out.
+		{`{"placement": {"matchExpressions": [{"values": "x"}]}}`, `invalid request body: field "placement.matchExpressions.0.values" must be an array|invalid request body: field "placement.matchExpressions.values" must be an array`},
 	} {
 		rec := serve(app, withIfMatch(jsonRequest(http.MethodPatch, tiny, tc.body), `"11"`))
-		if rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.Message != tc.message {
+		if rec.Code != http.StatusUnprocessableEntity || !slices.Contains(strings.Split(tc.message, "|"), decodeError(t, rec).Error.Message) {
 			t.Errorf("%s: %d %s", tc.body, rec.Code, rec.Body.String())
 		}
 	}
@@ -522,5 +527,30 @@ func TestListLocations(t *testing.T) {
 	fake.Locations = nil
 	if rec := serve(app, asUser(http.MethodGet, "/api/v1/locations")); rec.Code != http.StatusOK || strings.TrimSpace(rec.Body.String()) != `{"data":[]}` {
 		t.Fatalf("no locations: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// Each work's phase, reason and message, and a partially available model,
+// pass through as the backend derived them (proposal P13).
+func TestModelWorkPhasesPassThrough(t *testing.T) {
+	m := &aigridv1.Model{
+		Name:     "m",
+		Metadata: &aigridv1.ObjectMeta{Namespace: "ai-grid-models"},
+		Spec:     &aigridv1.ModelSpec{Placement: &aigridv1.Placement{}},
+		Status: &aigridv1.ModelStatus{
+			Phase: aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, Reason: "PartiallyAvailable", Message: "1 of 2 clusters are serving the model.",
+			Rollout: &aigridv1.RolloutStatus{Works: []*aigridv1.ManifestWorkStatus{
+				{ClusterName: "site-a", Phase: aigridv1.ModelPhase_MODEL_PHASE_READY},
+				{ClusterName: "site-b", Phase: aigridv1.ModelPhase_MODEL_PHASE_FAILED, Reason: "AppliedManifestWorkFailed", Message: "Failed to apply manifest work"},
+			}},
+		},
+	}
+	out := toModel(m)
+	if out.Phase != PhasePartiallyAvailable || out.Message != "1 of 2 clusters are serving the model." {
+		t.Errorf("model phase %q, message %q", out.Phase, out.Message)
+	}
+	a, b := out.Rollout.Works[0], out.Rollout.Works[1]
+	if a.Phase != PhaseReady || a.Reason != "" || b.Phase != PhaseFailed || b.Reason != "AppliedManifestWorkFailed" || b.Message != "Failed to apply manifest work" {
+		t.Errorf("works = %+v, %+v", a, b)
 	}
 }

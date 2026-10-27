@@ -127,6 +127,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 		body, _ = json.Marshal(errorBody{Error: errorPayload{Code: strconv.Itoa(status), Message: "internal server error"}})
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_, _ = w.Write(append(body, '\n'))

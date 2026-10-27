@@ -32,7 +32,10 @@ import (
 // it fail. Calls lists the methods reached, in order, and Metadata records the
 // incoming metadata of the last call so tests can assert on identity
 // forwarding. Clusters are served as given: the derived `status.state` is
-// whatever the test put there, so handler tests control it directly.
+// whatever the test put there, so handler tests control it directly. The
+// cluster list is by name, paged by offset and limit with the whole count as
+// `total`, and a filter is InvalidArgument, as in the fake backend;
+// LastListClusters keeps the request.
 // Updates mutate the slice in place and bump `resource_version`, except an
 // update that changes nothing, which keeps it (as the fake backend and the
 // API server do); LastUpdate keeps the last request, reached or refused.
@@ -65,6 +68,8 @@ type Fake struct {
 	Calls      []string
 	Metadata   metadata.MD
 	LastUpdate *aigridv1.UpdateManagedClusterRequest
+	// LastListClusters keeps the last ListManagedClusters request.
+	LastListClusters *aigridv1.ListManagedClustersRequest
 
 	LastListTenants  *aigridv1.ListTenantsRequest
 	LastCreateTenant *aigridv1.CreateTenantRequest
@@ -143,11 +148,22 @@ func (f *Fake) Ping(ctx context.Context, req *aigridv1.PingRequest) (*aigridv1.P
 }
 
 // ListManagedClusters implements ManagedClusters.
-func (f *Fake) ListManagedClusters(ctx context.Context, _ *aigridv1.ListManagedClustersRequest) (*aigridv1.ListManagedClustersResponse, error) {
+func (f *Fake) ListManagedClusters(ctx context.Context, req *aigridv1.ListManagedClustersRequest) (*aigridv1.ListManagedClustersResponse, error) {
 	if err := f.begin(ctx, "ListManagedClusters"); err != nil {
 		return nil, err
 	}
-	return &aigridv1.ListManagedClustersResponse{Clusters: f.Clusters}, nil
+	f.LastListClusters = req
+	if req.GetFilter() != "" {
+		return nil, status.Error(codes.InvalidArgument, "filter is not supported by this server yet")
+	}
+	sorted := slices.Clone(f.Clusters)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].GetName() < sorted[j].GetName() })
+	total := len(sorted)
+	page := sorted[min(int(req.GetOffset()), total):]
+	if req.Limit != nil && int(req.GetLimit()) < len(page) {
+		page = page[:req.GetLimit()]
+	}
+	return &aigridv1.ListManagedClustersResponse{Clusters: page, Size: int32(len(page)), Total: int32(total)}, nil
 }
 
 // GetManagedCluster implements ManagedClusters with the backend's NotFound message.

@@ -14,8 +14,12 @@ subjects:
     namespace: ai-grid
 ---
 # ai-grid-backend reads ManagedClusters with the pod's ServiceAccount. These
-# rules mirror deploy/kind/ai-grid-backend.yaml in the backend repository; grow
-# them there first when the backend needs more.
+# rules are the console's part of deploy/openshift/rbac.yaml in the backend
+# repository; grow them there first when the backend needs more. The backend
+# also reads the ai-grid-policies/ai-grid-ready Policy to report a cluster's
+# provisioning. This base does not grant that get: ai-grid-env-setup does, with
+# a Role in apps/ai-grid-policies. Without it, a cluster added to the grid stays
+# at Provisioning in the console.
 #
 # TODO(backend-as-caller): delete this ClusterRole and its binding once the
 # backend builds its hub client from the forwarded user token (work-breakdown

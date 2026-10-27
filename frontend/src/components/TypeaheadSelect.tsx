@@ -127,6 +127,8 @@ export const TypeaheadSelect = ({
     <MenuToggle
       ref={toggleRef}
       variant="typeahead"
+      // Names the menu's open button after the field, not PatternFly's "Menu toggle".
+      aria-label={`${ariaLabel} options`}
       isFullWidth
       isExpanded={isOpen}
       status={status}

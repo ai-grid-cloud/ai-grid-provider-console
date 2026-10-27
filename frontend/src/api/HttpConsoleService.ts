@@ -1,3 +1,4 @@
+import type { DashboardResource } from '@perses-dev/client';
 import {
   toGridCluster,
   toManagedModel,
@@ -8,7 +9,8 @@ import {
 } from './adapters';
 import type { GridMembership } from './clusters';
 import type { ConsoleService } from './ConsoleService';
-import { ServiceError } from './ConsoleService';
+import { RelayedError, ServiceError } from './ConsoleService';
+import { PERSES_API } from './monitoring';
 import type {
   ApiCluster,
   ApiModel,
@@ -76,6 +78,34 @@ export class HttpConsoleService implements ConsoleService {
     return toGridCluster(updated);
   }
 
+  /**
+   * GET /perses/api/api/v1/[projects/<project>/]dashboards through the BFF's relay. The relay passes
+   * Perses's answers on unchanged, so a failure carries Perses's message, or the BFF's own for the
+   * relay's checks (401, 403, 404 when monitoring isn't configured).
+   */
+  async listMonitoringDashboards(project: string): Promise<DashboardResource[]> {
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${PERSES_API}/api/v1/projects/${encodeURIComponent(project)}/dashboards`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      });
+    } catch {
+      throw new ServiceError(0, 'The console backend could not be reached.');
+    }
+    if (!response.ok) {
+      let message = `Request failed with status ${response.status}.`;
+      try {
+        const payload = (await response.json()) as ErrorBody & { message?: string };
+        message = payload.error?.message || payload.message || message;
+      } catch {
+        // keep the generic message
+      }
+      throw new RelayedError(response.status, message);
+    }
+    return (await response.json()) as DashboardResource[];
+  }
+
   async listOrganizations(): Promise<Organization[]> {
     return (await this.request<ApiTenant[]>('GET', '/tenants')).map(toOrganization);
   }
@@ -108,6 +138,12 @@ export class HttpConsoleService implements ConsoleService {
 
   async listModels(): Promise<ManagedModel[]> {
     return (await this.request<ApiModel[]>('GET', '/models')).map(toManagedModel);
+  }
+
+  async getModel(namespace: string, name: string): Promise<ManagedModel> {
+    return toManagedModel(
+      await this.request<ApiModel>('GET', `/models/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`),
+    );
   }
 
   listLocations(): Promise<string[]> {

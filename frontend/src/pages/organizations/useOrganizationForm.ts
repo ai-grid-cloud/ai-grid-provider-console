@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { ServiceError } from '../../api/ConsoleService';
 import type { OrganizationsService } from '../../api/organizations';
 import type { Organization, OrganizationInput } from '../../api/types';
-import { fieldErrorsOf, identityProviderSchema, organizationInputSchema, tenantDetailsSchema } from '../../validation';
+import {
+  fieldErrorsOf,
+  identityProviderSchema,
+  isBlankIdentityProvider,
+  organizationInputSchema,
+  tenantDetailsSchema,
+} from '../../validation';
 import { ORGANIZATION_CHANGED, currentServerErrors, emptyOrganizationInput, errorsUnder } from './serverErrors';
 
 const saveErrorMessage = (err: unknown, editing: boolean) => {
@@ -16,7 +22,10 @@ const saveErrorMessage = (err: unknown, editing: boolean) => {
   return err instanceof Error ? err.message : 'The organization could not be saved.';
 };
 
-const initialValues = (initial?: Organization): OrganizationInput =>
+/** The form always holds an identity provider; a blank one is left out on save. */
+type FormValues = Required<OrganizationInput>;
+
+const initialValues = (initial?: Organization): FormValues =>
   initial
     ? {
         name: initial.name,
@@ -34,7 +43,7 @@ const initialValues = (initial?: Organization): OrganizationInput =>
 export const useOrganizationForm = (service: OrganizationsService, initial?: Organization) => {
   const navigate = useNavigate();
   const [start] = useState(() => initialValues(initial));
-  const [values, setValues] = useState<OrganizationInput>(start);
+  const [values, setValues] = useState<FormValues>(start);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
   // The server's field errors and the form values they were returned for.
@@ -42,13 +51,18 @@ export const useOrganizationForm = (service: OrganizationsService, initial?: Org
 
   const detailErrors = fieldErrorsOf(tenantDetailsSchema, { name: values.name, domains: values.domains });
   const detailsValid = Object.keys(detailErrors).length === 0;
-  const idpValid = identityProviderSchema.safeParse(values.identityProvider).success;
+  // Optional: the backend's Tenants API has no identity provider yet, so a blank form is valid, but
+  // only for an organization without one. A save leaves an absent field alone, so clearing an
+  // existing one would change nothing; its form must stay complete.
+  const idpBlank = !initial?.identityProvider && isBlankIdentityProvider(values.identityProvider);
+  const idpValid = idpBlank || identityProviderSchema.safeParse(values.identityProvider).success;
+  const toSave: OrganizationInput = idpBlank ? { ...values, identityProvider: undefined } : values;
   const serverErrors = server ? currentServerErrors(server.errors, server.sent, values) : {};
 
   const leave = () => navigate(initial ? `/organizations/${encodeURIComponent(initial.id)}` : '/organizations');
 
   const save = async () => {
-    const input = organizationInputSchema.safeParse(values);
+    const input = organizationInputSchema.safeParse(toSave);
     if (saving || !input.success) return;
     setSaving(true);
     setError(undefined);
@@ -59,8 +73,16 @@ export const useOrganizationForm = (service: OrganizationsService, initial?: Org
       } else {
         await service.createOrganization(input.data);
       }
+      // A created organization replaces its create form in history, so Back doesn't land on it, empty.
       navigate(initial ? `/organizations/${encodeURIComponent(initial.id)}` : '/organizations', {
-        state: { notice: initial ? 'Organization configuration saved' : 'Organization and identity provider saved' },
+        replace: !initial,
+        state: {
+          notice: initial
+            ? 'Organization configuration saved'
+            : idpBlank
+              ? 'Organization saved'
+              : 'Organization and identity provider saved',
+        },
       });
     } catch (err) {
       setError(saveErrorMessage(err, !!initial));
@@ -79,6 +101,8 @@ export const useOrganizationForm = (service: OrganizationsService, initial?: Org
     detailErrors,
     detailsValid,
     idpValid,
+    /** What a save sends, which the Review step shows: the values without a blank identity provider. */
+    toSave,
     /** The server's errors for name and domains, keyed like detailErrors. */
     detailServerErrors: Object.fromEntries(
       Object.entries(serverErrors).filter(([path]) => !path.startsWith('identityProvider.')),

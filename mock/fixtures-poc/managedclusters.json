@@ -24,7 +24,8 @@
         "ai-grid/provisioned": "true",
         "ai-grid/site": "san-francisco",
         "ai-grid/region": "us-west",
-        "ai-grid/enabled": "true"
+        "ai-grid/enabled": "true",
+        "ai-grid/role": "combined"
       },
       "annotations": {
         "installer.multicluster.openshift.io/release-version": "2.17.3",
@@ -185,7 +186,8 @@
         "ai-grid/provisioned": "true",
         "ai-grid/site": "new-york",
         "ai-grid/region": "us-east",
-        "ai-grid/enabled": "true"
+        "ai-grid/enabled": "true",
+        "ai-grid/role": "combined"
       },
       "annotations": {
         "installer.multicluster.openshift.io/release-version": "2.17.3",
@@ -346,7 +348,8 @@
         "ai-grid/provisioned": "true",
         "ai-grid/site": "brussels",
         "ai-grid/region": "europe-west",
-        "ai-grid/enabled": "true"
+        "ai-grid/enabled": "true",
+        "ai-grid/role": "combined"
       },
       "annotations": {
         "installer.multicluster.openshift.io/release-version": "2.17.3",

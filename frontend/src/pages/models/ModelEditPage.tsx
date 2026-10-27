@@ -1,4 +1,4 @@
-import { Breadcrumb, BreadcrumbItem, EmptyState, EmptyStateBody, PageSection } from '@patternfly/react-core';
+import { Breadcrumb, BreadcrumbItem, PageSection } from '@patternfly/react-core';
 import { Link, useParams } from 'react-router-dom';
 import type { UserService } from '../../api/ConsoleService';
 import type { ClustersService } from '../../api/clusters';
@@ -8,7 +8,7 @@ import { LoadError } from '../../components/LoadError';
 import { PageHeader } from '../../components/PageHeader';
 import { PageLoading } from '../../components/PageLoading';
 import { useServiceData } from '../../hooks/useServiceData';
-import { modelPath } from './modelUtils';
+import { modelNotFound, modelPath } from './modelUtils';
 import { ModelWizard } from './ModelWizard';
 
 type Props = { service: ModelsService & UserService & Pick<ClustersService, 'listClusters'> };
@@ -19,8 +19,11 @@ type Props = { service: ModelsService & UserService & Pick<ClustersService, 'lis
  */
 export const ModelEditPage: React.FC<Props> = ({ service }) => {
   const { namespace = '', name = '' } = useParams();
-  const [models, loaded, error] = useServiceData<ManagedModel[]>(() => service.listModels(), [], 0);
-  const model = models.find((m) => m.namespace === namespace && m.name === name);
+  const [model, loaded, error] = useServiceData<ManagedModel | undefined>(
+    () => service.getModel(namespace, name),
+    undefined,
+    0,
+  );
   if (model) {
     return <ModelWizard key={`${namespace}/${name}`} service={service} model={model} />;
   }
@@ -45,15 +48,7 @@ export const ModelEditPage: React.FC<Props> = ({ service }) => {
         <PageLoading label="Loading model" />
       ) : (
         <PageSection isFilled>
-          {error ? (
-            <LoadError subject="Models" error={error} />
-          ) : (
-            <EmptyState titleText="Model deployment not found" headingLevel="h2">
-              <EmptyStateBody>
-                There is no model deployment {name} in {namespace}. <Link to="/models">Go to Models</Link>
-              </EmptyStateBody>
-            </EmptyState>
-          )}
+          {error && <LoadError subject="Models" error={error} notFound={modelNotFound(namespace, name)} />}
         </PageSection>
       )}
     </>

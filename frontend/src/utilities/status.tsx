@@ -4,6 +4,7 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
+  InfoCircleIcon,
   InProgressIcon,
   OutlinedQuestionCircleIcon,
   PendingIcon,
@@ -29,6 +30,10 @@ const tones: Record<string, StatusTone> = {
   Active: 'success',
   Pending: 'info',
   Failed: 'danger',
+  // A placed model serving on some of its clusters but not all (proposal P13).
+  'Partially available': 'warning',
+  // A model the backend saved to Git in git mode, without reading its status from the clusters.
+  'Saved to Git': 'neutral',
   Invalid: 'danger',
   Unavailable: 'danger',
   Unhealthy: 'danger',
@@ -57,6 +62,9 @@ export const statusLabelProps = (status: string | undefined): Pick<LabelProps, '
   // A few neutral states have a more specific icon than the question mark.
   if (status === 'Pending') {
     return { ...props, icon: <PendingIcon /> };
+  }
+  if (status === 'Saved to Git') {
+    return { ...props, icon: <InfoCircleIcon /> };
   }
   if (status === 'Disabled' || status === 'Not provisioned') {
     return { ...props, icon: <BanIcon /> };

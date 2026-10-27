@@ -90,7 +90,6 @@ describe('toGridCluster', () => {
       aiGridEnabled: true,
       provisioned: true,
       provisioningStatus: 'Provisioned',
-      hubAcceptsClient: true,
       location: 'paris',
       site: 'paris-dc1',
       region: 'europe-west',
@@ -303,6 +302,41 @@ describe('toModelCreate', () => {
 });
 
 describe('toManagedModel', () => {
+  it("maps each cluster's phase and a partially available model (P13)", () => {
+    const json = {
+      ...(getModels.body.data.find((m) => m.name === 'granite-8b-instruct') as unknown as ApiModel),
+      phase: 'partiallyavailable',
+      rollout: {
+        works: [
+          { cluster: 'site-paris-1', phase: 'ready', feedback: { ready: 'True' }, conditions: [] },
+          {
+            cluster: 'site-madrid-1',
+            phase: 'failed',
+            reason: 'AppliedManifestWorkFailed',
+            message: 'Failed to apply manifest work',
+          },
+        ],
+      },
+    } as ApiModel;
+    const model = toManagedModel(json);
+    expect(model.phase).toBe('Partially available');
+    expect(model.works).toEqual([
+      { cluster: 'site-paris-1', phase: 'Ready', reason: undefined, message: undefined, ready: 'True', conditions: [] },
+      {
+        cluster: 'site-madrid-1',
+        phase: 'Failed',
+        reason: 'AppliedManifestWorkFailed',
+        message: 'Failed to apply manifest work',
+        ready: undefined,
+        conditions: [],
+      },
+    ]);
+    // A hub model has no works.
+    expect(
+      toManagedModel(getModels.body.data.find((m) => m.name === 'tiny-llm') as unknown as ApiModel).works,
+    ).toBeUndefined();
+  });
+
   // GET /api/v1/models under PR 12's fixtures (mock/examples/get-models.json).
   const models = getModels.body.data as unknown as ApiModel[];
   const byName = (name: string) => toManagedModel(models.find((m) => m.name === name)!);
@@ -325,6 +359,11 @@ describe('toManagedModel', () => {
       statusMessage: expect.stringContaining('not found in namespaces'),
     });
     expect(toManagedModel({ name: 'new', namespace: 'ns', modelUri: 'hf://x', modelName: 'x' }).phase).toBe('Pending');
+    // Git mode: the backend reports no phase, only that the model was saved to Git.
+    const saved = { name: 'new', namespace: 'ns', modelUri: 'hf://x', modelName: 'x', reason: 'SavedToGit' };
+    expect(toManagedModel(saved)).toMatchObject({ phase: 'Saved to Git', reason: 'SavedToGit' });
+    // A real phase wins over the reason.
+    expect(toManagedModel({ ...saved, phase: 'ready' }).phase).toBe('Ready');
   });
 
   it('maps the fields the pages read', () => {

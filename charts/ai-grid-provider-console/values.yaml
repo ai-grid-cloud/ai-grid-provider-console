@@ -1,0 +1,112 @@
+# Values for the AI Grid provider console. One release per ACM hub: the names below are fixed (other
+# tooling, such as ai-grid-env-setup, refers to them), and some objects are cluster-scoped.
+# values.schema.json lists every key: one it doesn't know, such as a misspelled --set, fails the
+# install instead of being ignored. Add a new key there too.
+
+# Name of every object, and of the ServiceAccount the backend acts as.
+fullnameOverride: ai-grid-provider-console
+
+# Each image is repository:tag, repository@digest, or repository:tag@digest when both are set.
+# Pin a digest in production: tags can be overwritten.
+images:
+  authProxy:
+    repository: quay.io/opendatahub/odh-kube-auth-proxy
+    tag: latest
+    digest: ""
+  console:
+    repository: ghcr.io/ai-grid-cloud/ai-grid-provider-console
+    tag: latest
+    digest: ""
+  backend:
+    repository: ghcr.io/ai-grid-cloud/ai-grid-provider-backend
+    tag: latest
+    digest: ""
+imagePullPolicy: ""  # empty: the cluster default
+imagePullSecrets: []
+
+# Sign-in through OpenShift OAuth (kube-auth-proxy). The chart does not create the OAuthClient or
+# this Secret: hack/deploy.sh does, or ai-grid-env-setup's bootstrap/60-console.sh. A chart cannot
+# keep generated secrets stable under `helm template` or Argo CD. The Secret holds
+# OAUTH2_PROXY_CLIENT_ID, OAUTH2_PROXY_CLIENT_SECRET, OAUTH2_PROXY_COOKIE_SECRET (16, 24 or 32
+# bytes) and OAUTH2_PROXY_REDIRECT_URL.
+oauth:
+  secretName: ""  # default: <fullname>-oauth
+  cookieName: _ai_grid_console
+
+# The proxy's HTTPS certificate. With serviceCA, OpenShift's service CA issues it into secretName;
+# otherwise secretName must already hold tls.crt and tls.key.
+tls:
+  serviceCA: true
+  secretName: ""  # default: <fullname>-tls
+
+route:
+  # A reencrypt Route to the proxy (OpenShift).
+  enabled: true
+  # Empty lets the router assign <name>-<namespace>.<apps domain>.
+  host: ""
+  # PEM CA the router trusts for the proxy's certificate. Not needed with tls.serviceCA: the
+  # router trusts the service CA. Set it when tls.secretName holds a certificate from another CA.
+  destinationCACertificate: ""
+
+# The console container (BFF and frontend).
+console:
+  # GET /api/v1/config.
+  gridConsumerUrl: ""
+  mapTileUrl: ""
+  # The attribution the tile server requires, shown with mapTileUrl's tiles.
+  mapTileAttribution: ""
+  billingUrl: ""
+  logLevel: info
+  # The Monitoring page's Perses (docs/plan/bff-api.md, "The Perses relay"): its dashboard-*
+  # dashboards are the page's tabs. Empty url: Monitoring keeps its page without Perses.
+  perses:
+    # The hub's Perses server, such as the Cluster Observability Operator's:
+    # https://perses.openshift-cluster-observability-operator.svc:8080
+    url: ""
+    # The one Perses project Monitoring reads (with the global datasources). Its PersesDashboards
+    # whose names start with dashboard- (such as dashboard-usage) are the tabs; any other dashboard
+    # in it is ignored. Required with url: the rendering fails without it. Perses sends the
+    # signed-in admin's hub token on to the datasources it queries, so only provider admins may
+    # create or edit this project's PersesDashboards and PersesDatasources and the
+    # PersesGlobalDatasources, and the global datasources must point only at the hub's own Thanos
+    # and Loki.
+    project: ""
+    # The CA that verifies the server's certificate. The default is OpenShift's service CA, which
+    # every pod gets next to its ServiceAccount token and which issues the Cluster Observability
+    # Operator's Perses certificate. Empty: the system roots.
+    caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+backend:
+  # Secret with the backend's Keycloak settings: keys url, realm, admin-realm, username, password.
+  # Created by hack/deploy.sh or bootstrap/60-console.sh. The container does not start without it,
+  # which keeps the backend off its built-in default credentials.
+  keycloakSecretName: ai-grid-backend-keycloak
+  # Let the backend patch ManagedClusters (Add to AI Grid and Remove in the console). This also
+  # installs a ValidatingAdmissionPolicy that limits the backend's writes to the ai-grid/* and
+  # location labels and the ai-grid/* annotations. Off: the backend only reads clusters.
+  clusterWrites: false
+  # Git mode (ai-grid-provider-backend#29): the backend commits Models and Subscriptions to this
+  # repository, and Argo CD delivers them to the spokes. Backend images with git mode do not start
+  # without git.url. Empty url: no git settings, for backend images from before git mode.
+  git:
+    # https://, without credentials, e.g. https://github.com/ai-grid-cloud/demo-cluster.git.
+    url: ""
+    branch: main
+    # Secret with key token: a fine-grained token with contents: write on that repository only,
+    # mounted as a file. Created by hack/deploy.sh (GIT_TOKEN) or by hand on the hub, not by the
+    # chart.
+    tokenSecretName: ai-grid-backend-git
+    # The spokes' grid namespace, which each model's NetworkPolicy admits. Empty: the backend's
+    # default (redhat-ai-grid).
+    gridNamespace: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+authProxy:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 128Mi }

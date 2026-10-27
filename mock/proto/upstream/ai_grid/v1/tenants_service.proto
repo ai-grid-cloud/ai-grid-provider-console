@@ -4,6 +4,7 @@ package ai_grid.v1;
 
 import "ai_grid/v1/tenant_type.proto";
 import "google/api/annotations.proto";
+import "google/protobuf/field_mask.proto";
 
 option go_package = "github.com/osac-project/ai-grid-provider-backend/gen/ai_grid/v1;aigridv1";
 
@@ -33,9 +34,115 @@ message TenantsListResponse {
   repeated Tenant items = 3;
 }
 
-// Tenants are represented by Keycloak Organizations in the shared ai-grid realm.
+message TenantsGetRequest {
+  // Keycloak Organization id.
+  string id = 1;
+}
+
+message TenantsGetResponse {
+  Tenant object = 1;
+}
+
+message TenantsCreateRequest {
+  Tenant object = 1;
+}
+
+message TenantsCreateResponse {
+  Tenant object = 1;
+}
+
+message TenantsUpdateRequest {
+  Tenant object = 1;
+  google.protobuf.FieldMask update_mask = 2;
+
+  // object.metadata.version is required, with or without lock: without one
+  // the request is InvalidArgument. It's checked against the stored version
+  // (Keycloak organization attribute ai-grid/resource-version), so a stale
+  // one is Aborted. Every organization reads as version 1 or more. Every update that writes bumps
+  // the version; one whose update_mask names only id, metadata.version or
+  // metadata.creation_timestamp writes nothing and returns the tenant as
+  // stored. The backend serializes its own writes per tenant, so of two
+  // updates at the same version the second is Aborted. An edit made in
+  // Keycloak directly isn't versioned.
+  bool lock = 3;
+}
+
+message TenantsUpdateResponse {
+  Tenant object = 1;
+}
+
+message TenantsDeleteRequest {
+  // Keycloak Organization id.
+  string id = 1;
+
+  // The tenant's metadata.version as the caller last read it. Required: zero
+  // is InvalidArgument, and a value that differs from the stored version is
+  // Aborted, so a caller doesn't delete changes it hasn't seen.
+  int32 version = 2;
+}
+
+message TenantsDeleteResponse {}
+
+message TenantsListMembersRequest {
+  // Keycloak Organization id (tenant id).
+  string id = 1;
+
+  // Index of the first result. If not specified the default value will be zero.
+  optional int32 offset = 2;
+
+  // Maximum number of results to be returned by the server. When not specified all
+  // the results will be returned (subject to an internal Keycloak page cap).
+  optional int32 limit = 3;
+}
+
+message TenantsListMembersResponse {
+  // Actual number of items returned.
+  int32 size = 1;
+
+  // Total number of members that match (before limit).
+  int32 total = 2;
+
+  // Organization members.
+  repeated TenantMember items = 3;
+}
+
+// Tenants are Keycloak Organizations in the shared platform realm (KEYCLOAK_REALM).
+// They are not Keycloak realms.
 service Tenants {
   rpc List(TenantsListRequest) returns (TenantsListResponse) {
     option (google.api.http) = {get: "/api/v1/tenants"};
+  }
+
+  rpc Get(TenantsGetRequest) returns (TenantsGetResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/tenants/{id}"
+      response_body: "object"
+    };
+  }
+
+  rpc Create(TenantsCreateRequest) returns (TenantsCreateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/tenants"
+      body: "object"
+      response_body: "object"
+    };
+  }
+
+  rpc Update(TenantsUpdateRequest) returns (TenantsUpdateResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/tenants/{object.id}"
+      body: "object"
+      response_body: "object"
+    };
+  }
+
+  rpc Delete(TenantsDeleteRequest) returns (TenantsDeleteResponse) {
+    option (google.api.http) = {delete: "/api/v1/tenants/{id}"};
+  }
+
+  // ListMembers returns Keycloak users that belong to the tenant Organization.
+  // REST uses an AIP-136 custom method to keep the URL space flat (no nested collection).
+  rpc ListMembers(TenantsListMembersRequest) returns (TenantsListMembersResponse) {
+    option (google.api.http) = {get: "/api/v1/tenants/{id}:listMembers"};
   }
 }

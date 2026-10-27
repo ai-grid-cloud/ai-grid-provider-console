@@ -124,6 +124,7 @@
             "workName": "model-mistral-7b-instructg0002",
             "applied": "True",
             "feedback": {},
+            "phase": "pending",
             "conditions": [
               {
                 "type": "Applied",

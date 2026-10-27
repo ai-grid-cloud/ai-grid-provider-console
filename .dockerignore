@@ -9,3 +9,5 @@ frontend/dist
 bff/bin
 **/*.md
 frontend/.pnpm-store
+**/.env
+**/.env.*

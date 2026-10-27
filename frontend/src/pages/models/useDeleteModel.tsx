@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Stack } from '@patternfly/react-core';
-import type { ConsoleService } from '../../api/ConsoleService';
 import { ServiceError } from '../../api/ConsoleService';
 import type { ModelsService } from '../../api/models';
 import type { SubscriptionsService } from '../../api/subscriptions';
@@ -8,11 +7,7 @@ import type { ManagedModel } from '../../api/types';
 import { DeleteModal } from '../../components/DeleteModal';
 import { ReferencingSubscriptions } from './ModelReferences';
 
-export type ModelDeleteService = ModelsService &
-  Pick<SubscriptionsService, 'listSubscriptions'> &
-  Pick<ConsoleService, 'getConfig'>;
-
-const keyOf = (model: ManagedModel) => `${model.namespace}/${model.name}`;
+export type ModelDeleteService = ModelsService & Pick<SubscriptionsService, 'listSubscriptions'>;
 
 const deleteErrorOf = (err: unknown) =>
   err instanceof ServiceError && err.isNotImplemented
@@ -23,36 +18,45 @@ const deleteErrorOf = (err: unknown) =>
 
 /**
  * Deleting a model deployment, the same from its list row and its page: returns `confirmDelete`
- * and the modal to render. `models` is the latest list, so a retry after a failed delete sends
- * the version the backend has now; `refresh` reloads it.
+ * and the modal to render. `refresh` reloads the page after a failed delete.
  */
 export const useDeleteModel = (
   service: ModelDeleteService,
-  { models, refresh, onDeleted }: { models: ManagedModel[]; refresh: () => void; onDeleted: () => void },
+  { refresh, onDeleted }: { refresh: () => void; onDeleted: () => void },
 ): [(model: ManagedModel) => void, React.ReactNode] => {
   const [selected, setSelected] = useState<ManagedModel>();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<Error>();
+  const [reloadError, setReloadError] = useState<Error>();
+  const [inUse, setInUse] = useState(false);
 
   const confirmDelete = (model: ManagedModel) => {
     setSelected(model);
     setError(undefined);
+    setReloadError(undefined);
+    setInUse(false);
   };
 
   const remove = async () => {
     if (!selected || deleting) return;
     setDeleting(true);
     setError(undefined);
-    // The first attempt sends the version the user confirmed. After a failed delete the list
-    // reloads, so a retry sends the version the backend has now.
-    const current = error ? (models.find((m) => keyOf(m) === keyOf(selected)) ?? selected) : selected;
+    setReloadError(undefined);
+    // The first attempt sends the version the user confirmed. After a failed delete the dialog
+    // loads the model again and stays busy until it has, so a retry sends the version the backend
+    // has now.
     try {
-      await service.deleteModel(current.namespace, current.name, current.resourceVersion);
+      await service.deleteModel(selected.namespace, selected.name, selected.resourceVersion);
       setSelected(undefined);
       onDeleted();
     } catch (err) {
       setError(deleteErrorOf(err));
       refresh();
+      try {
+        setSelected(await service.getModel(selected.namespace, selected.name));
+      } catch (reloadErr) {
+        setReloadError(reloadErr instanceof Error ? reloadErr : new Error(String(reloadErr)));
+      }
     } finally {
       setDeleting(false);
     }
@@ -71,14 +75,18 @@ export const useDeleteModel = (
       onDelete={() => void remove()}
       deleting={deleting}
       error={error}
+      reloadError={reloadError}
       testId="delete-deployment-modal"
+      // Only a guide: while the subscriptions load, or if they fail to, Delete stays enabled. The
+      // backend refuses to delete a model a subscription uses, and stays the authority.
+      disabledReason={inUse ? 'Remove this model from its subscriptions first' : undefined}
     >
       <Stack hasGutter>
         <p>
           Delete this model, its saved deployment, and its location placement resources? Remove references from
           subscriptions and authorization policies first.
         </p>
-        <ReferencingSubscriptions service={service} model={selected} />
+        <ReferencingSubscriptions service={service} model={selected} onInUse={setInUse} />
       </Stack>
     </DeleteModal>
   );

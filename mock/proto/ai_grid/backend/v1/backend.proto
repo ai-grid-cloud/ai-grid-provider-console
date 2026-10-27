@@ -1,7 +1,10 @@
-// Stopgap: the messages of the backend's real ai_grid.v1 Clusters and
-// Tenants services, copied from ai-grid-provider-backend proto/ai_grid/v1 at 9827991 (main)
-// (clusters_service, managed_cluster_type, metadata_type, tenant_type, tenants_service), so the
-// BFF can call those RPCs. Field numbers, names and types are unchanged; the validation and HTTP
+// Stopgap: the messages of the backend's real ai_grid.v1 Clusters, Tenants, Subscriptions and
+// Models services, copied from ai-grid-provider-backend proto/ai_grid/v1 (clusters and
+// tenants at 8c1a1bc, PR 16; subscriptions and models at PR 27's merge ref 3428d8d)
+// (clusters_service, condition_type, managed_cluster_type, metadata_type, model_type,
+// models_service, subscription_type, subscriptions_service, tenant_type, tenants_service), so
+// the BFF can call those RPCs. Fields the BFF doesn't use are
+// left out. Field numbers, names and types are unchanged; the validation and HTTP
 // options are dropped. The package is renamed because the draft in ../../v1 declares the same
 // message names in ai_grid.v1: protobuf is wire-compatible across package names, and the BFF
 // calls the real method paths (/ai_grid.v1.Clusters/List ...) itself (bff/internal/backend/v1.go).
@@ -98,4 +101,361 @@ message TenantsListResponse {
   int32 size = 1;
   int32 total = 2;
   repeated Tenant items = 3;
+}
+
+message TenantsGetRequest {
+  string id = 1;
+}
+
+message TenantsGetResponse {
+  Tenant object = 1;
+}
+
+message TenantsCreateRequest {
+  Tenant object = 1;
+}
+
+message TenantsCreateResponse {
+  Tenant object = 1;
+}
+
+message TenantsUpdateRequest {
+  Tenant object = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  bool lock = 3;
+}
+
+message TenantsUpdateResponse {
+  Tenant object = 1;
+}
+
+message TenantsDeleteRequest {
+  string id = 1;
+  int32 version = 2;
+}
+
+message TenantsDeleteResponse {}
+
+enum ConditionStatus {
+  CONDITION_STATUS_UNSPECIFIED = 0;
+  CONDITION_STATUS_TRUE = 1;
+  CONDITION_STATUS_FALSE = 2;
+}
+
+message Condition {
+  string type = 1;
+  ConditionStatus status = 2;
+  google.protobuf.Timestamp last_transition_time = 3;
+  optional string reason = 4;
+  optional string message = 5;
+}
+
+message Subscription {
+  string id = 1;
+  Metadata metadata = 2;
+  SubscriptionSpec spec = 3;
+  SubscriptionStatus status = 4;
+}
+
+message SubscriptionSpec {
+  SubscriptionOwner owner = 1;
+  repeated SubscriptionModelRef model_refs = 2;
+  int32 priority = 3;
+  SubscriptionOrganization organization = 4;
+  TokenMetadata token_metadata = 5;
+  optional int32 inference_priority = 6;
+  repeated GuardrailAttachment guardrails = 7;
+}
+
+message SubscriptionOrganization {
+  string id = 1;
+}
+
+message SubscriptionOwner {
+  repeated string groups = 1;
+  repeated string users = 2;
+}
+
+message SubscriptionModelRef {
+  string name = 1;
+  string namespace = 2;
+  repeated TokenRateLimit token_rate_limits = 3;
+  bool unlimited = 4;
+  BillingRate billing_rate = 5;
+  repeated GuardrailAttachment guardrails = 6;
+  string display_name = 7;
+  string description = 8;
+}
+
+message TokenRateLimit {
+  int64 limit = 1;
+  string window = 2;
+}
+
+message BillingRate {
+  string per_token = 1;
+}
+
+message TokenMetadata {
+  string cost_center = 2;
+  map<string, string> labels = 3;
+}
+
+message GuardrailAttachment {
+  string ref_name = 1;
+  repeated string checks = 2;
+}
+
+message SubscriptionStatus {
+  string phase = 1;
+  repeated Condition conditions = 2;
+  repeated ResourceRefStatus model_ref_statuses = 3;
+  repeated TokenRateLimitStatus token_rate_limit_statuses = 4;
+}
+
+message ResourceRefStatus {
+  string name = 1;
+  string namespace = 2;
+  bool ready = 3;
+  string reason = 4;
+  string message = 5;
+}
+
+message TokenRateLimitStatus {
+  ResourceRefStatus ref = 1;
+  string model = 2;
+}
+
+message AuthPolicy {
+  string id = 1;
+  Metadata metadata = 2;
+  repeated string subject_groups = 3;
+  repeated AuthPolicyModelRef model_refs = 5;
+  string phase = 6;
+  repeated Condition conditions = 7;
+}
+
+message AuthPolicyModelRef {
+  string name = 1;
+  string namespace = 2;
+}
+
+message ModelRegistration {
+  string name = 1;
+  string namespace = 2;
+  string phase = 3;
+  string endpoint = 4;
+  repeated Condition conditions = 5;
+}
+
+message SubscriptionsListRequest {}
+
+message SubscriptionsListResponse {
+  repeated Subscription items = 3;
+}
+
+message SubscriptionsGetRequest {
+  string id = 1;
+}
+
+message SubscriptionsGetResponse {
+  Subscription object = 1;
+  repeated AuthPolicy auth_policies = 2;
+  repeated ModelRegistration model_registrations = 3;
+}
+
+message SubscriptionsCreateRequest {
+  Subscription object = 1;
+}
+
+message SubscriptionsCreateResponse {
+  Subscription object = 1;
+  AuthPolicy auth_policy = 2;
+}
+
+message SubscriptionsUpdateRequest {
+  Subscription object = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  bool lock = 3;
+}
+
+message SubscriptionsUpdateResponse {
+  Subscription object = 1;
+}
+
+message SubscriptionsDeleteRequest {
+  string id = 1;
+  int32 resource_version = 2;
+}
+
+message SubscriptionsDeleteResponse {}
+
+message Model {
+  string id = 1;
+  Metadata metadata = 2;
+  ModelSpec spec = 3;
+  ModelStatus status = 4;
+}
+
+message ModelSpec {
+  ModelSource model = 1;
+  optional int32 replicas = 2;
+  repeated string base_refs = 3;
+  string runtime = 4;
+  ModelRouter router = 5;
+  ModelContainer main = 6;
+  ModelScaling scaling = 7;
+  ModelPlacement placement = 8;
+  ModelRollout rollout = 9;
+}
+
+message ModelSource {
+  string uri = 1;
+  string name = 2;
+}
+
+message ModelRouter {
+  repeated ModelGatewayRef gateway_refs = 1;
+  bool managed_route = 2;
+  bool scheduler = 3;
+}
+
+message ModelGatewayRef {
+  string name = 1;
+  string namespace = 2;
+  string section_name = 3;
+}
+
+message ModelContainer {
+  string image = 1;
+  map<string, string> requests = 2;
+  map<string, string> limits = 3;
+  repeated ModelEnvVar env = 4;
+}
+
+message ModelEnvVar {
+  string name = 1;
+  string value = 2;
+}
+
+message ModelScaling {
+  int32 min_replicas = 1;
+  int32 max_replicas = 2;
+  bool keda = 3;
+  repeated ModelKedaTrigger triggers = 4;
+}
+
+message ModelKedaTrigger {
+  string type = 1;
+  map<string, string> metadata = 2;
+}
+
+message ModelPlacement {
+  repeated string cluster_sets = 1;
+  ModelLabelSelector label_selector = 2;
+  optional int32 number_of_clusters = 3;
+}
+
+message ModelLabelSelector {
+  map<string, string> match_labels = 1;
+  repeated ModelLabelSelectorRequirement match_expressions = 2;
+}
+
+message ModelLabelSelectorRequirement {
+  string key = 1;
+  string operator = 2;
+  repeated string values = 3;
+}
+
+message ModelRollout {
+  ModelRolloutStrategy strategy = 1;
+  string max_concurrency = 2;
+  string max_failures = 3;
+  string progress_deadline = 4;
+  string min_success_time = 5;
+}
+
+enum ModelRolloutStrategy {
+  MODEL_ROLLOUT_STRATEGY_UNSPECIFIED = 0;
+  MODEL_ROLLOUT_STRATEGY_ALL = 1;
+  MODEL_ROLLOUT_STRATEGY_PROGRESSIVE = 2;
+  MODEL_ROLLOUT_STRATEGY_PROGRESSIVE_PER_GROUP = 3;
+}
+
+message ModelStatus {
+  string url = 1;
+  repeated Condition conditions = 2;
+  ModelPhase phase = 3;
+  string reason = 4;
+  string message = 5;
+  ModelPlacementStatus placement = 6;
+  ModelRolloutStatus rollout = 7;
+  int64 observed_generation = 8;
+}
+
+enum ModelPhase {
+  MODEL_PHASE_UNSPECIFIED = 0;
+  MODEL_PHASE_PENDING = 1;
+  MODEL_PHASE_READY = 2;
+  MODEL_PHASE_FAILED = 3;
+}
+
+message ModelPlacementStatus {
+  int32 number_of_selected_clusters = 1;
+  repeated string selected_clusters = 2;
+  repeated Condition conditions = 3;
+}
+
+message ModelRolloutStatus {
+  repeated Condition conditions = 5;
+}
+
+message ModelsListRequest {
+  optional int32 offset = 1;
+  optional int32 limit = 2;
+}
+
+message ModelsListResponse {
+  int32 size = 1;
+  int32 total = 2;
+  repeated Model items = 3;
+}
+
+message ModelsGetRequest {
+  string id = 1;
+}
+
+message ModelsGetResponse {
+  Model object = 1;
+}
+
+message ModelsCreateRequest {
+  Model object = 1;
+}
+
+message ModelsCreateResponse {
+  Model object = 1;
+}
+
+message ModelsUpdateRequest {
+  Model object = 1;
+  google.protobuf.FieldMask update_mask = 2;
+  bool lock = 3;
+}
+
+message ModelsUpdateResponse {
+  Model object = 1;
+}
+
+message ModelsDeleteRequest {
+  string id = 1;
+  int32 resource_version = 2;
+}
+
+message ModelsDeleteResponse {}
+
+message ModelsListLocationsRequest {}
+
+message ModelsListLocationsResponse {
+  repeated string locations = 1;
 }

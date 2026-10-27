@@ -37,7 +37,7 @@ jobs:
           platforms: linux/amd64
           outputs: type=oci,dest=/tmp/ai-grid-provider-console.tar
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ github.event.pull_request.head.sha }}
+          build-args: CONSOLE_VERSION=${{ github.event.pull_request.head.sha }}
           cache-from: type=gha,scope=ai-grid-provider-console
           cache-to: type=gha,mode=max,scope=ai-grid-provider-console,ignore-error=true
           provenance: false

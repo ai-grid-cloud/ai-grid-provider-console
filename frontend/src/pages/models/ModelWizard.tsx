@@ -179,8 +179,13 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
   const [clusters, , , reloadClusters] = useServiceData(() => service.listClusters(), [], 0);
   const siteNames = useMemo(() => siteNamesOf(clusters), [clusters]);
   // AI Grid members whose location can't be chosen yet: not Ready, not provisioned, or unlabeled.
+  // A member is listed when GET /locations offers its name (the backend's locations are cluster
+  // names) or its location label (the fake's locations are labels).
   const unavailableMembers = clusters.filter(
-    (c) => c.aiGridEnabled && !(c.location && availableLocations.includes(c.location)),
+    (c) =>
+      c.aiGridEnabled &&
+      !availableLocations.includes(c.name) &&
+      !(c.location && availableLocations.includes(c.location)),
   ).length;
   const [locations, setLocations] = useState<string[]>(start.locations);
   // True from entering the Locations step until its locations reload answers; Next waits for it.
@@ -300,7 +305,8 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
         navigate(detailsPath, { state: { notice: 'Model deployment updated' } });
       } else {
         await service.createModel(input);
-        navigate('/models', { state: { notice: 'Model deployed' } });
+        // Replaces the deploy form in history, so Back doesn't land on it, empty.
+        navigate('/models', { replace: true, state: { notice: 'Model deployed' } });
       }
     } catch (err) {
       setError(

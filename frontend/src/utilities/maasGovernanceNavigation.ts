@@ -3,6 +3,7 @@
 // packages/maas/frontend/src/app/utilities/maasGovernanceNavigation.ts
 // upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
 // The authorization policy URLs are not ported: the PoC has no routes for them.
+import type { NotFound } from '../components/LoadError';
 
 export type GovernanceSection = 'subscriptions';
 
@@ -30,3 +31,11 @@ export const getReturnToFromState = (state: unknown): string | undefined => {
 
 export const getBackUrl = (state: unknown, section: GovernanceSection): string =>
   getReturnToFromState(state) ?? getSectionUrl(section);
+
+/** What a subscription page says when there is no such subscription; the way back is `listPath`. */
+export const subscriptionNotFound = (name: string, listPath: string): NotFound => ({
+  what: 'Subscription',
+  body: `There is no subscription ${name}.`,
+  listPath,
+  listLabel: 'Subscriptions',
+});

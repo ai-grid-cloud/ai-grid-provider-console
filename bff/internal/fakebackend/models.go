@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/fakebackend/celfilter"
@@ -337,7 +336,7 @@ func (s *Server) seedModel(obj *aigridv1.Model) error {
 			return fmt.Errorf("fixture model %s: creationTimestamp %s is not in the past; omit it to create the model when the fake starts", key, ts.AsTime().Format(time.RFC3339))
 		}
 	}
-	m.Metadata.CreationTimestamp = timestamppb.New(s.wallTime(created))
+	m.Metadata.CreationTimestamp = k8sTime(s.wallTime(created))
 	if rv := obj.GetMetadata().GetResourceVersion(); rv != "" {
 		m.Metadata.ResourceVersion = rv
 		if n, err := strconv.ParseInt(rv, 10, 64); err == nil && n > s.resourceVersion {
@@ -363,7 +362,7 @@ func (s *Server) resetSeeded(m *model) {
 	} else {
 		m.created = s.scenarioTime(m.obj.GetMetadata().GetCreationTimestamp().AsTime())
 	}
-	m.obj.Metadata.CreationTimestamp = timestamppb.New(s.wallTime(m.created))
+	m.obj.Metadata.CreationTimestamp = k8sTime(s.wallTime(m.created))
 	m.works, m.epochs, m.placementConds, m.rolloutConds, m.decisions = nil, nil, nil, nil, nil
 	m.scheduleChangedAt = time.Time{}
 	m.baseSpec = cloneSpec(m.obj.GetSpec())
@@ -523,7 +522,7 @@ func (s *Server) applyWork(m *model, tmpl *aigridv1.ModelSpec, cluster string, t
 	}
 	w.startedAt, w.agentStart, w.frozenAt = t, nil, nil
 	w.spec = cloneSpec(tmpl)
-	w.failApply = s.clusters[cluster].GetLabels()[LabelFailApply] == "true"
+	w.failApply = failsApply(s.clusters[cluster].GetLabels()[LabelFailApply], m.obj.GetName())
 	s.observeAgent(w, t)
 }
 
@@ -798,16 +797,67 @@ func (s *Server) viewModel(m *model, now time.Time) *aigridv1.Model {
 		st.Rollout.Conditions = append(st.Rollout.Conditions, proto.Clone(c).(*aigridv1.Condition))
 	}
 	for _, w := range m.works {
-		st.Rollout.Works = append(st.Rollout.Works, s.deriveWorkAt(m, w, params, now).status)
+		ws := s.deriveWorkAt(m, w, params, now).status
+		ws.Phase, ws.Reason, ws.Message = deriveWorkPhase(ws)
+		st.Rollout.Works = append(st.Rollout.Works, ws)
 	}
 	st.Phase, st.Reason, st.Message = derivePlacedPhase(st.Rollout)
 	out.Status = st
 	return out
 }
 
+// failsApply is whether a cluster's ai-grid-mock/fail-apply label value fails
+// the work of the model named `model`: "true" fails every model, any other
+// non-empty value is a comma-separated list of model names.
+func failsApply(value, model string) bool {
+	value = strings.TrimSpace(value)
+	if value == "true" {
+		return true
+	}
+	for _, name := range strings.Split(value, ",") {
+		if name = strings.TrimSpace(name); name != "" && name != "false" && name == model {
+			return true
+		}
+	}
+	return false
+}
+
+// deriveWorkPhase is the model's phase on one cluster (ManifestWorkStatus.phase
+// in model_type.proto, proposal P13), a console rule over what the cluster's
+// agent reported: READY when the spoke's `ready` feedback is True; FAILED when
+// the work's Applied is False (failed to apply, acm.md item 11) or Degraded is
+// True (Ready False with a terminal reason), Applied first; otherwise PENDING,
+// with no reason before the agent reports, else Available's reason and message
+// while it is not True, else Progressing's.
+func deriveWorkPhase(w *aigridv1.ManifestWorkStatus) (aigridv1.ModelPhase, string, string) {
+	conds := w.GetConditions()
+	for _, mf := range w.GetManifests() {
+		for _, fb := range mf.GetFeedback() {
+			if fb.GetName() == FeedbackReady && fb.GetValue() == "True" {
+				return aigridv1.ModelPhase_MODEL_PHASE_READY, "", ""
+			}
+		}
+	}
+	if c := condition(conds, CondWorkApplied); c.GetStatus() == cFalse {
+		return aigridv1.ModelPhase_MODEL_PHASE_FAILED, c.GetReason(), c.GetMessage()
+	}
+	if c := condition(conds, CondWorkDegraded); c.GetStatus() == cTrue {
+		return aigridv1.ModelPhase_MODEL_PHASE_FAILED, c.GetReason(), c.GetMessage()
+	}
+	if c := condition(conds, CondWorkAvailable); c != nil && c.GetStatus() != cTrue {
+		return aigridv1.ModelPhase_MODEL_PHASE_PENDING, c.GetReason(), c.GetMessage()
+	}
+	if c := condition(conds, CondWorkProgressing); c != nil {
+		return aigridv1.ModelPhase_MODEL_PHASE_PENDING, c.GetReason(), c.GetMessage()
+	}
+	return aigridv1.ModelPhase_MODEL_PHASE_PENDING, "", ""
+}
+
 // derivePlacedPhase is the phase derivation for a placed model (see
 // ModelPhase in model_type.proto), a console rule over the MWRS conditions:
-// rolled out and applied -> READY; applied NotAsExpected with a degraded or
+// rolled out and applied -> READY; some works READY and others not ->
+// PARTIALLY_AVAILABLE (proposal P13, "<n> of <m> clusters are serving the
+// model."); applied NotAsExpected with a degraded or
 // unapplied work -> FAILED; otherwise PENDING with the reason of
 // PlacementVerified when it is False, of PlacementRolledOut when
 // ManifestworkApplied is True (every work so far applied, more clusters to
@@ -826,9 +876,18 @@ func derivePlacedPhase(rollout *aigridv1.RolloutStatus) (aigridv1.ModelPhase, st
 			broken = true
 		}
 	}
+	serving := 0
+	for _, w := range rollout.GetWorks() {
+		if w.GetPhase() == aigridv1.ModelPhase_MODEL_PHASE_READY {
+			serving++
+		}
+	}
+	total := len(rollout.GetWorks())
 	switch {
 	case rolledOut.GetStatus() == cTrue && applied.GetStatus() == cTrue:
 		return aigridv1.ModelPhase_MODEL_PHASE_READY, ReasonRolloutComplete, ""
+	case serving > 0 && serving < total:
+		return aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable, fmt.Sprintf("%d of %d clusters are serving the model.", serving, total)
 	case applied.GetStatus() == cFalse && applied.GetReason() == ReasonNotAsExpected && broken:
 		return aigridv1.ModelPhase_MODEL_PHASE_FAILED, ReasonNotAsExpected, ""
 	case verified != nil && verified.GetStatus() == cFalse:
@@ -957,7 +1016,7 @@ func (s *Server) CreateModel(ctx context.Context, req *aigridv1.CreateModelReque
 	m := normalizeModel(obj)
 	m.Metadata.Uid = s.newID()
 	m.Metadata.Generation = 1
-	m.Metadata.CreationTimestamp = timestamppb.New(s.wallTime(now))
+	m.Metadata.CreationTimestamp = k8sTime(s.wallTime(now))
 	s.bumpModelVersion(m)
 	stored := &model{obj: m, created: now, baseSpec: cloneSpec(m.GetSpec()), candidateSince: map[string]time.Time{}}
 	s.models[key] = stored

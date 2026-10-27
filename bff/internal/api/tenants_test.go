@@ -178,10 +178,11 @@ func TestListTenantsPagesAndFilters(t *testing.T) {
 }
 
 func TestTenantFromTodaysBackend(t *testing.T) {
-	// Fields 1-3 only: alias falls back to the name, details are derived and an
+	// Fields 1-3 only: alias stays empty (after a rename Keycloak keeps the
+	// old one, so the name would be wrong), details are derived and an
 	// absent `enabled` reads as enabled (Keycloak's default), never as disabled.
 	tn := toTenant(&aigridv1.Tenant{Id: "x", Name: "tenant-a", Domains: []string{"a.example.com"}})
-	if tn.Alias != "tenant-a" || len(tn.DomainDetails) != 1 || tn.DomainDetails[0].Name != "a.example.com" || tn.Attributes == nil || !tn.Enabled {
+	if tn.Alias != "" || len(tn.DomainDetails) != 1 || tn.DomainDetails[0].Name != "a.example.com" || tn.Attributes == nil || !tn.Enabled {
 		t.Errorf("tenant = %+v", tn)
 	}
 	if toTenant(&aigridv1.Tenant{Id: "x", Name: "off", Enabled: proto.Bool(false)}).Enabled {
@@ -520,6 +521,18 @@ func TestTenantVersions(t *testing.T) {
 	if rec := serve(app, asUser(http.MethodDelete, "/api/v1/tenants/t-2")); rec.Code != http.StatusPreconditionRequired || len(fake.Calls) != 0 || len(fake.Tenants) != 2 {
 		t.Errorf("DELETE without If-Match = %d, calls %v", rec.Code, fake.Calls)
 	}
+	// The backend requires a version (PR 16): its InvalidArgument for version
+	// 0 is 422 with its message, on PATCH and on DELETE.
+	fake.Err = backendtest.Status(codes.InvalidArgument, "lock requires metadata.version")
+	for _, req := range []*http.Request{
+		patchTenant("t-2", "0", `{"description": "x"}`),
+		withIfMatch(asUser(http.MethodDelete, "/api/v1/tenants/t-2"), `"0"`),
+	} {
+		if rec := serve(app, req); rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.Message != "lock requires metadata.version" {
+			t.Errorf("%s at version 0 = %d %s, want 422 with the backend's message", req.Method, rec.Code, rec.Body.String())
+		}
+	}
+	fake.Err = nil
 	// A created tenant comes back with its first version.
 	rec = serve(app, jsonRequest(http.MethodPost, "/api/v1/tenants", `{"name": "new-org"}`))
 	if rec.Code != http.StatusCreated || rec.Header().Get("ETag") != `"1"` {

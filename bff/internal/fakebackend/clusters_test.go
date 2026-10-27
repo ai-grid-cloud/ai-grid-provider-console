@@ -172,6 +172,12 @@ func TestUpdateHonoursHubRBAC(t *testing.T) {
 	if got := status.Convert(err).Message(); got != want {
 		t.Errorf("message = %q, want %q", got, want)
 	}
+	// The BFF percent-encodes the forwarded user (gRPC metadata is ASCII); the
+	// message names the decoded one.
+	_, err = s.UpdateManagedCluster(as("viewer-token", "ren%C3%A9%25"), upd())
+	if got := status.Convert(err).Message(); !strings.Contains(got, `User "rené%" cannot patch`) {
+		t.Errorf("message = %q, want the decoded user", got)
+	}
 	if _, err := s.UpdateManagedCluster(as("expired-token", "ghost"), upd()); status.Code(err) != codes.Unauthenticated {
 		t.Errorf("rejected token = %v, want Unauthenticated", err)
 	}

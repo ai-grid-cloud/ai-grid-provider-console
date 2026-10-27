@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 
@@ -150,7 +149,7 @@ const trlpPrefix = "maas-trlp-"
 func (s *Server) maasCondition(typ string, st aigridv1.ConditionStatus, reason, message string, at time.Time) *aigridv1.Condition {
 	c := &aigridv1.Condition{Type: typ, Status: st, Reason: proto.String(reason), Message: proto.String(message)}
 	if !at.IsZero() {
-		c.LastTransitionTime = timestamppb.New(s.wallTime(at))
+		c.LastTransitionTime = k8sTime(s.wallTime(at))
 	}
 	return c
 }
@@ -416,7 +415,7 @@ func (s *Server) CreateSubscription(ctx context.Context, req *aigridv1.CreateSub
 	now := s.advance()
 	created := s.clock()
 	sub := in.Normalized().Subscription()
-	sub.ResourceVersion, sub.CreateTime = "1", timestamppb.New(created)
+	sub.ResourceVersion, sub.CreateTime = "1", k8sTime(created)
 	s.subscriptions[sub.GetName()] = sub
 	resp := &aigridv1.CreateSubscriptionResponse{Subscription: s.viewSubscription(sub, now)}
 	if withPolicy {

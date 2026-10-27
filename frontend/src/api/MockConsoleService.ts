@@ -1,3 +1,4 @@
+import type { DashboardResource } from '@perses-dev/client';
 import {
   consolePlacement,
   consolePlacementLocations,
@@ -61,8 +62,15 @@ export class MockConsoleService implements ConsoleService {
       version: 'mock',
       modelsNamespace: 'ai-grid-models',
       fakeBackend: false,
+      monitoring: { enabled: false, persesProject: '' },
     },
   ) {}
+
+  /** The hub's Perses dashboards, for the Monitoring page; none until a test sets them. */
+  monitoringDashboards: DashboardResource[] = [];
+
+  listMonitoringDashboards = async (project: string): Promise<DashboardResource[]> =>
+    this.monitoringDashboards.filter((d) => d.metadata.project === project);
 
   getUser = async (): Promise<User> => this.user;
 
@@ -70,20 +78,32 @@ export class MockConsoleService implements ConsoleService {
 
   listClusters = async (): Promise<GridCluster[]> => [...this.clusters];
 
-  /** Sets `ai-grid/enabled`, `ai-grid/role` and `location`, as the BFF's PATCH does. */
-  enrollCluster = async ({ name }: GridCluster, membership: GridMembership): Promise<GridCluster> =>
-    this.setMembership(name, membership);
+  /**
+   * Sets `ai-grid/enabled`, `ai-grid/role` and `location` on the labels the caller read, as
+   * HttpConsoleService sends them: the BFF's PATCH replaces the labels map as a whole, at the
+   * version the caller read.
+   */
+  enrollCluster = async (cluster: GridCluster, membership: GridMembership): Promise<GridCluster> =>
+    this.setMembership(cluster, membership);
 
-  removeClusterFromGrid = async ({ name }: GridCluster): Promise<GridCluster> => this.setMembership(name);
+  removeClusterFromGrid = async (cluster: GridCluster): Promise<GridCluster> => this.setMembership(cluster);
 
   /** Writes a membership's labels, or drops `ai-grid/enabled` without one; provisioning follows toGridCluster. */
-  private setMembership(name: string, membership?: GridMembership): GridCluster {
+  private setMembership(cluster: GridCluster, membership?: GridMembership): GridCluster {
+    const { name } = cluster;
     const index = this.clusters.findIndex((c) => c.name === name);
     if (index < 0) {
       throw new ServiceError(404, `object with identifier '${name}' not found`);
     }
     const current = this.clusters[index];
-    const labels = { ...current.labels };
+    // The fake backend's precondition (bff/internal/fakebackend/clusters.go), answered 409 by the BFF.
+    if ((cluster.resourceVersion ?? '') !== (current.resourceVersion ?? '')) {
+      throw new ServiceError(
+        409,
+        `object with identifier '${name}' has resource version ${current.resourceVersion}, the request carries "${cluster.resourceVersion ?? ''}"; fetch it again and retry`,
+      );
+    }
+    const labels = { ...cluster.labels };
     const member = !!membership;
     if (membership) {
       Object.assign(labels, {
@@ -188,6 +208,14 @@ export class MockConsoleService implements ConsoleService {
 
   listModels = async (): Promise<ManagedModel[]> =>
     structuredClone(this.models).sort((a, b) => a.name.localeCompare(b.name));
+
+  getModel = async (namespace: string, name: string): Promise<ManagedModel> => {
+    const model = this.models.find((m) => m.namespace === namespace && m.name === name);
+    if (!model) {
+      throw new ServiceError(404, `object with identifier '${namespace}/${name}' not found`);
+    }
+    return structuredClone(model);
+  };
 
   /** The PoC's eligibleLocations: Ready, provisioned AI Grid members' location labels. */
   listLocations = async (): Promise<string[]> =>
@@ -492,7 +520,6 @@ export const seedClusters = (): GridCluster[] =>
       aiGridEnabled: member,
       provisioned: member,
       provisioningStatus: member ? 'Provisioned' : 'Not provisioned',
-      hubAcceptsClient: true,
       location: name,
       site,
       region,
@@ -509,7 +536,7 @@ export const seedClusters = (): GridCluster[] =>
         'ai-grid/provisioned': String(member),
         'ai-grid/site': site,
         'ai-grid/region': region,
-        ...(member ? { 'ai-grid/enabled': 'true' } : {}),
+        ...(member ? { 'ai-grid/enabled': 'true', 'ai-grid/role': 'combined' } : {}),
       },
     };
   });

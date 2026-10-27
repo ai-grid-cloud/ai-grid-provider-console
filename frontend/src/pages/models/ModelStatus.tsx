@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { ExpandableSection, Label, Popover, Stack } from '@patternfly/react-core';
+import { ExpandableSection, Label, Stack } from '@patternfly/react-core';
 import type { ManagedModel } from '../../api/types';
 import { getPhaseProps } from '../../utilities/phaseLabelUtils';
-import { failureExplanations, hasModelStatusDetails, modelPhase, modelStatusTitle } from './modelStatusInfo';
+import { ModelStatusModal } from './ModelStatusModal';
+import { failureExplanations, modelPhase } from './modelStatusInfo';
 
 /**
  * The status in words: a sentence and the next step for a known failure, else the controller's
@@ -27,37 +28,48 @@ export const ModelStatusDetails: React.FC<{ model: ManagedModel }> = ({ model })
   );
 };
 
-/** The model's phase as a label; when there's more to say, it opens the explanation in a popover. */
-export const ModelStatusLabel: React.FC<{ model: ManagedModel }> = ({ model }) => {
+type LabelProps = {
+  model: ManagedModel;
+  /** On the Models page: expands the model's row to its locations, from the Partially available modal. */
+  onViewLocations?: () => void;
+};
+
+/**
+ * The model's phase as a label. As in jgiardino's Models design (an RHOAI pattern), only a label
+ * that can be clicked is filled: Ready and Saved to Git are outline labels with nothing to open (Saved
+ * to Git is all git mode knows, so a modal would only repeat it); any other status opens
+ * ModelStatusModal.
+ */
+export const ModelStatusLabel: React.FC<LabelProps> = ({ model, onViewLocations }) => {
   const [open, setOpen] = useState(false);
   const phase = modelPhase(model);
   const { icon, status, color } = getPhaseProps(phase);
-  const explained = hasModelStatusDetails(model);
-  const label = (
-    <Label
-      isCompact
-      icon={icon}
-      status={status}
-      color={color}
-      variant="filled"
-      onClick={explained ? () => setOpen((previous) => !previous) : undefined}
-    >
-      {phase}
-    </Label>
-  );
+  if (phase === 'Ready' || phase === 'Saved to Git') {
+    return (
+      <span data-testid="model-phase">
+        <Label isCompact variant="outline" icon={icon} status={status} color={color}>
+          {phase}
+        </Label>
+      </span>
+    );
+  }
   return (
     <span data-testid="model-phase">
-      {explained ? (
-        <Popover
-          isVisible={open}
-          shouldClose={() => setOpen(false)}
-          headerContent={modelStatusTitle(model)}
-          bodyContent={<ModelStatusDetails model={model} />}
-        >
-          {label}
-        </Popover>
-      ) : (
-        label
+      <Label isCompact variant="filled" icon={icon} status={status} color={color} onClick={() => setOpen(true)}>
+        {phase}
+      </Label>
+      {open && (
+        <ModelStatusModal
+          model={model}
+          onClose={() => setOpen(false)}
+          onViewLocations={
+            onViewLocations &&
+            (() => {
+              setOpen(false);
+              onViewLocations();
+            })
+          }
+        />
       )}
     </span>
   );

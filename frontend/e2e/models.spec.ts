@@ -56,7 +56,7 @@ test('deploys a model to a location, edits it in the same wizard, and deletes it
   // Delete from its Actions menu.
   await page.getByRole('button', { name: `Actions for ${unique}` }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
-  await page.getByLabel('Delete modal input').fill(unique);
+  await page.getByLabel(/^Type .* to confirm/).fill(unique);
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByText('Model deployment deleted')).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: unique })).toHaveCount(0);

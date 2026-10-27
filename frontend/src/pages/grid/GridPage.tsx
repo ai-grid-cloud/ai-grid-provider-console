@@ -1,5 +1,6 @@
 // Ported from krisv/ai-grid-cloud-provider-poc src/app/pages/grid/GridPage.tsx at 62319b8: the map at
-// /ai-grid and, with `monitoring`, the dashboards at /monitoring. The PoC's loading, error, and refresh
+// /ai-grid and, with `monitoring`, the dashboards at /monitoring when the console relays to no
+// Perses (MonitoringPage shows the hub's Perses dashboards otherwise). The PoC's loading, error, and refresh
 // state becomes useServiceData, and a failed load is a LoadError. A backend without Grid/GetOverview
 // (501) gets the console's not-available page, as Models and Subscriptions do.
 import { useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ import { PageLoading } from '../../components/PageLoading';
 import { RefreshButton } from '../../components/RefreshButton';
 import { RelativeTime } from '../../components/RelativeTime';
 import { SubtleText } from '../../components/SubtleText';
+import { useConsoleSession } from '../../context/useConsoleSession';
 import { useServiceData } from '../../hooks/useServiceData';
 import { GridFleetView } from './GridFleetView';
 import { ObservabilityPanel } from './ObservabilityPanel';
@@ -47,7 +49,7 @@ export const GridPage: React.FC<Props> = ({ service, monitoring = false }) => {
     undefined,
   );
   const [models, , modelsLoadError, refreshModels] = useServiceData<ManagedModel[]>(() => service.listModels(), []);
-  const [config, , configError] = useServiceData(() => service.getConfig(), undefined, 0);
+  const { config, configError } = useConsoleSession();
   const [organizations, , organizationsLoadError, refreshOrganizations] = useServiceData<Organization[]>(
     () => (monitoring ? service.listOrganizations() : Promise.resolve([])),
     [],

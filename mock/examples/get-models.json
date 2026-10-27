@@ -231,6 +231,7 @@
                 "ready": "True",
                 "url": "https://openshift-ai-inference.apps.site-paris-1.example.com/ai-grid-models/granite-8b-instruct"
               },
+              "phase": "ready",
               "conditions": [
                 {
                   "type": "Applied",
@@ -462,6 +463,7 @@
               "workName": "model-mistral-7b-instructg0002",
               "applied": "True",
               "feedback": {},
+              "phase": "pending",
               "conditions": [
                 {
                   "type": "Applied",

@@ -6,19 +6,46 @@ import "ai_grid/v1/metadata_type.proto";
 
 option go_package = "github.com/osac-project/ai-grid-provider-backend/gen/ai_grid/v1;aigridv1";
 
-// A tenant groups resources and users. Backed by a Keycloak Organization.
+// A tenant groups resources and users.
+// Backed by a Keycloak Organization in the shared platform realm (KEYCLOAK_REALM),
+// not by a Keycloak realm per tenant.
 message Tenant {
-  // Unique identifier of the tenant (Keycloak organization id).
+  // Unique identifier of the tenant (Keycloak organization id / UUID).
   string id = 1;
 
+  // metadata.name is the organization name. metadata.version is kept in the
+  // organization attribute ai-grid/resource-version: 1 on Create, bumped on
+  // every Update this backend makes, and 1 for an organization without the
+  // attribute (created in Keycloak directly). metadata.creation_timestamp comes from
+  // the attribute ai-grid/create-time (RFC 3339), stamped on Create; it's
+  // unset for an organization created elsewhere. Both are output only.
   Metadata metadata = 2;
   TenantSpec spec = 3;
   TenantStatus status = 4;
 }
 
 message TenantSpec {
-  // Email domains associated with this tenant.
+  // Email domains associated with this tenant (DNS hostnames, lowercase).
   repeated string domains = 1;
 }
 
 message TenantStatus {}
+
+// TenantMember is a Keycloak user that belongs to the tenant's Organization.
+// This is a read projection for listing; full user management is out of scope.
+message TenantMember {
+  // Keycloak user id (UUID).
+  string id = 1;
+
+  // Login username.
+  string username = 2;
+
+  // Email address when present on the user.
+  string email = 3;
+
+  string first_name = 4;
+  string last_name = 5;
+
+  // Whether the Keycloak user is enabled.
+  bool enabled = 6;
+}

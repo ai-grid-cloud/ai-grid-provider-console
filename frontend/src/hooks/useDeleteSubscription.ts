@@ -17,9 +17,11 @@ export const useDeleteSubscription = (service: SubscriptionsService) => {
         setError(
           err instanceof ServiceError && err.isNotImplemented
             ? new Error('Deleting subscriptions is not available on this backend yet.')
-            : err instanceof Error
-              ? err
-              : new Error('Unable to delete subscription.'),
+            : err instanceof ServiceError && err.status === 409
+              ? new Error('This subscription changed since you opened this dialog. Check it and try again.')
+              : err instanceof Error
+                ? err
+                : new Error('Unable to delete subscription.'),
         );
         return false;
       } finally {

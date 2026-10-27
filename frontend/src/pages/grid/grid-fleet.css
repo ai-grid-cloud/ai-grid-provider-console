@@ -24,6 +24,60 @@
   position: absolute;
   inset: 0;
 }
+/* Leaflet's stylesheet colours its sea, controls and tooltips with fixed light colours; these give
+   them PatternFly's tokens, so they follow the console's theme. The sea keeps the grey Leaflet's
+   own was (#ddd) in the light theme, and is darker than the land in the dark one. */
+.fleet-map {
+  --fleet-map--sea: var(--pf-t--color--gray--20);
+}
+:root.pf-v6-theme-dark .fleet-map {
+  --fleet-map--sea: var(--pf-t--global--background--color--secondary--default);
+}
+.fleet-map .leaflet-container {
+  background: var(--fleet-map--sea);
+}
+.fleet-map .leaflet-bar a,
+.fleet-map .leaflet-bar a:hover,
+.fleet-map .leaflet-bar a:focus {
+  color: var(--pf-t--global--text--color--regular);
+  border-bottom-color: var(--pf-t--global--border--color--default);
+}
+.fleet-map .leaflet-bar a {
+  background-color: var(--pf-t--global--background--color--primary--default);
+}
+.fleet-map .leaflet-bar a:hover,
+.fleet-map .leaflet-bar a:focus {
+  background-color: var(--pf-t--global--background--color--primary--hover);
+}
+.fleet-map .leaflet-bar a.leaflet-disabled {
+  color: var(--pf-t--global--text--color--disabled);
+  background-color: var(--pf-t--global--background--color--disabled--default);
+}
+.fleet-map .leaflet-container .leaflet-control-attribution {
+  color: var(--pf-t--global--text--color--subtle);
+  background: color-mix(in srgb, var(--pf-t--global--background--color--primary--default) 80%, transparent);
+}
+.fleet-map .leaflet-container .leaflet-control-attribution a {
+  color: var(--pf-t--global--text--color--link--default);
+}
+.fleet-map .leaflet-tooltip {
+  color: var(--pf-t--global--text--color--regular);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  border-color: var(--pf-t--global--background--color--floating--default);
+}
+.fleet-map .leaflet-tooltip-top::before {
+  border-top-color: var(--pf-t--global--background--color--floating--default);
+}
+.fleet-map .leaflet-tooltip-bottom::before {
+  border-bottom-color: var(--pf-t--global--background--color--floating--default);
+}
+.fleet-map .leaflet-tooltip-left::before {
+  border-left-color: var(--pf-t--global--background--color--floating--default);
+}
+.fleet-map .leaflet-tooltip-right::before {
+  border-right-color: var(--pf-t--global--background--color--floating--default);
+}
+
 /* The bundled land outline drawn when no tile server is configured. */
 .fleet-map-land {
   fill: var(--pf-t--global--background--color--primary--default);

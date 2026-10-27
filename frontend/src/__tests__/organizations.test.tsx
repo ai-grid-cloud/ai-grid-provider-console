@@ -11,10 +11,10 @@ import { App } from '../App';
 import { ServiceError } from '../api/ConsoleService';
 import { HttpConsoleService } from '../api/HttpConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
-import type { OrganizationInput } from '../api/types';
-import { renderAt } from './render';
+import type { Organization, OrganizationInput } from '../api/types';
+import { deferred, renderAt } from './render';
 
-const input: OrganizationInput = {
+const input: Required<OrganizationInput> = {
   name: 'tenant1',
   domains: ['tenant1.example.com'],
   identityProvider: {
@@ -49,7 +49,13 @@ const saveEdit = async (user: User) => {
   await openStep(user, 'Review');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
 };
-const viewer = { username: 'viewer', groups: [], isProviderAdmin: false };
+/** A user the console couldn't load: the pages show, but without write actions. A viewer
+ * (isProviderAdmin false) sees no pages at all (App.test.tsx). */
+const unknownUser = () => {
+  const service = new MockConsoleService();
+  service.getUser = () => Promise.reject(new ServiceError(500, 'unavailable'));
+  return service;
+};
 
 const fillRequiredIdp = async (user: ReturnType<typeof userEvent.setup>, values: [string, string][]) => {
   for (const [label, value] of values) {
@@ -85,10 +91,12 @@ it('onboards organization details then IdP, saves only after review, supports de
   await user.click(screen.getByRole('button', { name: 'Add domain' }));
   await user.click(screen.getByRole('button', { name: 'Remove domain 2' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
+  // A blank identity provider is optional; a partly filled one isn't.
+  expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Tenant 1 SSO');
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   expect(await service.listOrganizations()).toEqual([]);
   await fillRequiredIdp(user, [
-    ['Title', 'Tenant 1 SSO'],
     ['Client ID', 'tenant1-client'],
     ['Client secret reference', 'tenant1-secret'],
     ['Issuer', 'https://sso.example.com/tenant1'],
@@ -275,10 +283,10 @@ it('keeps input on conflict', async () => {
   expect(service.organizations[0].resourceVersion).toBe('2');
 });
 
-it('hides write actions from a viewer', async () => {
-  const service = new MockConsoleService(viewer);
+it('hides write actions until it knows the user is a provider admin', async () => {
+  const service = unknownUser();
   const list = renderAt('/organizations', service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('viewer'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
   const table = await screen.findByTestId('tenants-table');
   expect(within(table).getByRole('link', { name: 'acme-robotics' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Create organization' })).not.toBeInTheDocument();
@@ -287,7 +295,7 @@ it('hides write actions from a viewer', async () => {
   list.unmount();
 
   renderAt(`/organizations/${service.organizations[0].id}`, service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('viewer'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
   expect(await screen.findByRole('heading', { name: 'acme-robotics' })).toBeInTheDocument();
   expect(screen.queryByTestId('organization-actions')).not.toBeInTheDocument();
 });
@@ -363,6 +371,7 @@ const serviceOnTenantJson = (fetchFn: typeof fetch) => {
   const http = new HttpConsoleService(fetchFn);
   service.listOrganizations = () => http.listOrganizations();
   service.getOrganization = (id) => http.getOrganization(id);
+  service.createOrganization = (value) => http.createOrganization(value);
   service.updateOrganization = (id, value, version) => http.updateOrganization(id, value, version);
   return service;
 };
@@ -388,6 +397,58 @@ it('edit sends PATCH with domains, identity provider, and If-Match', async () =>
     domains: ['acme.example.net'],
     identityProvider: { ...input.identityProvider, title: 'Acme SSO' },
   });
+});
+
+it('edit: clearing an existing identity provider is not a valid save', async () => {
+  const fetchFn = vi.fn(async (url: string, _init?: RequestInit) =>
+    jsonResponse(200, { data: url.endsWith('/tenants') ? [tenantJson] : tenantJson }),
+  );
+  const user = userEvent.setup();
+  renderAt(`/organizations/${tenantJson.id}/edit`, serviceOnTenantJson(fetchFn as unknown as typeof fetch));
+  await openStep(user, 'Identity provider');
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Client ID' })).toHaveValue('tenant1-client'));
+  for (const box of screen.getAllByRole('textbox')) await user.clear(box);
+  expect(screen.getByRole('button', { name: 'Review' })).toBeDisabled();
+});
+
+it('leaves the create form out of history once the organization is created, so Back skips it', async () => {
+  let navigate: NavigateFunction = () => undefined;
+  const CaptureNavigate = () => {
+    navigate = useNavigate();
+    return null;
+  };
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter initialEntries={['/clusters', '/organizations/create']} initialIndex={1}>
+      <CaptureNavigate />
+      <App service={new MockConsoleService()} />
+    </MemoryRouter>,
+  );
+  await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'frontfix-1');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.click(screen.getByRole('button', { name: 'Create organization' }));
+  expect(await screen.findByText('Organization saved')).toBeVisible();
+  await act(async () => navigate(-1));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Clusters' })).toBeVisible();
+});
+
+it('create without an identity provider sends none, and Review says so', async () => {
+  const fetchFn = vi.fn(async (url: string, init?: RequestInit) =>
+    init?.method === 'POST'
+      ? jsonResponse(201, { data: { ...tenantJson, identityProvider: undefined } })
+      : jsonResponse(200, { data: url.endsWith('/tenants') ? [] : tenantJson }),
+  );
+  const user = userEvent.setup();
+  renderAt('/organizations/create', serviceOnTenantJson(fetchFn as unknown as typeof fetch));
+  await user.type(await screen.findByRole('textbox', { name: 'Name' }), 'tenant1');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  expect(screen.getByTestId('tenant-configuration-details')).toHaveTextContent('No identity provider is configured.');
+  await user.click(screen.getByRole('button', { name: 'Create organization' }));
+  expect(await screen.findByText('Organization saved')).toBeVisible();
+  const post = fetchFn.mock.calls.find(([, init]) => init?.method === 'POST');
+  expect(JSON.parse(String(post?.[1]?.body))).toEqual({ name: 'tenant1', domains: [] });
 });
 
 it('lists the identity provider by title, a dash without one, and Disabled for a disabled organization', async () => {
@@ -498,4 +559,98 @@ it('moves an edit refused for a field to that field, once, and lets the user ret
   await openStep(user, 'Review');
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeVisible();
   expect(screen.queryByRole('textbox', { name: 'Issuer' })).not.toBeInTheDocument();
+});
+
+it('reloads an organization after a stale delete from its page, keeping the typed name, so a retry succeeds', async () => {
+  const service = new MockConsoleService();
+  const [organization] = service.organizations;
+  const user = userEvent.setup();
+  renderAt(`/organizations/${organization.id}`, service);
+  await user.click(await screen.findByTestId('organization-actions'));
+  await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+  const modal = await screen.findByTestId('delete-tenant-modal');
+  await user.type(within(modal).getByTestId('delete-modal-input'), organization.name);
+  // Someone else saves the organization while the dialog is open.
+  service.organizations[0] = { ...organization, resourceVersion: String(Number(organization.resourceVersion) + 1) };
+  await user.click(within(modal).getByRole('button', { name: 'Delete' }));
+  expect(
+    await within(modal).findByText('This organization changed since you opened this dialog. Check it and try again.'),
+  ).toBeVisible();
+  expect(within(modal).getByTestId('delete-modal-input')).toHaveValue(organization.name);
+  await user.click(within(modal).getByRole('button', { name: 'Delete' }));
+  expect(await screen.findByText('Organization deleted')).toBeVisible();
+  expect(service.organizations.some((o) => o.id === organization.id)).toBe(false);
+});
+
+it('keeps the delete dialog busy until the reloaded organization is in, and says when the reload fails', async () => {
+  const service = new MockConsoleService();
+  const [organization] = service.organizations;
+  const user = userEvent.setup();
+  renderAt('/organizations', service);
+  await user.click(await screen.findByRole('button', { name: `Actions for ${organization.name}` }));
+  await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+  const modal = await screen.findByTestId('delete-tenant-modal');
+  await user.type(within(modal).getByTestId('delete-modal-input'), organization.name);
+  service.organizations[0] = { ...organization, resourceVersion: String(Number(organization.resourceVersion) + 1) };
+  const deleteSpy = vi.spyOn(service, 'deleteOrganization');
+  const reload = deferred<Organization>();
+  const reloadSpy = vi.spyOn(service, 'getOrganization').mockReturnValueOnce(reload.promise);
+  await user.click(within(modal).getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(reloadSpy).toHaveBeenCalledTimes(1));
+  // The reload is still out: Delete stays busy, so no retry with the stale version.
+  expect(within(modal).getByRole('button', { name: /Delete/ })).toBeDisabled();
+  await user.type(within(modal).getByTestId('delete-modal-input'), '{Enter}');
+  expect(deleteSpy).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    reload.resolve(service.organizations[0]);
+  });
+  expect(within(modal).getByRole('button', { name: 'Delete' })).toBeEnabled();
+
+  // A second stale delete whose reload fails says so.
+  service.organizations[0] = {
+    ...service.organizations[0],
+    resourceVersion: String(Number(service.organizations[0].resourceVersion) + 1),
+  };
+  reloadSpy.mockRejectedValueOnce(new ServiceError(503, 'Service unavailable.'));
+  await user.click(within(modal).getByRole('button', { name: 'Delete' }));
+  expect(await within(modal).findByText(/could not be loaded again: Service unavailable\./)).toBeVisible();
+  expect(within(modal).getByRole('button', { name: 'Delete' })).toBeEnabled();
+});
+
+it('moves focus to the previous domain on Remove domain, or to Add domain when none is left', async () => {
+  const user = userEvent.setup();
+  renderAt('/organizations/create', new MockConsoleService());
+  const add = await screen.findByRole('button', { name: 'Add domain' });
+  await user.click(add);
+  await user.type(screen.getByRole('textbox', { name: /^Domain 1/ }), 'one.example.com');
+  await user.click(add);
+  await user.type(screen.getByRole('textbox', { name: /^Domain 2/ }), 'two.example.com');
+  await user.click(add);
+  await user.click(screen.getByRole('button', { name: 'Remove domain 3' }));
+  expect(screen.getByRole('textbox', { name: /^Domain 2/ })).toHaveFocus();
+  // The first has no previous one: focus goes to the domain that takes its place.
+  await user.click(screen.getByRole('button', { name: 'Remove domain 1' }));
+  expect(screen.getByRole('textbox', { name: /^Domain 1/ })).toHaveFocus();
+  expect(screen.getByRole('textbox', { name: /^Domain 1/ })).toHaveValue('two.example.com');
+  await user.click(screen.getByRole('button', { name: 'Remove domain 1' }));
+  expect(screen.queryByRole('textbox', { name: /^Domain/ })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Add domain' })).toHaveFocus();
+});
+
+it('heads the wizard sections at h2, moves focus to an added domain, and names the delete field by its prompt', async () => {
+  const service = new MockConsoleService();
+  const user = userEvent.setup();
+  const wizard = renderAt('/organizations/create', service);
+  expect(await screen.findByRole('heading', { level: 2, name: 'Domains' })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Add domain' }));
+  const domains = screen.getAllByRole('textbox', { name: /^Domain \d/ });
+  expect(domains[domains.length - 1]).toHaveFocus();
+  wizard.unmount();
+
+  const [organization] = service.organizations;
+  renderAt(`/organizations/${organization.id}`, service);
+  await user.click(await screen.findByTestId('organization-actions'));
+  await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+  const modal = await screen.findByTestId('delete-tenant-modal');
+  expect(within(modal).getByRole('textbox', { name: `Type ${organization.name} to confirm deletion:` })).toBeVisible();
 });

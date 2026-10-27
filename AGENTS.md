@@ -55,7 +55,10 @@ What the BFF does:
 - maps gRPC codes to HTTP statuses, keeping the backend's message, and its own body errors to 422;
 - forwards the caller's identity (the token as `authorization`, plus user, email and groups);
 - serves the SPA, `/healthcheck`, `/readyz`, `/api/v1/config`, and asks the hub for
-  `isProviderAdmin` (a `SelfSubjectAccessReview` with the caller's token).
+  `isProviderAdmin` (a `SelfSubjectAccessReview` with the caller's token);
+- relays `/perses/api` to the hub's Perses with the caller's token, for the Monitoring page:
+  only the read and query paths the Perses components call, nothing else of the caller's
+  (`bff/internal/perses`). Perses authorizes and runs the queries.
 
 What belongs in the backend, and so in the fake (`bff/internal/fakebackend`) until the backend
 ships it: validation of values, normalization and defaults, resource versions and the
@@ -105,15 +108,34 @@ when the RPCs allow it.
   that do not parse or are out of range left out; `consoleUrl`, `platform` and `product` from
   cluster claims; `gpuCapacity` from `status.capacity["nvidia.com/gpu"]`; `addons` from the
   `feature.open-cluster-management.io/addon-*` labels; the list sorted by name.
-- `fetchCluster`: against a backend without `GetManagedCluster` (the shipped one), the BFF
-  filters `ListManagedClusters` by name and writes its own NotFound message.
+- `fetchCluster`: when `GetManagedCluster` answers `Unimplemented`, the BFF filters
+  `ListManagedClusters` by name and writes its own NotFound message. Neither the fake nor the
+  shipped backend (`mock/proto/upstream/COMMIT`, whose `Clusters/Get` `v1.go` calls) answers
+  that any more, so this only serves an older backend; remove it once none is deployed.
 - The stopgap clients for the backend's current `ai_grid.v1` (`bff/internal/backend/v1.go`),
   until the console moves to Connect and the backend's contract: `FromV1Cluster` derives the
   draft's cluster state from `spec.hub_accepts_client`, `status.joined`,
-  `status.available_condition` and the deletion time, and `GetTenant` finds the tenant in the
-  list.
-- `toTenant` (`bff/internal/api/tenants.go`), fallbacks for the shipped backend: `alias`
-  defaults to the name, `enabled` defaults to true, `domainDetails` is built from `domains`.
+  `status.available_condition` and the deletion time, and the tenant writes refuse with
+  `Unimplemented` the draft fields the backend's `Tenant` lacks. They accept those fields when
+  they hold what a read shows (`description: ""`, `enabled: true`, `attributes: {}`), which may
+  not be what Keycloak stores (`readBackValue`), and send a PATCH that sets only such fields as
+  an update with the mask `id`.
+- The stopgap Models and Subscriptions clients (`bff/internal/backend/v1_models.go`, `v1.go`),
+  until Models and Subscriptions move to the Connect clients:
+  - the models namespace: reads give the BFF's `--models-namespace`, and a model elsewhere is
+    NotFound;
+  - the console's placement (the member labels plus `location In [...]`) is sent as
+    `name In [...]`, and a read turns it back. The wizard counts a member as offered when
+    `GET /locations` names either its cluster name (the backend) or its location label (the
+    fake);
+  - 501 for `createAuthPolicy: false`, and for a model list with a filter or an order;
+  - a model or registration the backend reports as saved to Git (reason `SavedToGit`, no phase)
+    keeps that reason, which the UI shows as Saved to Git;
+  - a subscription update reads the subscription first and sends its annotations back with the
+    display name and description changed, because the backend replaces the map whole;
+  - a delete with `If-Match: "0"` is 412, because the backend treats version 0 as no check.
+- `toTenant` (`bff/internal/api/tenants.go`), fallbacks for the shipped backend: `enabled`
+  defaults to true, `domainDetails` is built from `domains`.
 - `toModel` (`bff/internal/api/models.go`): `displayName` and `description` from the
   `openshift.io/display-name` and `openshift.io/description` annotations; `modelName` defaults to
   the model name; `placement.selectedClusters` from the decisions; `placement.satisfied`,
@@ -122,7 +144,12 @@ when the RPCs allow it.
   `progressing` and `degraded` from its conditions and `feedback` from the manifest feedback
   values; `rollout.strategy` shown as `All` when unset.
 - `fromRolloutSpec`: parses the rollout strategy name into the enum and answers 422 for an
-  unknown one.
+  unknown one; an empty strategy is sent as `ROLLOUT_STRATEGY_ALL`, a default the backend
+  should apply to `ROLLOUT_STRATEGY_UNSPECIFIED`.
+- `toGridOverview` (`bff/internal/api/grid.go`): drops metric points whose value is NaN or
+  ±Inf (JSON cannot carry them), always sends `demo: false`, and writes `updatedAt` as
+  `2006-01-02T15:04:05.000Z` (the PoC's millisecond format) whatever precision the backend
+  sends.
 - The model create (`createModel`): `cpu`, `memory` and `gpuCount` become the main container's
   requests (the GPU also its limit, a negative `gpuCount` is 422); `scaling` becomes a KEDA
   block; the gateway defaults to `openshift-ingress/openshift-ai-inference`; the managed route
@@ -132,7 +159,7 @@ when the RPCs allow it.
   when the caller sent any of them; without them `listMeta` falls back to a total it can prove.
   This is compatibility with the shipped backend, not filtering.
 - `requireProviderAdmin` (`bff/internal/api/middleware.go`), the BFF's one authorization
-  decision: every `/api/v1` call except `GET /user` and `GET /config` needs the caller's
+  decision: every `/api/v1` call except `GET` (or `HEAD`) `/user` and `/config` needs the caller's
   `isProviderAdmin` review to pass (403 otherwise), until the backend authorizes the caller.
 
 ## Agent skills

@@ -165,11 +165,9 @@ BFF: `GET /api/v1/tenants?offset=&limit=&filter=` with a `meta` page and the cli
 see above); an absent `enabled` from today's backend (fields 1-3 only) reads as enabled; the
 JSON has no `redirectUrl` and carries `resourceVersion` (also the `ETag` of a single tenant);
 PATCH and DELETE need `If-Match` (428 without it) and map it to the version fields above (409
-when stale). Against the shipped backend, which has only `ListTenants`, `GET
-/api/v1/tenants/{id}` has no list fallback (unlike `GET /api/v1/clusters/{name}`) and answers
-501, as does every tenant write, and so does a list with `filter`, `limit` or an `offset` above 0: the shipped `ListTenantsRequest`
-is empty and its response has no `total`, so the BFF cannot tell a filtered result from the
-unfiltered list and refuses it (`docs/plan/bff-api.md`).
+when stale). Against the real backend, the BFF calls its `Tenants` RPCs, which carry only the
+name, domains, version and creation time: a write setting any other field answers 501, and so
+does a list with `filter`, because that backend doesn't evaluate it (`docs/plan/bff-api.md`).
 UI: main already has a basic, read-only Tenants page (`frontend/src/pages/TenantsPage.tsx`:
 name, domains, id), which keeps working because the list's `data` is still an array of
 tenants with those fields. Porting the fuller UI for this area (search, paging, create, edit,

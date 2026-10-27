@@ -14,7 +14,12 @@ import (
 // subscription.
 
 // listSubscriptions answers GET /api/v1/subscriptions in the backend's order.
+// ListSubscriptionsRequest is empty, so any query parameter is 422 (noQuery).
 func (a *App) listSubscriptions(w http.ResponseWriter, r *http.Request) {
+	if err := noQuery(r, "subscriptions"); err != nil {
+		a.respondError(w, r, err)
+		return
+	}
 	ctx, cancel := a.backend.Context(r.Context())
 	defer cancel()
 	resp, err := a.backend.Subscriptions.ListSubscriptions(ctx, &aigridv1.ListSubscriptionsRequest{})
@@ -77,6 +82,7 @@ func (a *App) createSubscription(w http.ResponseWriter, r *http.Request) {
 		policy := subscription.FromAuthPolicy(p)
 		out.AuthPolicy = &policy
 	}
+	a.log(r).Info("subscription created", "name", out.Subscription.Name, "authPolicy", out.AuthPolicy != nil)
 	w.Header().Set("Location", APIPrefix+"/subscriptions/"+url.PathEscape(out.Subscription.Name))
 	writeData(w, http.StatusCreated, out)
 }
@@ -109,6 +115,7 @@ func (a *App) updateSubscription(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
+	a.log(r).Info("subscription updated", "name", obj.GetName())
 	setETag(w, resp.GetSubscription().GetResourceVersion())
 	writeData(w, http.StatusOK, subscription.Mutation{Subscription: subscription.FromSubscription(resp.GetSubscription())})
 }
@@ -128,6 +135,7 @@ func (a *App) deleteSubscription(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
+	a.log(r).Info("subscription deleted", "name", r.PathValue("name"))
 	w.WriteHeader(http.StatusNoContent)
 }
 

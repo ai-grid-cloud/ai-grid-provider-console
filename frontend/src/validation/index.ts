@@ -95,8 +95,23 @@ export const identityProviderSchema = z
   })
   .strict();
 export const organizationInputSchema = tenantDetailsSchema
-  .extend({ identityProvider: identityProviderSchema })
+  .extend({ identityProvider: identityProviderSchema.optional() })
   .strict();
+/** An identity provider form with nothing typed in it, which the organization form leaves out. */
+export const isBlankIdentityProvider = ({ title, description, config }: z.input<typeof identityProviderSchema>) =>
+  ![
+    title,
+    description,
+    config.clientId,
+    config.clientSecretSecret.name,
+    config.issuer,
+    config.authorizationUrl,
+    config.tokenUrl,
+    config.defaultScopes,
+    config.userInfoUrl,
+    config.jwksUrl,
+    config.logoutUrl,
+  ].some((v) => v?.trim());
 
 // Ported from krisv/ai-grid-cloud-provider-poc shared/subscription-validation.mjs at 62319b8.
 export const resourceName = z

@@ -44,8 +44,12 @@ type Config struct {
 	// Timeout bounds every RPC.
 	Timeout time.Duration
 	// DraftAPI says the backend serves the console's draft proto (the fake).
-	// Otherwise clusters and tenants use the backend's real RPCs (v1.go).
+	// Otherwise clusters, tenants, subscriptions and models use the backend's real RPCs (v1.go).
 	DraftAPI bool
+	// ModelsNamespace is the namespace the console's models are in. The real
+	// backend's models have none, so its models are reported in this one
+	// (v1_models.go).
+	ModelsNamespace string
 }
 
 // Client wraps the generated service clients.
@@ -91,8 +95,11 @@ func Dial(cfg Config, extra ...grpc.DialOption) (*Client, error) {
 	}
 	var clusters aigridv1.ManagedClustersClient = v1Clusters{conn}
 	var tenants aigridv1.TenantsClient = v1Tenants{conn}
+	var subscriptions aigridv1.SubscriptionsClient = v1Subscriptions{conn}
+	var models aigridv1.ModelsClient = v1Models{conn: conn, namespace: cfg.ModelsNamespace}
 	if cfg.DraftAPI {
 		clusters, tenants = aigridv1.NewManagedClustersClient(conn), aigridv1.NewTenantsClient(conn)
+		subscriptions, models = aigridv1.NewSubscriptionsClient(conn), aigridv1.NewModelsClient(conn)
 	}
 	return &Client{
 		conn:          conn,
@@ -100,8 +107,8 @@ func Dial(cfg Config, extra ...grpc.DialOption) (*Client, error) {
 		Health:        aigridv1.NewAiGridClient(conn),
 		Clusters:      clusters,
 		Tenants:       tenants,
-		Models:        aigridv1.NewModelsClient(conn),
-		Subscriptions: aigridv1.NewSubscriptionsClient(conn),
+		Models:        models,
+		Subscriptions: subscriptions,
 		Grid:          aigridv1.NewGridClient(conn),
 	}, nil
 }
@@ -129,19 +136,56 @@ func (c *Client) Context(parent context.Context) (context.Context, context.Cance
 
 // forwardIdentity copies the caller's identity from the context into gRPC
 // metadata. Requests without an identity (the readiness probe) carry none.
+// The user, the email and each group are percent-encoded
+// (EncodeMetadataValue): grpc-go refuses a metadata value that is not
+// printable ASCII, so a group such as `équipe-ops` sent as is would fail
+// every call.
 func forwardIdentity(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	if id, ok := identity.FromContext(ctx); ok {
 		pairs := []string{MetaAuthorization, "Bearer " + id.Token()}
 		if id.Username != "" {
-			pairs = append(pairs, MetaUser, id.Username)
+			pairs = append(pairs, MetaUser, EncodeMetadataValue(id.Username))
 		}
 		if id.Email != "" {
-			pairs = append(pairs, MetaEmail, id.Email)
+			pairs = append(pairs, MetaEmail, EncodeMetadataValue(id.Email))
 		}
 		if len(id.Groups) > 0 {
-			pairs = append(pairs, MetaGroups, strings.Join(id.Groups, ","))
+			groups := make([]string, len(id.Groups))
+			for i, g := range id.Groups {
+				groups[i] = EncodeMetadataValue(g)
+			}
+			pairs = append(pairs, MetaGroups, strings.Join(groups, ","))
 		}
 		ctx = metadata.AppendToOutgoingContext(ctx, pairs...)
 	}
 	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+// EncodeMetadataValue percent-encodes `%` and every byte outside printable
+// ASCII (0x20-0x7E) as `%XX`, upper-case hex, so that any proxy header value
+// is a valid gRPC metadata value. An ASCII value without `%` stays the same,
+// byte for byte. A receiver decodes with plain percent-decoding (Go's
+// url.PathUnescape, which leaves `+` alone) and gets the original bytes back,
+// UTF-8 for a name such as `équipe-ops`. The groups are encoded one by one
+// and joined with `,`; a group never contains one (package identity splits
+// the header on it), so the receiver splits first and then decodes. This is
+// a proposal to the backend team, not yet agreed: the fake decodes it, the
+// shipped backend doesn't yet and sees a non-ASCII name still encoded
+// (harmless while these values are advisory, docs/plan/bff-api.md).
+func EncodeMetadataValue(v string) string {
+	if !strings.ContainsFunc(v, func(r rune) bool { return r == '%' || r < 0x20 || r > 0x7e }) {
+		return v
+	}
+	const hex = "0123456789ABCDEF"
+	var b strings.Builder
+	for i := 0; i < len(v); i++ {
+		if c := v[i]; c == '%' || c < 0x20 || c > 0x7e {
+			b.WriteByte('%')
+			b.WriteByte(hex[c>>4])
+			b.WriteByte(hex[c&0x0f])
+		} else {
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }

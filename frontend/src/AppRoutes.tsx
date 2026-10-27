@@ -1,21 +1,45 @@
-import { Fragment } from 'react';
-import { Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom';
+import { Fragment, lazy, Suspense } from 'react';
+import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import type { ConsoleService } from './api/ConsoleService';
 import { NotFoundPage } from './components/NotFoundPage';
+import { PageErrorBoundary } from './components/PageErrorBoundary';
+import { PageLoading } from './components/PageLoading';
 import { MaaSGovernanceProvider } from './context/MaaSGovernanceContext';
+// The landing page (/ goes to /clusters) is in the first download; every other page, and the map
+// with Leaflet, loads when it is first opened.
 import { ClustersPage } from './pages/clusters/ClustersPage';
-import { GridPage } from './pages/grid/GridPage';
-import { ModelDetailsPage } from './pages/models/ModelDetailsPage';
-import { ModelEditPage } from './pages/models/ModelEditPage';
-import { ModelWizard } from './pages/models/ModelWizard';
-import { ModelsPage } from './pages/models/ModelsPage';
-import { OrganizationDetailsPage } from './pages/organizations/OrganizationDetailsPage';
-import { OrganizationListPage } from './pages/organizations/OrganizationListPage';
-import { OrganizationWizardPage } from './pages/organizations/OrganizationWizardPage';
-import { CreateSubscriptionPage } from './pages/subscriptions/CreateSubscriptionPage';
-import { EditSubscriptionPage } from './pages/subscriptions/EditSubscriptionPage';
-import { SubscriptionsPage } from './pages/subscriptions/SubscriptionsPage';
-import { ViewSubscriptionPage } from './pages/subscriptions/ViewSubscriptionPage';
+
+const GridPage = lazy(() => import('./pages/grid/GridPage').then((m) => ({ default: m.GridPage })));
+const MonitoringPage = lazy(() =>
+  import('./pages/monitoring/MonitoringPage').then((m) => ({ default: m.MonitoringPage })),
+);
+const ModelDetailsPage = lazy(() =>
+  import('./pages/models/ModelDetailsPage').then((m) => ({ default: m.ModelDetailsPage })),
+);
+const ModelEditPage = lazy(() => import('./pages/models/ModelEditPage').then((m) => ({ default: m.ModelEditPage })));
+const ModelWizard = lazy(() => import('./pages/models/ModelWizard').then((m) => ({ default: m.ModelWizard })));
+const ModelsPage = lazy(() => import('./pages/models/ModelsPage').then((m) => ({ default: m.ModelsPage })));
+const OrganizationDetailsPage = lazy(() =>
+  import('./pages/organizations/OrganizationDetailsPage').then((m) => ({ default: m.OrganizationDetailsPage })),
+);
+const OrganizationListPage = lazy(() =>
+  import('./pages/organizations/OrganizationListPage').then((m) => ({ default: m.OrganizationListPage })),
+);
+const OrganizationWizardPage = lazy(() =>
+  import('./pages/organizations/OrganizationWizardPage').then((m) => ({ default: m.OrganizationWizardPage })),
+);
+const CreateSubscriptionPage = lazy(() =>
+  import('./pages/subscriptions/CreateSubscriptionPage').then((m) => ({ default: m.CreateSubscriptionPage })),
+);
+const EditSubscriptionPage = lazy(() =>
+  import('./pages/subscriptions/EditSubscriptionPage').then((m) => ({ default: m.EditSubscriptionPage })),
+);
+const SubscriptionsPage = lazy(() =>
+  import('./pages/subscriptions/SubscriptionsPage').then((m) => ({ default: m.SubscriptionsPage })),
+);
+const ViewSubscriptionPage = lazy(() =>
+  import('./pages/subscriptions/ViewSubscriptionPage').then((m) => ({ default: m.ViewSubscriptionPage })),
+);
 
 type Props = { service: ConsoleService };
 
@@ -26,11 +50,19 @@ const ByParams: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 // Ported from krisv/ai-grid-cloud-provider-poc src/app/App.tsx at 62319b8.
 export const AppRoutes: React.FC<Props> = ({ service }) => (
+  <PageErrorBoundary resetKey={useLocation().pathname}>
+    <Suspense fallback={<PageLoading label="Loading page" />}>
+      <Pages service={service} />
+    </Suspense>
+  </PageErrorBoundary>
+);
+
+const Pages: React.FC<Props> = ({ service }) => (
   <Routes>
     <Route path="/" element={<Navigate to="/clusters" replace />} />
     {/* Keyed, so moving between the map and monitoring mounts a fresh page with its own loads. */}
     <Route path="/ai-grid" element={<GridPage key="ai-grid" service={service} />} />
-    <Route path="/monitoring" element={<GridPage key="monitoring" service={service} monitoring />} />
+    <Route path="/monitoring" element={<MonitoringPage service={service} />} />
     <Route path="/clusters" element={<ClustersPage service={service} />} />
     <Route path="/organizations" element={<OrganizationListPage service={service} />} />
     <Route path="/organizations/create" element={<OrganizationWizardPage service={service} />} />

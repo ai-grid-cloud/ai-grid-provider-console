@@ -21,6 +21,9 @@ export const failureExplanations: Record<string, { summary: string; next: string
 
 export const modelPhase = (model: ManagedModel): string => model.phase ?? 'Pending';
 
+/** A placed model serving on some of its clusters but not all (the backend's phase, proposal P13). */
+export const PARTIALLY_AVAILABLE = 'Partially available';
+
 /** The status's title: "Deployment failed" for Failed, else the phase. */
 export const modelStatusTitle = (model: ManagedModel): string =>
   modelPhase(model) === 'Failed' ? 'Deployment failed' : modelPhase(model);

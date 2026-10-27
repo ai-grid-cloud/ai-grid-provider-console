@@ -250,7 +250,9 @@ containing `oom` or `fail` (`MinimumReplicasUnavailable`), a Gateway that does n
 (`RefsInvalid`). A placed model gets a Placement whose decision is recomputed from cluster
 labels, taints and the cluster sets bound into its namespace, and a ManifestWorkReplicaSet
 whose per-cluster works are applied all at once or progressively; a cluster labelled
-`ai-grid-mock/fail-apply=true` fails to apply its work. `settings.json` reproduces the dev
+`ai-grid-mock/fail-apply=true` (or one naming the model) fails to apply its work. Each work
+carries its phase, and a model served on some clusters but not all is partially available
+(proposal P13). `settings.json` reproduces the dev
 hub's disabled ManifestWorkReplicaSet gate with `FailedPrecondition`. See `areas/models.md`.
 Frontend: model list and detail with per-site status from the works, create wizard with the
 POC's inputs mapped to the real spec, delete blocked while a subscription references the

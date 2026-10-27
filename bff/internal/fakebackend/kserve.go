@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
@@ -701,7 +700,7 @@ func workloadServiceAddress(in llmisvcInput) []*aigridv1.Address {
 // carries neither.
 func setModelCondition(st *aigridv1.ModelStatus, now time.Time, typ string, status aigridv1.ConditionStatus, reason, message string) {
 	if c := condition(st.Conditions, typ); c != nil && (c.GetStatus() != status || c.GetReason() != reason || c.GetMessage() != message) {
-		c.LastTransitionTime = timestamppb.New(now)
+		c.LastTransitionTime = k8sTime(now)
 	}
 	st.Conditions = writeCondition(st.Conditions, now, typ, status, reason, message)
 }
@@ -719,10 +718,10 @@ func writeCondition(conds []*aigridv1.Condition, now time.Time, typ string, stat
 		}
 	}
 	if cond == nil {
-		cond = &aigridv1.Condition{Type: typ, LastTransitionTime: timestamppb.New(now)}
+		cond = &aigridv1.Condition{Type: typ, LastTransitionTime: k8sTime(now)}
 		conds = append(conds, cond)
 	} else if cond.GetStatus() != status {
-		cond.LastTransitionTime = timestamppb.New(now)
+		cond.LastTransitionTime = k8sTime(now)
 	}
 	cond.Status = status
 	cond.Reason, cond.Message = nil, nil

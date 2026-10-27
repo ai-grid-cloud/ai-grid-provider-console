@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -49,6 +50,9 @@ const (
 	PhasePending = "pending"
 	PhaseReady   = "ready"
 	PhaseFailed  = "failed"
+	// PhasePartiallyAvailable is a placed model serving on some of its
+	// clusters but not all (proposal P13).
+	PhasePartiallyAvailable = "partiallyavailable"
 )
 
 // Rollout strategy names as the CRD spells them.
@@ -70,9 +74,10 @@ const (
 )
 
 var phaseStrings = map[aigridv1.ModelPhase]string{
-	aigridv1.ModelPhase_MODEL_PHASE_PENDING: PhasePending,
-	aigridv1.ModelPhase_MODEL_PHASE_READY:   PhaseReady,
-	aigridv1.ModelPhase_MODEL_PHASE_FAILED:  PhaseFailed,
+	aigridv1.ModelPhase_MODEL_PHASE_PENDING:             PhasePending,
+	aigridv1.ModelPhase_MODEL_PHASE_READY:               PhaseReady,
+	aigridv1.ModelPhase_MODEL_PHASE_FAILED:              PhaseFailed,
+	aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE: PhasePartiallyAvailable,
 }
 
 var strategyStrings = map[aigridv1.RolloutStrategy]string{
@@ -258,7 +263,13 @@ type WorkStatus struct {
 	Progressing string `json:"progressing,omitempty"`
 	Degraded    string `json:"degraded,omitempty"`
 	// Feedback is the `ready` and `url` the agent scraped from the spoke object.
-	Feedback           WorkFeedback       `json:"feedback"`
+	Feedback WorkFeedback `json:"feedback"`
+	// Phase, Reason and Message are the backend's summary of the model on
+	// this cluster (proposal P13): pending, ready or failed, and the
+	// condition that decided it.
+	Phase              string             `json:"phase,omitempty"`
+	Reason             string             `json:"reason,omitempty"`
+	Message            string             `json:"message,omitempty"`
 	Conditions         []ClusterCondition `json:"conditions"`
 	Generation         int64              `json:"generation"`
 	ObservedGeneration int64              `json:"observedGeneration"`
@@ -428,7 +439,8 @@ func toModel(m *aigridv1.Model) Model {
 			ws := WorkStatus{Cluster: w.GetClusterName(), WorkName: w.GetWorkName(),
 				Applied: conditionString(w.GetConditions(), "Applied"), Available: conditionString(w.GetConditions(), "Available"),
 				Progressing: conditionString(w.GetConditions(), "Progressing"), Degraded: conditionString(w.GetConditions(), "Degraded"),
-				Conditions: toConditions(w.GetConditions()), Generation: w.GetGeneration(), ObservedGeneration: w.GetObservedGeneration()}
+				Conditions: toConditions(w.GetConditions()), Generation: w.GetGeneration(), ObservedGeneration: w.GetObservedGeneration(),
+				Phase: phaseStrings[w.GetPhase()], Reason: w.GetReason(), Message: w.GetMessage()}
 			for _, mf := range w.GetManifests() {
 				for _, fb := range mf.GetFeedback() {
 					switch fb.GetName() {
@@ -643,7 +655,7 @@ func (a *App) createModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := toModel(resp.GetObject())
-	a.logger.Info("model created", "namespace", m.Namespace, "name", m.Name, "placed", m.Placement != nil)
+	a.log(r).Info("model created", "namespace", m.Namespace, "name", m.Name, "placed", m.Placement != nil)
 	w.Header().Set("Location", APIPrefix+"/models/"+url.PathEscape(m.Namespace)+"/"+url.PathEscape(m.Name))
 	setETag(w, m.ResourceVersion)
 	writeData(w, http.StatusCreated, m)
@@ -664,6 +676,15 @@ func (o *optionalPlacement) UnmarshalJSON(b []byte) error {
 	dec := json.NewDecoder(strings.NewReader(string(b)))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&v); err != nil {
+		// This decoder starts at the placement, so its paths do too; name the
+		// field from the body's root, as the POST body's errors do. Wrapped, so
+		// the outer decoder doesn't add "placement." again: Go 1.26 prefixes an
+		// UnmarshalTypeError an UnmarshalJSON returns, Go 1.27 doesn't.
+		var typ *json.UnmarshalTypeError
+		if errors.As(err, &typ) {
+			typ.Field = "placement." + typ.Field
+			return fmt.Errorf("placement: %w", err)
+		}
 		return err
 	}
 	o.Value = &v
@@ -759,7 +780,7 @@ func (a *App) patchModel(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
-	a.logger.Info("model updated", "namespace", namespace, "name", name, "paths", paths)
+	a.log(r).Info("model updated", "namespace", namespace, "name", name, "paths", paths)
 	setETag(w, updated.GetObject().GetMetadata().GetResourceVersion())
 	writeData(w, http.StatusOK, toModel(updated.GetObject()))
 }
@@ -781,7 +802,7 @@ func (a *App) deleteModel(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
-	a.logger.Info("model deleted", "namespace", namespace, "name", name)
+	a.log(r).Info("model deleted", "namespace", namespace, "name", name)
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 }

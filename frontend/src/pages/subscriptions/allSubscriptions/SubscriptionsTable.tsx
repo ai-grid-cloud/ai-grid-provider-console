@@ -3,19 +3,26 @@
 // packages/maas/frontend/src/app/pages/subscriptions/allSubscriptions/SubscriptionsTable.tsx
 // upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
 // The PoC's dashboard Table: sortable columns, the console's PaginatedTable, and its
-// "No results found" view when the filter matches nothing.
+// "No results found" view when the filter matches nothing. Each row is its own Tbody, so its
+// groups or models can expand under it.
 import { useMemo, useState } from 'react';
 import { Table, Tbody, Th, Thead, Tr } from '@patternfly/react-table';
-import type { MaaSSubscription } from '../../../api/types';
+import type { MaaSSubscription, ManagedModel } from '../../../api/types';
 import { PaginatedTable } from '../../../components/PaginatedTable';
 import { TableEmptyRow } from '../../../components/TableEmptyRow';
 import { subscriptionsColumns } from './columns';
+import type { ModelsState } from './ExpandedModelsPanel';
 import { SubscriptionTableRow } from './SubscriptionTableRow';
 
 type Props = {
   subscriptions: MaaSSubscription[];
   /** A subscription's organization name, or its id when the organization is unknown. */
   organizationName: (subscription: MaaSSubscription) => string;
+  /** The hub's models, for the rows' models expansion, and whether they have loaded. */
+  models: ManagedModel[];
+  modelsState: ModelsState;
+  /** Each location's site name, from the clusters. */
+  siteNames: Map<string, string>;
   toolbarContent: React.ReactNode;
   onClearFilters: () => void;
   canWrite: boolean;
@@ -25,6 +32,9 @@ type Props = {
 export const SubscriptionsTable: React.FC<Props> = ({
   subscriptions,
   organizationName,
+  models,
+  modelsState,
+  siteNames,
   toolbarContent,
   onClearFilters,
   canWrite,
@@ -39,7 +49,7 @@ export const SubscriptionsTable: React.FC<Props> = ({
 
   return (
     <>
-      <PaginatedTable rows={sorted} toolbar={toolbarContent}>
+      <PaginatedTable rows={sorted} toolbar={toolbarContent} clearAllFilters={onClearFilters}>
         {(pageRows) => (
           <Table aria-label="Subscriptions" data-testid="subscriptions-table">
             <Thead>
@@ -63,18 +73,19 @@ export const SubscriptionsTable: React.FC<Props> = ({
               </Tr>
             </Thead>
             {sorted.length ? (
-              <Tbody>
-                {pageRows.map((subscription) => (
-                  <SubscriptionTableRow
-                    key={subscription.name}
-                    subscription={subscription}
-                    columns={columns}
-                    organization={organizationName(subscription)}
-                    canWrite={canWrite}
-                    setDeleteSubscription={setDeleteSubscription}
-                  />
-                ))}
-              </Tbody>
+              pageRows.map((subscription) => (
+                <SubscriptionTableRow
+                  key={subscription.name}
+                  subscription={subscription}
+                  columns={columns}
+                  organization={organizationName(subscription)}
+                  models={models}
+                  modelsState={modelsState}
+                  siteNames={siteNames}
+                  canWrite={canWrite}
+                  setDeleteSubscription={setDeleteSubscription}
+                />
+              ))
             ) : (
               <Tbody>
                 <TableEmptyRow

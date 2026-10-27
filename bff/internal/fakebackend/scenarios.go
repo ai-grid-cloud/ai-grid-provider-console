@@ -8,7 +8,6 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
@@ -224,7 +223,7 @@ func (s *Server) applyEvent(c *aigridv1.ManagedCluster, sc *scenario, now time.T
 		if c.DeletionTimestamp == nil {
 			c.Generation++ // the API server bumps generation when it marks an object deleting (apiserver registry/generic/registry/store.go markAsDeleting L1016-1021)
 		}
-		c.DeletionTimestamp = timestamppb.New(now)
+		c.DeletionTimestamp = k8sTime(now)
 		setCondition(c, now, CondImportSucceeded, aigridv1.ConditionStatus_CONDITION_STATUS_FALSE, ReasonDetaching, MessageDetaching)
 		setDeletingCondition(c, now)
 	case EventDetached:

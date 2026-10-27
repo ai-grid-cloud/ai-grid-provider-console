@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"slices"
 	"sort"
 	"strconv"
@@ -32,7 +33,6 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	aigridv1 "github.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1"
 )
@@ -217,7 +217,7 @@ func New(fx *Fixtures, logger *slog.Logger) (*Server, error) {
 			sub.ResourceVersion = "1"
 		}
 		if sub.GetCreateTime() == nil {
-			sub.CreateTime = timestamppb.New(s.start)
+			sub.CreateTime = k8sTime(s.start)
 			s.liveSubscriptions[sub.GetName()] = true
 		}
 		s.subscriptions[sub.GetName()] = sub
@@ -264,7 +264,7 @@ func (s *Server) SetClock(clock func() time.Time) {
 	s.reconcileModels(s.start)
 	for name := range s.liveSubscriptions {
 		if sub, ok := s.subscriptions[name]; ok {
-			sub.CreateTime = timestamppb.New(s.start)
+			sub.CreateTime = k8sTime(s.start)
 		}
 	}
 }
@@ -341,13 +341,30 @@ func (s *Server) logCalls(ctx context.Context, req any, info *grpc.UnaryServerIn
 	start := time.Now()
 	resp, err := handler(ctx, req)
 	md, _ := metadata.FromIncomingContext(ctx)
-	user := strings.Join(md.Get("x-forwarded-user"), ",")
+	user := forwardedUser(md)
 	code := codes.OK
 	if err != nil {
 		code = status.Code(err)
 	}
 	s.logger.Info("rpc", "method", info.FullMethod, "user", user, "hasToken", len(md.Get("authorization")) > 0, "code", code.String(), "duration", time.Since(start).Round(time.Millisecond))
 	return resp, err
+}
+
+// forwardedUser is the advisory x-forwarded-user metadata, percent-decoded:
+// the BFF percent-encodes `%` and every byte outside printable ASCII in the
+// forwarded user, email and groups, because gRPC metadata values must be
+// printable ASCII (docs/plan/bff-api.md, "Identity"; backend.EncodeMetadataValue).
+// A value that does not decode is kept as sent.
+func forwardedUser(md metadata.MD) string {
+	values := md.Get("x-forwarded-user")
+	users := make([]string, 0, len(values))
+	for _, v := range values {
+		if decoded, err := url.PathUnescape(v); err == nil {
+			v = decoded
+		}
+		users = append(users, v)
+	}
+	return strings.Join(users, ",")
 }
 
 // bumpResourceVersion stamps a written object with the next store revision.
@@ -385,7 +402,7 @@ func (s *Server) isProviderAdmin(ctx context.Context, token string) (user string
 		return "", false, err
 	}
 	md, _ := metadata.FromIncomingContext(ctx)
-	user = strings.Join(md.Get("x-forwarded-user"), ",")
+	user = forwardedUser(md)
 	return user, s.access.DefaultAllowed && !slices.Contains(s.access.DeniedTokens, token), nil
 }
 

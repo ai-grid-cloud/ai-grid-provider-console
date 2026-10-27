@@ -13,6 +13,7 @@ import type {
   MaaSSubscription,
   ManagedModel,
   ModelPlacementSpec,
+  ModelWork,
   Organization,
   SubscriptionInfoResponse,
 } from './types';
@@ -45,7 +46,6 @@ export const toGridCluster = (json: ApiCluster): GridCluster => ({
   // Membership first: right after Remove the hub can still report the cluster
   // provisioned until its ready Policy lets go of it.
   provisioningStatus: !json.aiGridEnabled ? 'Not provisioned' : json.provisioned ? 'Provisioned' : 'Provisioning',
-  hubAcceptsClient: json.hubAcceptsClient ?? false,
   location: json.location,
   site: json.site,
   region: json.region,
@@ -132,11 +132,25 @@ export const toOrganization = (json: ApiTenant): Organization => {
   return out;
 };
 
-const modelPhases: Record<string, string> = { pending: 'Pending', ready: 'Ready', failed: 'Failed' };
+const modelPhases: Record<string, string> = {
+  pending: 'Pending',
+  ready: 'Ready',
+  failed: 'Failed',
+  partiallyavailable: 'Partially available',
+};
+
+const phaseOf = (phase: string | undefined) => (phase ? (modelPhases[phase] ?? phase) : 'Pending');
+
+/** The backend's reason for a model in git mode, where it reports no phase. */
+const SAVED_TO_GIT_REASON = 'SavedToGit';
+
+/** A model's phase: Saved to Git when the backend saved it to Git and reports no phase. */
+const modelPhaseOf = (phase: string | undefined, reason: string | undefined) =>
+  !phase && reason === SAVED_TO_GIT_REASON ? 'Saved to Git' : phaseOf(phase);
 
 /**
  * Maps a model of GET/POST /models to the PoC's ManagedModel. Status is PR 12's phase (Pending
- * before the backend reports one); locations are the placement's decided locations (P8).
+ * before the backend reports one, Saved to Git when the backend saved it to Git); locations are the placement's decided locations (P8).
  */
 export const toManagedModel = (json: ApiModel): ManagedModel => ({
   name: json.name,
@@ -144,12 +158,20 @@ export const toManagedModel = (json: ApiModel): ManagedModel => ({
   displayName: json.displayName,
   description: json.description,
   modelRef: { kind: 'LLMInferenceService', name: json.name },
-  phase: json.phase ? (modelPhases[json.phase] ?? json.phase) : 'Pending',
+  phase: modelPhaseOf(json.phase, json.reason),
   reason: json.reason,
   statusMessage: json.message,
   creationTimestamp: json.creationTimestamp,
   resourceVersion: json.resourceVersion ?? '',
   locations: json.placement?.locations ?? [],
+  works: json.rollout?.works?.map((work): ModelWork => ({
+    cluster: work.cluster,
+    phase: phaseOf(work.phase),
+    reason: work.reason,
+    message: work.message,
+    ready: work.feedback?.ready,
+    conditions: work.conditions ?? [],
+  })),
   modelUri: json.modelUri,
   modelName: json.modelName,
   runtimeImage: json.runtimeImage,

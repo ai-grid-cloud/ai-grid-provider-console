@@ -38,6 +38,7 @@ import { MultiSelection } from '../../../components/MultiSelection';
 import { SystemAuthenticatedWarning } from '../../../components/SystemAuthenticatedWarning';
 import { TypeaheadSelect } from '../../../components/TypeaheadSelect';
 import { useMaaSGovernanceContext } from '../../../context/useMaaSGovernanceContext';
+import { useConfirmDiscard } from '../../../hooks/useConfirmDiscard';
 import type { SubscriptionModelEntry } from '../../../hooks/useSubscriptionModels';
 import { useSubscriptionModels } from '../../../hooks/useSubscriptionModels';
 import { isSameModel } from '../../../utilities/authpolicies';
@@ -166,7 +167,24 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
   const organizationLocked = !!subscription?.tokenMetadata?.organizationId;
   const organizationMissing = !organizationId;
 
+  // What the user can change, so Cancel asks before discarding it and an unchanged edit can't be saved
+  // (as the organization and model forms do).
+  const formValues = JSON.stringify({
+    name: nameDescData.name,
+    k8sName: nameDescData.k8sName.value,
+    description: nameDescData.description,
+    groups: selectedGroupNames,
+    organizationId,
+    priority: priority == null || Number.isNaN(priority) ? null : priority,
+    models: models.map((m) => [m.modelRefSummary.namespace, m.modelRefSummary.name, m.tokenRateLimits, m.unlimited]),
+  });
+  const [initialValues] = useState(formValues);
+  const isDirty = formValues !== initialValues;
+  const leave = () => navigate(returnTo ?? getSectionUrl('subscriptions'));
+  const [requestLeave, discardModal] = useConfirmDiscard(isDirty && !isSubmitting, leave);
+
   const canSubmit =
+    (!isEditing || isDirty) &&
     isNameValid &&
     Object.keys(fieldErrors).length === 0 &&
     allModelsHaveRateLimits &&
@@ -236,7 +254,9 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
         await service.createSubscription(request);
       }
       refresh();
+      // A created subscription replaces its create form in history, so Back doesn't land on it, empty.
       navigate(returnTo ?? getSectionUrl('subscriptions'), {
+        replace: !isEditing,
         state: { notice: isEditing ? 'Subscription updated' : 'Subscription created' },
       });
     } catch (e) {
@@ -312,6 +332,8 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
             id="subscription-priority"
             data-testid="subscription-priority"
             inputAriaLabel="Priority"
+            minusBtnAriaLabel="Decrease priority"
+            plusBtnAriaLabel="Increase priority"
             value={priority == null || Number.isNaN(priority) ? '' : priority}
             min={MIN_PRIORITY}
             max={MAX_PRIORITY}
@@ -345,6 +367,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
         <FormGroup label="Groups" fieldId="subscription-groups" isRequired>
           <MultiSelection
             ariaLabel="Enter groups"
+            toggleAriaLabel="Groups options"
             value={selectedGroups}
             setValue={(newValue) => {
               setGroupsTouched(true);
@@ -449,7 +472,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
           </Button>
           <Button
             variant="link"
-            onClick={() => navigate(returnTo ?? getSectionUrl('subscriptions'))}
+            onClick={requestLeave}
             isDisabled={isSubmitting}
             data-testid="cancel-subscription-button"
           >
@@ -457,6 +480,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ service, modelRefs, su
           </Button>
         </ActionGroup>
       </Form>
+      {discardModal}
     </PageSection>
   );
 };

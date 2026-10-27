@@ -164,7 +164,8 @@ out of the summary, and its cluster is to apply again like a new one.
   `ready=False`, so the MWRS reads `ManifestworkApplied=False/Processing` and the model
   PENDING/`Processing` indefinitely (no MWRS condition shows the progress-deadline timeout, which
   only frees the slot in a `Progressive` rollout).
-- A cluster labelled `ai-grid-mock/fail-apply=true` (a console mock label) behaves like a spoke
+- A cluster labelled `ai-grid-mock/fail-apply=true` (a console mock label; any other value is a
+  comma-separated list of the model names it fails) behaves, for those models, like a spoke
   without the KServe CRD: `Applied=False/AppliedManifestWorkFailed`, the manifest
   `AppliedManifestFailed` "Failed to apply manifest: the server doesn't have a resource type
   "LLMInferenceService"" with an empty `resource` in its meta, the manifest
@@ -330,3 +331,10 @@ Backend ask: the `Models` service and `Model` message as drafted in
 `mock/proto/ai_grid/v1/model*.proto`, with the phase derived server-side;
 `AiGrid/GetHubCapabilities`; the ManifestWorkReplicaSet feature gate on the hub
 (`mock/research/acm.md` open question 1).
+
+Open question for the backend team: a model in a namespace that does not exist. The fake creates
+it anyway (any namespace the request names is fine), while a real API server answers the
+LLMInferenceService create with NotFound (`namespaces "<ns>" not found`). Whether the backend
+creates the namespace first, refuses with NotFound (404 through the BFF) or something else is
+not decided; the console creates models in `MODELS_NAMESPACE` (`ai-grid-models`), which the
+deployment has to provide meanwhile. The fake is left as it is until the backend decides.

@@ -1,12 +1,9 @@
 import { Banner } from '@patternfly/react-core';
-import type { ConsoleService } from '../api/ConsoleService';
-import { useServiceData } from '../hooks/useServiceData';
-
-type Props = { service: ConsoleService };
+import { useConsoleSession } from '../context/useConsoleSession';
 
 /** Warns that the console is talking to the fake backend, so changes reach no cluster. */
-export const FakeBackendBanner: React.FC<Props> = ({ service }) => {
-  const [config] = useServiceData(() => service.getConfig(), undefined, 0);
+export const FakeBackendBanner: React.FC = () => {
+  const { config } = useConsoleSession();
   if (!config?.fakeBackend) {
     return null;
   }

@@ -241,16 +241,24 @@ func terminating(c *aigridv1.ManagedCluster) bool { return c.GetDeletionTimestam
 // replaced and lastTransitionTime moves only when the status actually
 // changes. observedGeneration is left unset: the hub's ManagedCluster
 // conditions never carry it (checked on the dev hub).
+// k8sTime is a time as the API server stores it: metav1.Time is serialized
+// as RFC 3339 in whole seconds, so a creationTimestamp, a condition's
+// lastTransitionTime or a taint's timeAdded never has a fraction. The fake's
+// clock has one, so every Kubernetes time it serves goes through here.
+func k8sTime(t time.Time) *timestamppb.Timestamp {
+	return timestamppb.New(t.Truncate(time.Second))
+}
+
 func setCondition(c *aigridv1.ManagedCluster, now time.Time, typ string, st aigridv1.ConditionStatus, reason, message string) {
 	if c.Status == nil {
 		c.Status = &aigridv1.ManagedClusterStatus{}
 	}
 	cond := findCondition(c, typ)
 	if cond == nil {
-		cond = &aigridv1.Condition{Type: typ, LastTransitionTime: timestamppb.New(now)}
+		cond = &aigridv1.Condition{Type: typ, LastTransitionTime: k8sTime(now)}
 		c.Status.Conditions = append(c.Status.Conditions, cond)
 	} else if cond.GetStatus() != st {
-		cond.LastTransitionTime = timestamppb.New(now)
+		cond.LastTransitionTime = k8sTime(now)
 	}
 	cond.Status = st
 	cond.Reason = proto.String(reason)
@@ -274,7 +282,7 @@ func addTaint(c *aigridv1.ManagedCluster, now time.Time, key string) bool {
 	if hasTaint(c, key) {
 		return false
 	}
-	c.Taints = append(c.Taints, &aigridv1.Taint{Key: key, Effect: TaintNoSelect, TimeAdded: timestamppb.New(now)})
+	c.Taints = append(c.Taints, &aigridv1.Taint{Key: key, Effect: TaintNoSelect, TimeAdded: k8sTime(now)})
 	return true
 }
 

@@ -516,7 +516,7 @@
     },
     {
       "schema": "organization",
-      "name": "missing identity provider",
+      "name": "no identity provider",
       "input": {
         "name": "acme-robotics",
         "domains": [
@@ -524,9 +524,7 @@
           "acme.example.org"
         ]
       },
-      "fieldErrors": {
-        "identityProvider": "Required"
-      }
+      "fieldErrors": {}
     },
     {
       "schema": "model",

@@ -3,6 +3,8 @@ import type { CreateModelRequest, ManagedModel, ModelUpdate } from './types';
 /** The Models area: model deployments and the locations they are placed on. */
 export interface ModelsService {
   listModels(): Promise<ManagedModel[]>;
+  /** One model deployment; fails with a 404 when there is none. */
+  getModel(namespace: string, name: string): Promise<ManagedModel>;
   /** Locations of Ready, provisioned AI Grid members. */
   listLocations(): Promise<string[]>;
   /** Creates the model in the console's models namespace (ConsoleConfig.modelsNamespace). */

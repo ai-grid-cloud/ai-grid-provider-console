@@ -202,6 +202,7 @@
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "available",
         "feature.open-cluster-management.io/addon-work-manager": "available",
         "ai-grid/enabled": "true",
+        "ai-grid/role": "combined",
         "ai-grid/provisioned": "true",
         "location": "paris",
         "ai-grid/site": "paris-dc1",
@@ -516,10 +517,12 @@
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "unreachable",
         "feature.open-cluster-management.io/addon-work-manager": "unreachable",
         "ai-grid/enabled": "true",
+        "ai-grid/role": "ingress",
         "ai-grid/provisioned": "true",
         "location": "madrid",
         "ai-grid/site": "madrid-dc1",
-        "ai-grid/region": "europe-south"
+        "ai-grid/region": "europe-south",
+        "ai-grid-mock/fail-apply": "mistral-7b-instruct"
       },
       "annotations": {
         "installer.multicluster.openshift.io/release-version": "2.17.3",
@@ -688,6 +691,7 @@
         "feature.open-cluster-management.io/addon-managed-serviceaccount": "available",
         "feature.open-cluster-management.io/addon-work-manager": "available",
         "ai-grid/enabled": "true",
+        "ai-grid/role": "inference",
         "ai-grid/provisioned": "false",
         "location": "ashburn",
         "ai-grid/site": "ashburn-dc1",

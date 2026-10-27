@@ -3,8 +3,6 @@
 // and TenantActionsMenu.tsx at commit 8cb0a227e45cc9b17421b6e79ce493ed370ebd5d.
 import { useMemo, useState } from 'react';
 import {
-  Alert,
-  AlertActionLink,
   Button,
   EmptyState,
   EmptyStateActions,
@@ -16,8 +14,6 @@ import {
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import type { ThProps } from '@patternfly/react-table';
 import { Link, useNavigate } from 'react-router-dom';
-import type { UserService } from '../../api/ConsoleService';
-import { ServiceError } from '../../api/ConsoleService';
 import type { OrganizationsService } from '../../api/organizations';
 import type { Organization } from '../../api/types';
 import { PageHeader } from '../../components/PageHeader';
@@ -28,11 +24,12 @@ import { SimpleMenuActions } from '../../components/SimpleMenuActions';
 import { StatusLabel } from '../../components/StatusLabel';
 import { ToolbarSearch } from '../../components/ToolbarSearch';
 import { TableEmptyRow } from '../../components/TableEmptyRow';
+import { useConsoleSession } from '../../context/useConsoleSession';
 import { useServiceData } from '../../hooks/useServiceData';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { useDeleteOrganization } from './useDeleteOrganization';
 
-type Props = { service: OrganizationsService & UserService };
+type Props = { service: OrganizationsService };
 
 type Column = { label: string; sort: (a: Organization, b: Organization) => number };
 
@@ -49,11 +46,14 @@ const columns: Column[] = [
 export const OrganizationListPage: React.FC<Props> = ({ service }) => {
   const navigate = useNavigate();
   const [organizations, loaded, error, refresh] = useServiceData<Organization[]>(() => service.listOrganizations(), []);
-  const [user] = useServiceData(() => service.getUser(), undefined, 0);
+  const { user } = useConsoleSession();
   const canWrite = !!user?.isProviderAdmin;
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 0, direction: 'asc' });
-  const [confirmDelete, deleteModal] = useDeleteOrganization(service, () => void refresh());
+  const [confirmDelete, deleteModal] = useDeleteOrganization(service, {
+    refresh: () => void refresh(),
+    onDeleted: () => void refresh(),
+  });
 
   const rows = useMemo(() => {
     const term = search.toLowerCase();
@@ -75,18 +75,13 @@ export const OrganizationListPage: React.FC<Props> = ({ service }) => {
 
   const body = () => {
     if (error) {
-      if (error instanceof ServiceError && error.isNotImplemented) {
-        return <LoadError subject="Organizations" error={error} />;
-      }
       return (
-        <Alert
-          isInline
-          variant="danger"
+        <LoadError
+          subject="Organizations"
+          error={error}
           title="Error loading organizations"
-          actionLinks={<AlertActionLink onClick={() => void refresh()}>Retry</AlertActionLink>}
-        >
-          {error.message}
-        </Alert>
+          onRetry={() => void refresh()}
+        />
       );
     }
     if (organizations.length === 0) {

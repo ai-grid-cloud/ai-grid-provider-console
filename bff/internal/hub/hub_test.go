@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -18,6 +20,8 @@ type fakeHub struct {
 	status  int
 	gotAuth string
 	gotBody accessReview
+	// gotRaw is the body as plain JSON, independent of the package's types.
+	gotRaw map[string]any
 }
 
 func (f *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +31,14 @@ func (f *fakeHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.gotAuth = r.Header.Get("Authorization")
-	if err := json.NewDecoder(r.Body).Decode(&f.gotBody); err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		f.t.Errorf("read body: %v", err)
+	}
+	if err := json.Unmarshal(body, &f.gotBody); err != nil {
+		f.t.Errorf("decode body: %v", err)
+	}
+	if err := json.Unmarshal(body, &f.gotRaw); err != nil {
 		f.t.Errorf("decode body: %v", err)
 	}
 	if f.status != 0 {
@@ -65,6 +76,35 @@ func TestCanISendsTokenAndAttributes(t *testing.T) {
 	}
 }
 
+// TestProviderAdminCheckIsPatchOnManagedClusters pins the question itself, as
+// the hub receives it: comparing against ProviderAdminCheck alone would pass
+// whatever the constant says, and the provider-admin gate is this question.
+func TestProviderAdminCheckIsPatchOnManagedClusters(t *testing.T) {
+	f := &fakeHub{t: t, allowed: true}
+	if _, err := newClient(t, f).CanI(context.Background(), "tok", ProviderAdminCheck); err != nil {
+		t.Fatal(err)
+	}
+	if f.gotRaw == nil {
+		t.Fatal("no access review reached the hub")
+	}
+	want := map[string]any{
+		"apiVersion": "authorization.k8s.io/v1",
+		"kind":       "SelfSubjectAccessReview",
+		"spec": map[string]any{"resourceAttributes": map[string]any{
+			"group":    "cluster.open-cluster-management.io",
+			"resource": "managedclusters",
+			"verb":     "patch",
+		}},
+	}
+	got := map[string]any{}
+	for _, k := range []string{"apiVersion", "kind", "spec"} {
+		got[k] = f.gotRaw[k]
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("access review = %v, want %v", got, want)
+	}
+}
+
 func TestCanIDenied(t *testing.T) {
 	c := newClient(t, &fakeHub{t: t, allowed: false})
 	ok, err := c.CanI(context.Background(), "tok", ProviderAdminCheck)
@@ -84,6 +124,18 @@ func TestCanIErrors(t *testing.T) {
 	c = newClient(t, &fakeHub{t: t, status: http.StatusInternalServerError})
 	if _, err := c.CanI(context.Background(), "tok", ProviderAdminCheck); err == nil || strings.Contains(err.Error(), "tok") {
 		t.Errorf("5xx should fail without leaking the token, got %v", err)
+	}
+}
+
+// A page's parallel access reviews reuse open connections instead of opening
+// new ones past the default two per host.
+func TestNewKeepsConnectionsForParallelReviews(t *testing.T) {
+	c, err := New(Config{URL: "https://api.example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.http.Transport.(*http.Transport).MaxIdleConnsPerHost; got != 16 {
+		t.Fatalf("MaxIdleConnsPerHost = %d, want 16", got)
 	}
 }
 

@@ -59,6 +59,21 @@ describe('HttpConsoleService', () => {
     );
   });
 
+  it('gets one model by namespace and name', async () => {
+    const model = { name: 'a b', namespace: 'team-models', resourceVersion: '7', modelName: 'org/widget' };
+    const fetchFn = vi.fn().mockResolvedValue(jsonResponse(200, { data: model }));
+    const service = new HttpConsoleService(fetchFn);
+    await expect(service.getModel('team-models', 'a b')).resolves.toMatchObject({
+      name: 'a b',
+      namespace: 'team-models',
+      resourceVersion: '7',
+    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/v1/models/team-models/a%20b',
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   it('lists, creates and deletes models, with the version in If-Match', async () => {
     const model = { name: 'widget', namespace: 'team-models', modelUri: 'hf://org/widget', modelName: 'org/widget' };
     const fetchFn = vi.fn().mockImplementation(async (url: string) =>

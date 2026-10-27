@@ -63,8 +63,13 @@ the PoC; the browser tests use it. Run the pieces separately with `make dev-fake
 `make dev-frontend-fake`.
 
 The fake backend (`bff/cmd/fake-backend`) serves the backend's gRPC services from
-`fixtures/` and answers the BFF's access review like a hub would. Its gRPC services need
-`authorization` metadata like the real backend; the BFF forwards it from the proxy headers.
+`fixtures/` and answers the BFF's access review like a hub would. The fake hub answers one
+question only, the provider-admin check (`patch` on `managedclusters` in
+`cluster.open-cluster-management.io`); any other access review is a 400 that names both and is
+logged, so a BFF that asks the wrong question fails instead of being answered by token. Its gRPC services need
+`authorization` metadata like the real backend; the BFF forwards it from the proxy headers, with
+the user, email and groups percent-encoded (`docs/plan/bff-api.md`, Identity), and the fake
+decodes the user it logs and names in its 403 messages.
 Edit the fixtures and restart to change the fleet, the tenants or the models: `tenants.json`
 can reproduce a Keycloak that is unreachable or has no `ai-grid` realm, and
 `manifestWorkReplicaSetEnabled: false` in `settings.json` mirrors the dev hub: creating a
@@ -86,7 +91,7 @@ adds `"meta": {"size", "total", "offset", "limit"}` (`limit` only when the reque
 | Method | Path | Request body | Response `data` |
 |---|---|---|---|
 | GET | `/api/v1/user` | | `{username, email?, groups, isProviderAdmin}` |
-| GET | `/api/v1/config` | | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, modelsNamespace, fakeBackend}` |
+| GET | `/api/v1/config` | | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, modelsNamespace, fakeBackend, monitoring: {enabled, persesProject}}` |
 | GET | `/api/v1/clusters` | | `GridCluster[]` by name |
 | GET | `/api/v1/clusters/{name}` | | `GridCluster`, `ETag` |
 | PATCH | `/api/v1/clusters/{name}` | `{labels?, annotations?}` (whole maps; only `ai-grid/*` keys and the `location` label may change) | `GridCluster` after the write, `ETag` |
@@ -208,7 +213,7 @@ field, and `areas/*.md` what the fake derives from them.
 | `local-cluster` | `ready` | the hub itself |
 | `site-paris-1` | `ready` | enrolled and provisioned, 16 GPUs, site name and coordinates |
 | `site-frankfurt-1` | `ready` | not enrolled (no `ai-grid/*` labels), 8 GPUs, add-on `application-manager` `unhealthy` |
-| `site-madrid-1` | `unknown` | lease expired, `unreachable` taint, add-ons `unreachable`; enrolled and provisioned |
+| `site-madrid-1` | `unknown` | lease expired, `unreachable` taint, add-ons `unreachable`; enrolled and provisioned; `ai-grid-mock/fail-apply=mistral-7b-instruct`, so only Mistral's work fails to apply there |
 | `site-ashburn-1` | `offline` | API server down, `unavailable` taint; add-ons still `available` (the hub changes them only on a lost lease) |
 | `site-berlin-1` | `importing` | no claims yet |
 | `site-oslo-1` | `pendingimport` | |
@@ -230,8 +235,8 @@ tenant has `resourceVersion` `"1"`. Replace the file with `{"unavailable": "<tex
 | Model | `phase` at start | What it shows |
 |---|---|---|
 | `tiny-llm` | `ready` | a hub deployment, no placement |
-| `granite-8b-instruct` | `ready` (`Complete`) | placed on enrolled and provisioned sites: `site-paris-1` at start; `site-madrid-1` joins at 300 s, when its lease recovers (`pending` until about 345 s, then `ready` on two sites) |
-| `mistral-7b-instruct` | `pending` (`NotAsExpected` at 0 s, then `Processing`) | created when the fake starts; a Progressive rollout one site at a time in cluster-name order: `site-frankfurt-1` at once (ready at about 45 s), `site-berlin-1` (selected once it joins at 20 s; applied at about 75 s, after `minSuccessTime` 30 s), `site-paris-1` (applied at about 150 s), `ready` at about 195 s; `site-madrid-1` is added at 300 s (`pending` again until about 345 s) |
+| `granite-8b-instruct` | `ready` (`Complete`) | placed on enrolled and provisioned sites: `site-paris-1` at start; `site-madrid-1` joins at 300 s, when its lease recovers (`partiallyavailable` while Madrid's starts, `ready` on two sites from about 345 s) |
+| `mistral-7b-instruct` | `pending` (`NotAsExpected` at 0 s, then `Processing`) | created when the fake starts; a Progressive rollout one site at a time in cluster-name order: `site-frankfurt-1` at once (ready at about 45 s), `site-berlin-1` (selected once it joins at 20 s; applied at about 75 s, after `minSuccessTime` 30 s), `site-paris-1` (applied at about 150 s), `ready` at about 195 s (`partiallyavailable` between a site's ready and the next one's); `site-madrid-1` is added at 300 s and fails to apply there (`ai-grid-mock/fail-apply`), so it stays `partiallyavailable`, serving on three of four clusters (proposal P13) |
 | `llama-3-70b` | `failed` (`ConfigNotFound`) | a preset the hub lacks |
 | `codellama-13b` | `pending` (`PlacementDecisionEmpty`) | a placement that matches no cluster |
 
@@ -254,7 +259,7 @@ lifecycles alike. Restart the fake to replay.
 | 30 s | `edge-lyon-2` finishes detaching and disappears from the list |
 | 70 s | `site-berlin-1`'s `ManagedClusterImportSucceeded` condition turns True (and its `resourceVersion` moves); `status` stays `ready` |
 | 90 s, 130 s | `site-berlin-1` add-ons become available (three, then all seven) |
-| 300 s | `site-madrid-1` recovers its lease: `unknown` to `ready`; `granite-8b-instruct` and `mistral-7b-instruct` roll out to it (both `pending` until its work is ready, about 45 s later) |
+| 300 s | `site-madrid-1` recovers its lease: `unknown` to `ready`; `granite-8b-instruct` and `mistral-7b-instruct` roll out to it: Granite reads `partiallyavailable` until its work there is ready, about 45 s later, then `ready`; Mistral's work fails to apply there, so Mistral stays `partiallyavailable` |
 
 A model created with `POST /api/v1/models` (and `mistral-7b-instruct` at start) walks
 KServe's conditions, counted from its creation:
@@ -283,8 +288,10 @@ reads `pending` with that reason for good: no condition tells it apart from a sl
 spoke such a model keeps its work `Progressing` and the placed model reads
 `pending`/`Processing` for good; the rollout's `progressDeadline` times that cluster out (a
 `Progressive` rollout moves on to the next one), which no condition shows; a cluster labelled
-`ai-grid-mock/fail-apply=true` fails to apply its work: the model reads `failed`/`NotAsExpected`
-and the work `applied: "False"`, `available: "Unknown"`, with
+`ai-grid-mock/fail-apply=true` (or a comma-separated list of model names) fails to apply the
+matching works: a model with no other cluster serving it reads `failed`/`NotAsExpected`, one
+served elsewhere `partiallyavailable` (proposal P13), and the work `phase: "failed"`,
+`applied: "False"`, `available: "Unknown"`, with
 `Applied=False/AppliedManifestWorkFailed` "Failed to apply manifest work" (the manifest's own
 text, `Failed to apply manifest: the server doesn't have a resource type "LLMInferenceService"`,
 is in the gRPC status only).
@@ -294,15 +301,16 @@ is in the gRPC status only).
 | Status | How to get it from the fake | Message |
 |---|---|---|
 | 401 | `AUTH_TOKEN=expired-token` on any `/api/v1` endpoint but `GET /config`: the hub rejects the token in the BFF's provider-admin check (the access review, for `GET /user`), before the BFF's own checks (415, 428, 422, 413). `GET /config` asks neither and answers 200. A request without the token header is 401 on every `/api/v1` path, `/config` included | `the hub rejected the credentials; log in again`, `missing x-forwarded-access-token header` |
-| 403 | `viewer-token` on any `/api/v1` request but `GET /user` and `GET /config`, reads included: the BFF's provider-admin check refuses it before its own checks (415, 428, the body) and before the backend. The backend's own 403 texts are behind that check until the backend authorizes the caller | `the console is for provider admins: the hub says you may not patch ManagedClusters` |
+| 403 | `viewer-token` on any `/api/v1` request but `GET /user` and `GET /config`, reads included: the BFF's provider-admin check refuses it before its own checks (415, 428, the body) and before the backend. The backend's own 403 texts are behind that check until the backend authorizes the caller | `this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one` |
 | 404 | an unknown cluster, tenant or model | `object with identifier '<name>' not found` for a cluster, `'<id>'` for a tenant, `'<namespace>/<name>'` for a model |
+| 405 | a known `/api/v1` path with a method it has no route for, such as `POST /api/v1/clusters` | `POST is not allowed on /api/v1/clusters; use GET, HEAD`, with an `Allow` header |
 | 409 | a taken tenant name or alias, or model name; a blank `name` in a tenant PATCH (Keycloak's own answer); an `If-Match` older than the object (also for an update that would change nothing) | `A organization with the same name already exists.`, `... same alias already exists`, the API server's `... already exists` for a model, `object with identifier '<id>' has resource version <v>, the request carries "<v>"; fetch it again and retry` |
 | 412 | `manifestWorkReplicaSetEnabled: false` in `settings.json`, then a model with `placement` (a POST, or a PATCH that adds one); `{"realmMissing": true}` or `{"organizationsDisabled": true}` in `tenants.json` | `ManifestWorkReplicaSet feature gate disabled on hub`; `Keycloak realm "ai-grid": Realm not found.`, `Keycloak realm "ai-grid": Organizations not enabled for this realm.` |
 | 413 | a body over 1 MiB | `request body must not exceed 1048576 bytes` |
 | 415 | a POST, PUT or PATCH without `Content-Type: application/json` (an HTML form, `text/plain`) | `request body must be JSON: send Content-Type: application/json` |
 | 428 | a PATCH, PUT or DELETE without `If-Match`, or with `If-Match: *` | `this write needs an If-Match header: send the ETag that GET answered (the object's resourceVersion), for example If-Match: "42"`, `If-Match: * names no version: ...`: send the `ETag` of the GET the page showed |
-| 422 | a body the BFF rejects (unknown field, such as the removed `aiGridEnabled` or `hubAcceptsClient` or a model's `displayName`, wrong type, trailing content) or that names no field (`the request body names no field to change`), a cluster PATCH that changes a label or annotation outside the console's keys (`label "cluster.open-cluster-management.io/clusterset" cannot be changed through the console; only ai-grid/* labels and annotations and the location label can`), a repeated `filter`, an `ai-grid/latitude` or `ai-grid/longitude` annotation that is not a number in range (`annotation "ai-grid/latitude" must be a number between -90 and 90, got "91"`), a malformed `If-Match`, a list query with the removed `search`, `namespace` or `label`, a `filter` the backend cannot evaluate (`GET /api/v1/models?filter=this.metadata.labels[%22x%22]==%22y%22`: no model has `x`, and the index is not guarded), or a value the backend rejects | `query parameter "search" is not supported; send a CEL filter in "filter"`, `filter <f> is not a valid CEL expression: ...`, `filter <f> failed on '<id>': no such key: <k>`, Keycloak's texts (`Name can not be null`, `Invalid domain format: <d>`, `Cannot change the alias`, `Domain <d> is already linked to organization <o> in realm ai-grid`), the CRD's (`replicas and scaling are mutually exclusive; ...`) and the console's own checks (`spec.rollout requires spec.placement`, `attribute "ai-grid/resource-version" is reserved ...`); Keycloak's `Identity provider with alias '<a>' does not exist in realm ai-grid` exists in the fake but no BFF body can send a domain's identity provider |
-| 501 | not reachable through today's endpoints on the fake. The shipped backend answers it for every RPC it lacks: `PATCH /clusters/{name}`, `GET /tenants/{id}`, every tenant write, every `/models` endpoint and `/capabilities` (`GET /clusters/{name}` falls back to the list); and the BFF answers it for `GET /tenants` with `filter`, `limit` or an `offset` above 0 there, because that backend ignores them | `the AI Grid backend does not support this operation yet`, or `the AI Grid backend does not support filtering or paging tenants yet; ...`: show "not available on this backend yet", not an error page |
+| 422 | a body the BFF rejects (unknown field, such as the removed `aiGridEnabled` or `hubAcceptsClient` or a model's `displayName`, wrong type, trailing content) or that names no field (`the request body names no field to change`), a cluster PATCH that changes a label or annotation outside the console's keys (`label "cluster.open-cluster-management.io/clusterset" cannot be changed through the console; only ai-grid/* labels and annotations and the location label can`), a repeated `filter`, `offset` or `limit`, any query parameter on `GET /api/v1/subscriptions` (`the subscriptions list takes no query parameters; ...`), a `filter` on `GET /api/v1/clusters` (the fake doesn't evaluate one yet), an `ai-grid/latitude` or `ai-grid/longitude` annotation that is not a number in range (`annotation "ai-grid/latitude" must be a number between -90 and 90, got "91"`), a malformed `If-Match`, a list query with the removed `search`, `namespace` or `label`, a `filter` the backend cannot evaluate (`GET /api/v1/models?filter=this.metadata.labels[%22x%22]==%22y%22`: no model has `x`, and the index is not guarded), or a value the backend rejects | `query parameter "search" is not supported; send a CEL filter in "filter"`, `filter <f> is not a valid CEL expression: ...`, `filter <f> failed on '<id>': no such key: <k>`, Keycloak's texts (`Name can not be null`, `Invalid domain format: <d>`, `Cannot change the alias`, `Domain <d> is already linked to organization <o> in realm ai-grid`), the CRD's (`replicas and scaling are mutually exclusive; ...`) and the console's own checks (`spec.rollout requires spec.placement`, `attribute "ai-grid/resource-version" is reserved ...`); Keycloak's `Identity provider with alias '<a>' does not exist in realm ai-grid` exists in the fake but no BFF body can send a domain's identity provider |
+| 501 | not reachable through today's endpoints on the fake. The shipped backend answers it for every RPC it lacks: every `/models` endpoint and `/capabilities`; and the BFF answers it for `GET /tenants` and `GET /clusters` with `filter`, and for a tenant write that sets a field the backend's `Tenant` lacks (`identityProvider`, `description`, `attributes`, `enabled: false`, an `alias` other than the name) | `the AI Grid backend does not support this operation yet`, or `the AI Grid backend does not support filtering or paging tenants yet; ...`: show "not available on this backend yet", not an error page |
 | 503 | `{"unavailable": "..."}` in `tenants.json`, then any tenants endpoint as a provider admin (a viewer stays 403, an expired token 401: the token checks come first) | `the AI Grid backend is unavailable; try again` |
 
 The full table, including 502 and 504, is in `bff-api.md`, "Errors".

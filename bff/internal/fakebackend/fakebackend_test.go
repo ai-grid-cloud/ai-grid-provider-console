@@ -515,9 +515,10 @@ func TestHubAccessReview(t *testing.T) {
 	h := NewHub(Access{DefaultAllowed: true, DeniedTokens: []string{"viewer"}, RejectedTokens: []string{"expired"}}, slog.New(slog.DiscardHandler))
 	srv := httptest.NewServer(h.Handler())
 	defer srv.Close()
-	review := func(token string) (int, bool) {
+	const adminQuestion = `{"group":"cluster.open-cluster-management.io","resource":"managedclusters","verb":"patch"}`
+	ask := func(token, attrs string) (int, bool, string) {
 		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/apis/authorization.k8s.io/v1/selfsubjectaccessreviews",
-			strings.NewReader(`{"apiVersion":"authorization.k8s.io/v1","kind":"SelfSubjectAccessReview","spec":{"resourceAttributes":{"group":"cluster.open-cluster-management.io","resource":"managedclusters","verb":"patch"}}}`))
+			strings.NewReader(`{"apiVersion":"authorization.k8s.io/v1","kind":"SelfSubjectAccessReview","spec":{"resourceAttributes":`+attrs+`}}`))
 		if token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
@@ -527,10 +528,29 @@ func TestHubAccessReview(t *testing.T) {
 		}
 		defer func() { _ = resp.Body.Close() }()
 		var out struct {
-			Status struct{ Allowed bool } `json:"status"`
+			Status  json.RawMessage `json:"status"`
+			Message string          `json:"message"`
 		}
 		_ = json.NewDecoder(resp.Body).Decode(&out)
-		return resp.StatusCode, out.Status.Allowed
+		var st struct{ Allowed bool }
+		_ = json.Unmarshal(out.Status, &st)
+		return resp.StatusCode, st.Allowed, out.Message
+	}
+	review := func(token string) (int, bool) {
+		code, allowed, _ := ask(token, adminQuestion)
+		return code, allowed
+	}
+	// Only the provider-admin question is answered: any other one would be
+	// answered by token alone and hide a BFF that asks the wrong thing.
+	for _, other := range []string{
+		`{"group":"cluster.open-cluster-management.io","resource":"managedclusters","verb":"get"}`,
+		`{"resource":"managedclusters","verb":"patch"}`,
+		`{"group":"cluster.open-cluster-management.io","resource":"managedclusters","verb":"patch","namespace":"x"}`,
+	} {
+		code, allowed, msg := ask("admin-token", other)
+		if code != http.StatusBadRequest || allowed || !strings.Contains(msg, "only the provider-admin access review") {
+			t.Errorf("question %s: %d %v %q, want 400 naming the one question", other, code, allowed, msg)
+		}
 	}
 	if code, allowed := review("admin-token"); code != http.StatusCreated || !allowed {
 		t.Errorf("admin: %d %v", code, allowed)

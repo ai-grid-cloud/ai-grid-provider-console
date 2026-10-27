@@ -177,9 +177,10 @@ func newApp(t *testing.T) *api.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// No environment: every setting is its default, so the files do not
-	// depend on the shell that ran the test.
-	cfg, err := config.Parse([]string{"--hub-api-url=" + hubSrv.URL}, func(string) (string, bool) { return "", false })
+	// No environment, so the files do not depend on the shell that ran the
+	// test. Every setting is its default except the models namespace, which
+	// `make run-fake` sets for the fake backend's fixtures.
+	cfg, err := config.Parse([]string{"--hub-api-url=" + hubSrv.URL, "--models-namespace=ai-grid-models"}, func(string) (string, bool) { return "", false })
 	if err != nil {
 		t.Fatal(err)
 	}

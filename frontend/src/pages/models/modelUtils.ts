@@ -1,4 +1,5 @@
 import type { GridCluster, ManagedModel } from '../../api/types';
+import type { NotFound } from '../../components/LoadError';
 
 /** A model deployment's page. */
 export const modelPath = (model: Pick<ManagedModel, 'namespace' | 'name'>) =>
@@ -20,3 +21,11 @@ export const locationLabel = (location: string, siteNames: Map<string, string>):
   const site = siteNames.get(location);
   return site ? `${site} (${location})` : location;
 };
+
+/** What a model page says when there is no such deployment. */
+export const modelNotFound = (namespace: string, name: string): NotFound => ({
+  what: 'Model deployment',
+  body: `There is no model deployment ${name} in ${namespace}.`,
+  listPath: '/models',
+  listLabel: 'Models',
+});

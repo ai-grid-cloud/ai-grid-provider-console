@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
-import type { InitialEntry } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import type { InitialEntry, NavigateFunction } from 'react-router-dom';
 import { App } from '../App';
 import { ServiceError } from '../api/ConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
@@ -40,6 +40,28 @@ describe('routes', () => {
       expect(screen.queryByText('Page not found')).not.toBeInTheDocument();
       unmount();
     }
+  });
+
+  // Each /user is a hub access review: the shell loads the user and the config, and pages read them.
+  it.each([
+    '/ai-grid',
+    '/clusters',
+    '/organizations',
+    '/organizations/org-1',
+    '/models',
+    '/models/ai-grid-models/granite-3-8b',
+    '/subscriptions',
+    '/subscriptions/view/engineering',
+  ])('asks for the user and the config once: %s', async (path) => {
+    const service = new MockConsoleService();
+    const getUser = vi.spyOn(service, 'getUser');
+    const getConfig = vi.spyOn(service, 'getConfig');
+    at(path, service);
+    await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user'));
+    await screen.findByRole('heading', { level: 1 });
+    await waitFor(() => expect(screen.queryByRole('progressbar')).not.toBeInTheDocument());
+    expect(getUser).toHaveBeenCalledTimes(1);
+    expect(getConfig).toHaveBeenCalledTimes(1);
   });
 
   // Review focus 1 (A33/C10): on the real backend, which has only Ping, ListManagedClusters and
@@ -84,6 +106,43 @@ describe('routes', () => {
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText('the AI Grid backend does not support this operation yet')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['/models/ai-grid-models/nope', 'nope', 'Model deployment not found', 'Go to Models', '/models'],
+    ['/models/ai-grid-models/nope/edit', 'Edit nope', 'Model deployment not found', 'Go to Models', '/models'],
+    [
+      '/organizations/does-not-exist',
+      'does-not-exist',
+      'Organization not found',
+      'Go to Organizations',
+      '/organizations',
+    ],
+    [
+      '/organizations/does-not-exist/edit',
+      'Edit does-not-exist',
+      'Organization not found',
+      'Go to Organizations',
+      '/organizations',
+    ],
+    ['/subscriptions/view/nope', 'nope', 'Subscription not found', 'Go to Subscriptions', '/subscriptions'],
+    [
+      '/subscriptions/edit/nope',
+      'Edit subscription',
+      'Subscription not found',
+      'Go to Subscriptions',
+      '/subscriptions',
+    ],
+  ])('says a missing object is not found, the same way: %s', async (path, h1, title, back, href) => {
+    at(path);
+    const state = await screen.findByTestId('not-found-state');
+    // The page's heading names the object that was asked for.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(h1);
+    expect(within(state).getByRole('heading', { name: title })).toBeVisible();
+    expect(within(state).getByRole('link', { name: back })).toHaveAttribute('href', href);
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(document.querySelector('.pf-v6-c-alert.pf-m-danger')).toBeNull();
+    expect(screen.queryByText(/object with identifier/)).not.toBeInTheDocument();
   });
 
   it('shows the not-found page with a way back', async () => {
@@ -145,5 +204,58 @@ describe('routes', () => {
   it('shows a success toast for a notice passed through navigation state', async () => {
     at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
     expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+  });
+
+  it('clears a success toast when the user moves on to another page', async () => {
+    const user = userEvent.setup();
+    at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
+    expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Models' }));
+    await screen.findByRole('heading', { level: 1, name: 'Models' });
+    expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+  });
+
+  it('does not show a notice again when Back returns to its page', async () => {
+    let navigate!: NavigateFunction;
+    const CaptureNavigate = () => {
+      navigate = useNavigate();
+      return null;
+    };
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/clusters', state: { notice: 'Organization saved' } }]}>
+        <CaptureNavigate />
+        <App service={new MockConsoleService()} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+    // Taking the notice out of the history entry doesn't close the toast.
+    await act(async () => {});
+    expect(screen.getByText('Organization saved')).toBeInTheDocument();
+    await user.click(screen.getByRole('link', { name: 'Models' }));
+    await screen.findByRole('heading', { level: 1, name: 'Models' });
+    await act(async () => {
+      await navigate(-1);
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Clusters' });
+    expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+  });
+
+  it('times a success toast out', async () => {
+    vi.useFakeTimers();
+    try {
+      at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText('Organization saved')).toBeInTheDocument();
+      // PatternFly's 8 seconds, then its 3-second fade.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(11500);
+      });
+      expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -1,23 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  AlertActionLink,
   Button,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   EmptyState,
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
-  Icon,
   PageSection,
   ToolbarItem,
-  Tooltip,
 } from '@patternfly/react-core';
-import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import type { ThProps } from '@patternfly/react-table';
 import { Link, useNavigate } from 'react-router-dom';
 import type { ClustersService, GridMembership } from '../../api/clusters';
-import type { UserService } from '../../api/ConsoleService';
 import { ServiceError } from '../../api/ConsoleService';
 import type { GridCluster } from '../../api/types';
 import { LoadError } from '../../components/LoadError';
@@ -29,84 +27,142 @@ import { SimpleMenuActions } from '../../components/SimpleMenuActions';
 import { StatusLabel } from '../../components/StatusLabel';
 import { ToolbarSearch } from '../../components/ToolbarSearch';
 import { TableEmptyRow } from '../../components/TableEmptyRow';
+import { useConsoleSession } from '../../context/useConsoleSession';
 import { useServiceData } from '../../hooks/useServiceData';
 import { EMPTY_VALUE } from '../../utilities/format';
 import type { MembershipChange } from './MembershipModal';
+import { ClusterChangedError } from './ClusterChangedError';
 import { MembershipModal } from './MembershipModal';
+import { MissingLabel } from './MissingLabel';
+import { clusterRoles, roleOf } from './roles';
 
 // Ported from krisv/ai-grid-cloud-provider-poc src/app/pages/clusters/ClustersPage.tsx at 62319b8.
-// The PoC's columns, labels, and enroll flow, plus the console's Hub and OpenShift columns,
-// removal from AI Grid, and a confirmation both ways. Site and Region are left out until clusters
-// carry them (ai-grid/site and ai-grid/region; nothing sets them yet). The Connection tooltip
-// adds the ACM state behind Unknown (such as Importing) and the backend's message, which the
-// PoC's three states don't have.
+// The PoC's columns, labels, and enroll flow, plus the console's Role and OpenShift columns,
+// removal from AI Grid, and a confirmation both ways. No Hub column: a cluster the hub hasn't
+// accepted shows Not accepted in the Connection tooltip, and Add says why it's disabled (on the
+// real backend the BFF derives that state from spec.hub_accepts_client, bff/internal/backend/v1.go).
+// Site and Region (ai-grid/site and ai-grid/region) are left out: geography is after the MVP, and
+// the console doesn't write either label. The Connection tooltip adds the ACM state behind Unknown (such as
+// Importing) and the backend's message, which the PoC's three states don't have.
 
-type Props = { service: ClustersService & UserService };
+type Props = { service: ClustersService };
 
-// A wide column shows from the 2xl breakpoint (1450 px) up; below it the table fits the
-// content area without clipping the Action column.
-type Column = { label: string; sort?: (a: GridCluster, b: GridCluster) => number; wide?: boolean };
+type Column = {
+  label: string;
+  sort?: (a: GridCluster, b: GridCluster) => number;
+  info?: ThProps['info'];
+};
 
 const columns: Column[] = [
   { label: 'Cluster', sort: (a, b) => a.name.localeCompare(b.name) },
   { label: 'Location', sort: (a, b) => (a.location ?? '').localeCompare(b.location ?? '') },
   { label: 'Connection', sort: (a, b) => a.status.localeCompare(b.status) },
   { label: 'AI Grid', sort: (a, b) => membership(a).localeCompare(membership(b)) },
-  { label: 'Hub', wide: true },
+  {
+    label: 'Role',
+    sort: (a, b) => memberRole(a).localeCompare(memberRole(b)),
+    info: {
+      ariaLabel: 'About cluster roles',
+      popover: (
+        <DescriptionList isCompact>
+          {clusterRoles.map((r) => (
+            <DescriptionListGroup key={r.value}>
+              <DescriptionListTerm>{r.label}</DescriptionListTerm>
+              <DescriptionListDescription>{r.description}</DescriptionListDescription>
+            </DescriptionListGroup>
+          ))}
+        </DescriptionList>
+      ),
+      popoverProps: { headerContent: 'What a member runs' },
+    },
+  },
   { label: 'OpenShift' },
 ];
-
-const wideOnly: ThProps['visibility'] = ['hidden', 'visibleOn2Xl'];
 
 /** A member's provisioning, or nothing for a cluster outside AI Grid (sorts first). */
 const membership = (c: GridCluster) => (c.aiGridEnabled ? c.provisioningStatus : '');
 
+/** A member's role label, '-' for a member without one, nothing outside AI Grid (sorts first). */
+const memberRole = (c: GridCluster) => (c.aiGridEnabled ? (roleOf(c.labels)?.label ?? '-') : '');
+
 /** The Connection tooltip: the ACM state behind Unknown, then the backend's message. */
 const statusReason = (c: GridCluster) => [c.state, c.statusMessage].filter(Boolean).join(': ') || undefined;
 
-/** Why a cluster can't be added: the hub hasn't finished importing it (or is detaching it). */
-const cannotAddReason = (c: GridCluster) =>
-  c.state ? `The hub can add this cluster to AI Grid once it has imported it (now: ${c.state}).` : undefined;
+/** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */
+const cannotAddReason = (c: GridCluster) => {
+  if (c.state === 'Not accepted') {
+    return "The hub hasn't accepted this cluster yet. Accept it in ACM, then add it to AI Grid.";
+  }
+  return c.state ? `The hub can add this cluster to AI Grid once it has imported it (now: ${c.state}).` : undefined;
+};
 
 export const ClustersPage: React.FC<Props> = ({ service }) => {
   const navigate = useNavigate();
   const [clusters, loaded, error, refresh] = useServiceData<GridCluster[]>(() => service.listClusters(), []);
-  const [user] = useServiceData(() => service.getUser(), undefined, 0);
+  const { user } = useConsoleSession();
   const isProviderAdmin = !!user?.isProviderAdmin;
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 0, direction: 'asc' });
   const [change, setChange] = useState<MembershipChange>();
-  // Membership the backend confirmed, shown until the next list arrives (it applies only to
-  // the list it was confirmed against).
-  const [confirmed, setConfirmed] = useState<{ list: GridCluster[]; members: Map<string, boolean> }>();
-  const overrides = confirmed?.list === clusters ? confirmed.members : undefined;
+  // Clusters as the backend returned them from Add or Remove, with their new labels (role and
+  // location), shown in place of the listed ones until a reload started after the latest change
+  // answers. A poll that answers in between can't bring back the row from before the change.
+  const [confirmed, setConfirmed] = useState<Map<string, GridCluster>>(new Map());
+  const lastReload = useRef(0);
 
   const rows = useMemo(() => {
     const term = search.toLowerCase();
     const compare = columns[sortBy.index].sort!;
     return clusters
-      .map((c) => (overrides?.has(c.name) ? { ...c, aiGridEnabled: overrides.get(c.name)! } : c))
+      .map((c) => confirmed.get(c.name) ?? c)
       .filter((c) => c.name.toLowerCase().includes(term))
       .sort((a, b) => (sortBy.direction === 'asc' ? compare(a, b) : compare(b, a)));
-  }, [clusters, overrides, search, sortBy]);
+  }, [clusters, confirmed, search, sortBy]);
 
+  /** Reloads the list; its answer includes every change so far, so it replaces the confirmed clusters. */
   const reload = () => {
-    setConfirmed(undefined);
-    void refresh();
+    const id = ++lastReload.current;
+    void refresh().then(() => {
+      if (id === lastReload.current) setConfirmed(new Map());
+    });
   };
 
   /** Adds the cluster to AI Grid or removes it; throws for the modal to show. */
   const applyChange = async ({ cluster, join }: MembershipChange, membership?: GridMembership) => {
-    const updated = membership
-      ? await service.enrollCluster(cluster, membership)
-      : await service.removeClusterFromGrid(cluster);
+    let updated: GridCluster;
+    try {
+      updated = membership
+        ? await service.enrollCluster(cluster, membership)
+        : await service.removeClusterFromGrid(cluster);
+    } catch (err) {
+      if (err instanceof ServiceError && err.isConflict) {
+        // The cluster changed since the dialog opened, so the PATCH carried old labels and an old
+        // version. Load it again and give the open dialog the new one, so the next try sends what
+        // the backend has now; the dialog decides whether the user's location and role still
+        // stand (ClusterChangedError).
+        const current = await service.listClusters().then(
+          (list) => list.find((c) => c.name === cluster.name),
+          () => undefined,
+        );
+        if (current) {
+          setChange((open) => (open?.cluster.name === current.name ? { ...open, cluster: current } : open));
+        }
+        reload();
+        throw new ClusterChangedError(current);
+      }
+      throw err;
+    }
     if (updated.aiGridEnabled !== join) {
       throw new Error('The Hub did not confirm the change. Refresh and try again.');
     }
-    setConfirmed({ list: clusters, members: new Map(overrides).set(updated.name, join) });
+    setConfirmed((prev) => new Map(prev).set(updated.name, updated));
     setChange(undefined);
-    navigate('.', { state: { notice: `${updated.name} ${join ? 'added to' : 'removed from'} AI Grid` } });
-    void refresh();
+    // Replace, so the notice doesn't add a second Clusters entry to the browser's history.
+    navigate('.', {
+      replace: true,
+      state: { notice: `${updated.name} ${join ? 'added to' : 'removed from'} AI Grid` },
+    });
+    reload();
   };
 
   const sortParams = (index: number): ThProps['sort'] =>
@@ -120,19 +176,7 @@ export const ClustersPage: React.FC<Props> = ({ service }) => {
 
   const body = () => {
     if (error) {
-      if (error instanceof ServiceError && error.isNotImplemented) {
-        return <LoadError subject="Clusters" error={error} />;
-      }
-      return (
-        <Alert
-          isInline
-          variant="danger"
-          title="Error loading clusters"
-          actionLinks={<AlertActionLink onClick={reload}>Retry</AlertActionLink>}
-        >
-          {error.message}
-        </Alert>
-      );
+      return <LoadError subject="Clusters" error={error} title="Error loading clusters" onRetry={reload} />;
     }
     if (clusters.length === 0) {
       return (
@@ -171,7 +215,7 @@ export const ClustersPage: React.FC<Props> = ({ service }) => {
               <Thead>
                 <Tr>
                   {columns.map((c, i) => (
-                    <Th key={c.label} sort={sortParams(i)} modifier="wrap" visibility={c.wide ? wideOnly : undefined}>
+                    <Th key={c.label} sort={sortParams(i)} info={c.info} modifier="wrap">
                       {c.label}
                     </Th>
                   ))}
@@ -198,14 +242,12 @@ export const ClustersPage: React.FC<Props> = ({ service }) => {
                       <Td dataLabel="Location">
                         {c.location ??
                           (c.aiGridEnabled ? (
-                            <Tooltip content="This member has no location label, so models can't be deployed to it.">
-                              <span tabIndex={0} data-testid={`missing-location-${c.name}`}>
-                                <Icon status="warning" isInline>
-                                  <ExclamationTriangleIcon />
-                                </Icon>{' '}
-                                No location
-                              </span>
-                            </Tooltip>
+                            <MissingLabel
+                              testId={`missing-location-${c.name}`}
+                              reason="This member has no location label, so models can't be deployed to it."
+                            >
+                              No location
+                            </MissingLabel>
                           ) : (
                             EMPTY_VALUE
                           ))}
@@ -214,10 +256,23 @@ export const ClustersPage: React.FC<Props> = ({ service }) => {
                         <StatusLabel isCompact status={c.status} reason={statusReason(c)} />
                       </Td>
                       <Td dataLabel="AI Grid">
-                        {c.aiGridEnabled ? <StatusLabel isCompact status={c.provisioningStatus} /> : EMPTY_VALUE}
+                        {c.aiGridEnabled ? (
+                          <StatusLabel isCompact status={c.provisioningStatus} />
+                        ) : (
+                          <span className="pf-v6-u-text-color-subtle">Not added</span>
+                        )}
                       </Td>
-                      <Td dataLabel="Hub" visibility={wideOnly}>
-                        {c.hubAcceptsClient ? 'Accepted' : 'Pending'}
+                      <Td dataLabel="Role">
+                        {!c.aiGridEnabled
+                          ? EMPTY_VALUE
+                          : (roleOf(c.labels)?.label ?? (
+                              <MissingLabel
+                                testId={`missing-role-${c.name}`}
+                                reason="This member has no role, so the hub doesn't install OpenShift AI or MaaS on it, and it never finishes provisioning. Remove it from AI Grid and add it again to choose a role."
+                              >
+                                No role
+                              </MissingLabel>
+                            ))}
                       </Td>
                       <Td dataLabel="OpenShift">{c.openshiftVersion ?? EMPTY_VALUE}</Td>
                       {isProviderAdmin && (

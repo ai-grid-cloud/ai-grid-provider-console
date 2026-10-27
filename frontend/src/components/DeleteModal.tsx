@@ -15,6 +15,7 @@ import {
   Stack,
   StackItem,
   TextInput,
+  Tooltip,
 } from '@patternfly/react-core';
 
 type Props = {
@@ -26,9 +27,13 @@ type Props = {
   deleteName: string;
   submitButtonLabel?: string;
   error?: Error;
+  /** Loading the object again after a failed delete failed too, so a retry sends the old version. */
+  reloadError?: Error;
   children: React.ReactNode;
   testId?: string;
   genericLabel?: boolean;
+  /** Why Delete can't be used now; set, it disables Delete and shows this in a tooltip. */
+  disabledReason?: string;
 };
 
 /** A delete confirmation that needs the resource's name typed in. */
@@ -40,9 +45,11 @@ export const DeleteModal: React.FC<Props> = ({
   onDelete,
   deleteName,
   error,
+  reloadError,
   submitButtonLabel = 'Delete',
   testId,
   genericLabel,
+  disabledReason,
 }) => {
   const [value, setValue] = useState('');
   const deleteNameSanitized = useMemo(() => deleteName.trim().replace(/\s+/g, ' '), [deleteName]);
@@ -56,18 +63,19 @@ export const DeleteModal: React.FC<Props> = ({
           <StackItem>{children}</StackItem>
           <StackItem>
             <Flex direction={{ default: 'column' }} spaceItems={{ default: 'spaceItemsSm' }}>
-              <FlexItem>
+              <FlexItem id="delete-modal-prompt">
                 Type <strong>{deleteNameSanitized}</strong> to confirm
                 {genericLabel ? '' : ' deletion'}:
               </FlexItem>
               <TextInput
                 id="delete-modal-input"
                 data-testid="delete-modal-input"
-                aria-label="Delete modal input"
+                // Named by the prompt above it, so a screen reader says what to type.
+                aria-labelledby="delete-modal-prompt"
                 value={value}
                 onChange={(_event, newValue) => setValue(newValue)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && confirmed && !deleting) {
+                  if (event.key === 'Enter' && confirmed && !deleting && !disabledReason) {
                     onDelete();
                   }
                 }}
@@ -83,15 +91,25 @@ export const DeleteModal: React.FC<Props> = ({
                 variant="danger"
               >
                 {error.message}
+                {reloadError && <p>The latest version could not be loaded again: {reloadError.message}</p>}
               </Alert>
             </StackItem>
           )}
         </Stack>
       </ModalBody>
       <ModalFooter>
-        <Button variant="danger" isLoading={deleting} isDisabled={deleting || !confirmed} onClick={onDelete}>
-          {submitButtonLabel}
-        </Button>
+        {disabledReason ? (
+          // Aria-disabled, not disabled, so the button takes focus and shows why from the keyboard.
+          <Tooltip content={disabledReason}>
+            <Button variant="danger" isAriaDisabled>
+              {submitButtonLabel}
+            </Button>
+          </Tooltip>
+        ) : (
+          <Button variant="danger" isLoading={deleting} isDisabled={deleting || !confirmed} onClick={onDelete}>
+            {submitButtonLabel}
+          </Button>
+        )}
         <Button variant="link" onClick={onClose}>
           Cancel
         </Button>

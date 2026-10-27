@@ -7,7 +7,7 @@ import { Breadcrumb, BreadcrumbItem } from '@patternfly/react-core';
 import type { GovernanceService } from '../../context/useMaaSGovernanceContext';
 import { useMaaSGovernanceContext } from '../../context/useMaaSGovernanceContext';
 import { useGetSubscriptionInfo } from '../../hooks/useGetSubscriptionInfo';
-import { getBackUrl, getSubscriptionViewUrl } from '../../utilities/maasGovernanceNavigation';
+import { getBackUrl, getSubscriptionViewUrl, subscriptionNotFound } from '../../utilities/maasGovernanceNavigation';
 import { ApplicationsPage } from './ApplicationsPage';
 import { CreateSubscriptionForm } from './createSubscription/CreateSubscriptionForm';
 
@@ -41,6 +41,7 @@ export const EditSubscriptionPage: React.FC<Props> = ({ service }) => {
       loaded={loaded || !!error}
       loadError={error}
       errorMessage="Unable to load subscription details."
+      notFound={subscriptionNotFound(subscriptionName, returnTo)}
       onRetry={() => {
         void reloadInfo();
         refresh();

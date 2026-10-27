@@ -11,7 +11,11 @@
       "billingUrl": "",
       "version": "dev",
       "modelsNamespace": "ai-grid-models",
-      "fakeBackend": false
+      "fakeBackend": false,
+      "monitoring": {
+        "enabled": false,
+        "persesProject": ""
+      }
     }
   }
 }

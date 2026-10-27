@@ -76,10 +76,13 @@ const (
 	ReasonPlacementDecisionEmpty    = "PlacementDecisionEmpty"
 	ReasonNotAsExpected             = "NotAsExpected"
 	ReasonRolloutComplete           = "Complete"
-	ReasonRolloutProgressing        = "Progressing"
-	ReasonProcessing                = "Processing"
-	MessageFeatureGateDisabled      = "ManifestWorkReplicaSet feature gate disabled on hub" // acm.md "Proposal"; the console's text for the backend's FailedPrecondition
-	MessageReferencedByCatalogFm    = "model %s is referenced by %s; remove those references first"
+	// ReasonPartiallyAvailable is the reason of a model that is READY on some
+	// of its clusters and not on others (proposal P13); the console's own.
+	ReasonPartiallyAvailable     = "PartiallyAvailable"
+	ReasonRolloutProgressing     = "Progressing"
+	ReasonProcessing             = "Processing"
+	MessageFeatureGateDisabled   = "ManifestWorkReplicaSet feature gate disabled on hub" // acm.md "Proposal"; the console's text for the backend's FailedPrecondition
+	MessageReferencedByCatalogFm = "model %s is referenced by %s; remove those references first"
 	// LabelManifestWorkReplicaSetLegacy is the deprecated owner label on a
 	// generated work, value `<namespace>.<name>`, still set when that fits 63
 	// characters (ocm:hub/controllers/manifestworkreplicasetcontroller/
@@ -89,7 +92,11 @@ const (
 	LabelManifestWorkReplicaSetOwnerKeyHash = "work.open-cluster-management.io/ownerkey-hash"
 	LabelPlacementName                      = "work.open-cluster-management.io/placementname"
 	// LabelFailApply on a ManagedCluster makes its work fail to apply
-	// (acm.md item 11). A console-owned mock label, not a hub one.
+	// (acm.md item 11). A console-owned mock label, not a hub one. "true"
+	// fails every model's work on that cluster; any other value is a
+	// comma-separated list of the model names whose work fails there, so one
+	// cluster can fail one model and serve another (a partially available
+	// model, proposal P13).
 	LabelFailApply = "ai-grid-mock/fail-apply"
 
 	// Feedback rule names and the resource identifiers of the two manifests

@@ -53,7 +53,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   const confirm = page.getByRole('button', { name: 'Delete', exact: true });
   await expect(confirm).toBeDisabled();
-  await page.getByLabel('Delete modal input').fill(unique);
+  await page.getByLabel(/^Type .* to confirm/).fill(unique);
   await confirm.click();
   await expect(page.getByText('Organization deleted')).toBeVisible();
   await expect(page.getByRole('link', { name: unique, exact: true })).toHaveCount(0);

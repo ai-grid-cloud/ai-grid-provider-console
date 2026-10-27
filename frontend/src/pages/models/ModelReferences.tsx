@@ -1,8 +1,9 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, List, ListItem } from '@patternfly/react-core';
-import type { ConsoleService } from '../../api/ConsoleService';
 import type { SubscriptionsService } from '../../api/subscriptions';
 import type { MaaSSubscription, ManagedModel } from '../../api/types';
+import { useConsoleSession } from '../../context/useConsoleSession';
 import { useServiceData } from '../../hooks/useServiceData';
 
 /** A subscription's model reference without a namespace means the console's models namespace. */
@@ -11,17 +12,23 @@ const references = (subscription: MaaSSubscription, model: ManagedModel, modelsN
     (ref) => ref.name === model.name && (ref.namespace ?? modelsNamespace) === model.namespace,
   );
 
-/** The subscriptions that still give access to the model, which the user should change first. */
+/**
+ * The subscriptions that still give access to the model, which the user should change first.
+ * `onInUse` hears whether any were found; while they load, or if they fail to, none are.
+ */
 export const ReferencingSubscriptions: React.FC<{
-  service: Pick<SubscriptionsService, 'listSubscriptions'> & Pick<ConsoleService, 'getConfig'>;
+  service: Pick<SubscriptionsService, 'listSubscriptions'>;
   model: ManagedModel;
-}> = ({ service, model }) => {
+  onInUse?: (inUse: boolean) => void;
+}> = ({ service, model, onInUse }) => {
   const [subscriptions, loaded] = useServiceData(() => service.listSubscriptions(), [], 0);
-  const [config] = useServiceData(() => service.getConfig(), undefined, 0);
+  const { config } = useConsoleSession();
   const using = config
     ? subscriptions.filter((subscription) => references(subscription, model, config.modelsNamespace))
     : [];
-  if (!loaded || using.length === 0) {
+  const inUse = loaded && using.length > 0;
+  useEffect(() => onInUse?.(inUse), [onInUse, inUse]);
+  if (!inUse) {
     return null;
   }
   return (

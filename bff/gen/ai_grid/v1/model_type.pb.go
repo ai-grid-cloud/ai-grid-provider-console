@@ -114,7 +114,12 @@ func (RolloutStrategy) EnumDescriptor() ([]byte, []int) {
 //	`Ready=False/MinimumReplicasUnavailable`, which the template's Degraded
 //	rule does not match, so its work stays Progressing and the model reads
 //	PENDING/`Processing`; a Progressive rollout times that cluster out after
-//	`progress_deadline`.
+//	`progress_deadline`. Between READY and FAILED, a placed model whose works
+//	are mixed (at least one work READY and at least one not, see
+//	ManifestWorkStatus.phase) is PARTIALLY_AVAILABLE with reason
+//	`PartiallyAvailable` and message "<n> of <m> clusters are serving the
+//	model." (proposal P13). So the precedence is READY, PARTIALLY_AVAILABLE,
+//	FAILED, then the PENDING cases.
 type ModelPhase int32
 
 const (
@@ -127,6 +132,9 @@ const (
 	// `Ready` is False with a terminal reason (hub), or a work is degraded or
 	// failed to apply.
 	ModelPhase_MODEL_PHASE_FAILED ModelPhase = 3
+	// Placed model: serving on some of its clusters but not all (a work is
+	// READY and another is PENDING or FAILED). Proposal P13.
+	ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE ModelPhase = 4
 )
 
 // Enum value maps for ModelPhase.
@@ -136,12 +144,14 @@ var (
 		1: "MODEL_PHASE_PENDING",
 		2: "MODEL_PHASE_READY",
 		3: "MODEL_PHASE_FAILED",
+		4: "MODEL_PHASE_PARTIALLY_AVAILABLE",
 	}
 	ModelPhase_value = map[string]int32{
-		"MODEL_PHASE_UNSPECIFIED": 0,
-		"MODEL_PHASE_PENDING":     1,
-		"MODEL_PHASE_READY":       2,
-		"MODEL_PHASE_FAILED":      3,
+		"MODEL_PHASE_UNSPECIFIED":         0,
+		"MODEL_PHASE_PENDING":             1,
+		"MODEL_PHASE_READY":               2,
+		"MODEL_PHASE_FAILED":              3,
+		"MODEL_PHASE_PARTIALLY_AVAILABLE": 4,
 	}
 )
 
@@ -2178,8 +2188,24 @@ type ManifestWorkStatus struct {
 	Generation int64 `protobuf:"varint,5,opt,name=generation,proto3" json:"generation,omitempty"`
 	// `observedGeneration` of the `Applied` condition.
 	ObservedGeneration int64 `protobuf:"varint,6,opt,name=observed_generation,json=observedGeneration,proto3" json:"observed_generation,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Summary of the model on this one cluster, derived by the server
+	// (proposal P13), output only:
+	//
+	//	READY when the spoke reports the model ready (the `ready` feedback
+	//	value of the LLMInferenceService manifest is "True"), with no reason;
+	//	FAILED when the work's `Applied` is False, or its `Degraded` is True
+	//	(the spoke's Ready is False with a terminal reason), with that
+	//	condition's reason and message, Applied first;
+	//	PENDING otherwise: with no reason when the cluster's agent has not
+	//	reported the work yet, else the reason and message of `Available` when
+	//	it is not True, else of `Progressing`.
+	Phase ModelPhase `protobuf:"varint,7,opt,name=phase,proto3,enum=ai_grid.v1.ModelPhase" json:"phase,omitempty"`
+	// Reason of the condition that decided `phase`.
+	Reason string `protobuf:"bytes,8,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Message of the condition that decided `phase`.
+	Message       string `protobuf:"bytes,9,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ManifestWorkStatus) Reset() {
@@ -2252,6 +2278,27 @@ func (x *ManifestWorkStatus) GetObservedGeneration() int64 {
 		return x.ObservedGeneration
 	}
 	return 0
+}
+
+func (x *ManifestWorkStatus) GetPhase() ModelPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return ModelPhase_MODEL_PHASE_UNSPECIFIED
+}
+
+func (x *ManifestWorkStatus) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ManifestWorkStatus) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 // One `status.resourceStatus.manifests[]` entry.
@@ -2645,7 +2692,7 @@ const file_ai_grid_v1_model_type_proto_rawDesc = "" +
 	"\tavailable\x18\x03 \x01(\x05R\tavailable\x12 \n" +
 	"\vprogressing\x18\x04 \x01(\x05R\vprogressing\x12\x1a\n" +
 	"\bdegraded\x18\x05 \x01(\x05R\bdegraded\x12\x18\n" +
-	"\aupdated\x18\x06 \x01(\x05R\aupdated\"\x96\x02\n" +
+	"\aupdated\x18\x06 \x01(\x05R\aupdated\"\xf6\x02\n" +
 	"\x12ManifestWorkStatus\x12!\n" +
 	"\fcluster_name\x18\x01 \x01(\tR\vclusterName\x12\x1b\n" +
 	"\twork_name\x18\x02 \x01(\tR\bworkName\x125\n" +
@@ -2656,7 +2703,10 @@ const file_ai_grid_v1_model_type_proto_rawDesc = "" +
 	"\n" +
 	"generation\x18\x05 \x01(\x03R\n" +
 	"generation\x12/\n" +
-	"\x13observed_generation\x18\x06 \x01(\x03R\x12observedGeneration\"\xba\x01\n" +
+	"\x13observed_generation\x18\x06 \x01(\x03R\x12observedGeneration\x12,\n" +
+	"\x05phase\x18\a \x01(\x0e2\x16.ai_grid.v1.ModelPhaseR\x05phase\x12\x16\n" +
+	"\x06reason\x18\b \x01(\tR\x06reason\x12\x18\n" +
+	"\amessage\x18\t \x01(\tR\amessage\"\xba\x01\n" +
 	"\x0eManifestStatus\x12:\n" +
 	"\bresource\x18\x01 \x01(\v2\x1e.ai_grid.v1.ResourceIdentifierR\bresource\x125\n" +
 	"\n" +
@@ -2679,13 +2729,14 @@ const file_ai_grid_v1_model_type_proto_rawDesc = "" +
 	"\x1cROLLOUT_STRATEGY_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ROLLOUT_STRATEGY_ALL\x10\x01\x12 \n" +
 	"\x1cROLLOUT_STRATEGY_PROGRESSIVE\x10\x02\x12*\n" +
-	"&ROLLOUT_STRATEGY_PROGRESSIVE_PER_GROUP\x10\x03*q\n" +
+	"&ROLLOUT_STRATEGY_PROGRESSIVE_PER_GROUP\x10\x03*\x96\x01\n" +
 	"\n" +
 	"ModelPhase\x12\x1b\n" +
 	"\x17MODEL_PHASE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MODEL_PHASE_PENDING\x10\x01\x12\x15\n" +
 	"\x11MODEL_PHASE_READY\x10\x02\x12\x16\n" +
-	"\x12MODEL_PHASE_FAILED\x10\x03BOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
+	"\x12MODEL_PHASE_FAILED\x10\x03\x12#\n" +
+	"\x1fMODEL_PHASE_PARTIALLY_AVAILABLE\x10\x04BOZMgithub.com/ai-grid-cloud/ai-grid-provider-console/bff/gen/ai_grid/v1;aigridv1b\x06proto3"
 
 var (
 	file_ai_grid_v1_model_type_proto_rawDescOnce sync.Once
@@ -2783,14 +2834,15 @@ var file_ai_grid_v1_model_type_proto_depIdxs = []int32{
 	28, // 38: ai_grid.v1.RolloutStatus.works:type_name -> ai_grid.v1.ManifestWorkStatus
 	37, // 39: ai_grid.v1.ManifestWorkStatus.conditions:type_name -> ai_grid.v1.Condition
 	29, // 40: ai_grid.v1.ManifestWorkStatus.manifests:type_name -> ai_grid.v1.ManifestStatus
-	30, // 41: ai_grid.v1.ManifestStatus.resource:type_name -> ai_grid.v1.ResourceIdentifier
-	37, // 42: ai_grid.v1.ManifestStatus.conditions:type_name -> ai_grid.v1.Condition
-	31, // 43: ai_grid.v1.ManifestStatus.feedback:type_name -> ai_grid.v1.FeedbackValue
-	44, // [44:44] is the sub-list for method output_type
-	44, // [44:44] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	1,  // 41: ai_grid.v1.ManifestWorkStatus.phase:type_name -> ai_grid.v1.ModelPhase
+	30, // 42: ai_grid.v1.ManifestStatus.resource:type_name -> ai_grid.v1.ResourceIdentifier
+	37, // 43: ai_grid.v1.ManifestStatus.conditions:type_name -> ai_grid.v1.Condition
+	31, // 44: ai_grid.v1.ManifestStatus.feedback:type_name -> ai_grid.v1.FeedbackValue
+	45, // [45:45] is the sub-list for method output_type
+	45, // [45:45] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_ai_grid_v1_model_type_proto_init() }

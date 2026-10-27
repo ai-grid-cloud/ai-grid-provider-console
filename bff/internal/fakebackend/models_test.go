@@ -283,7 +283,8 @@ func TestRepoModelFixturesDeriveTheirStates(t *testing.T) {
 
 	// madrid recovers its lease at 300s and joins both placements; its works
 	// are applied at the event's time even though the fake was polled later,
-	// and both models return to pending.
+	// and both models serve on their other clusters while madrid's starts:
+	// partially available (P13).
 	advance(310 * time.Second)
 	mistral = getModel(t, s, "mistral-7b-instruct")
 	if d := mistral.GetStatus().GetPlacement().GetDecisions(); len(d) != 4 {
@@ -292,7 +293,10 @@ func TestRepoModelFixturesDeriveTheirStates(t *testing.T) {
 	if w := mistral.GetStatus().GetRollout().GetWorks(); len(w) != 4 || w[2].GetClusterName() != "site-madrid-1" || !condition(w[2].GetConditions(), CondWorkApplied).GetLastTransitionTime().AsTime().Equal(testStart.Add(300*time.Second)) {
 		t.Errorf("mistral's madrid work = %v", w)
 	}
-	wantPhase(t, mistral, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonProcessing)
+	wantPhase(t, mistral, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
+	if msg := mistral.GetStatus().GetMessage(); msg != "3 of 4 clusters are serving the model." {
+		t.Errorf("mistral's message = %q", msg)
+	}
 	granite = getModel(t, s, "granite-8b-instruct")
 	if d := granite.GetStatus().GetPlacement().GetDecisions(); len(d) != 2 || d[0].GetClusterName() != "site-madrid-1" {
 		t.Errorf("madrid joins once its taint is gone: %v", d)
@@ -300,13 +304,30 @@ func TestRepoModelFixturesDeriveTheirStates(t *testing.T) {
 	if w := granite.GetStatus().GetRollout().GetWorks()[0]; w.GetClusterName() != "site-madrid-1" || !condition(w.GetConditions(), CondWorkApplied).GetLastTransitionTime().AsTime().Equal(testStart.Add(300*time.Second)) {
 		t.Errorf("madrid's work = %v", w)
 	}
-	wantPhase(t, granite, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonProcessing)
-	// madrid's spokes are Ready at 345s: both models are Ready, granite on two
-	// sites and mistral on four.
+	wantPhase(t, granite, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
+	if msg := granite.GetStatus().GetMessage(); msg != "1 of 2 clusters are serving the model." {
+		t.Errorf("granite's message = %q", msg)
+	}
+	// madrid's spoke is Ready for granite at 345s: granite is Ready on two
+	// sites. madrid's ai-grid-mock/fail-apply names mistral only, so mistral's
+	// work there never applies: it stays partially available, serving on
+	// three of its four clusters, the fixtures' standing example of P13.
 	advance(350 * time.Second)
 	granite, mistral = getModel(t, s, "granite-8b-instruct"), getModel(t, s, "mistral-7b-instruct")
 	wantPhase(t, granite, aigridv1.ModelPhase_MODEL_PHASE_READY, ReasonRolloutComplete)
-	wantPhase(t, mistral, aigridv1.ModelPhase_MODEL_PHASE_READY, ReasonRolloutComplete)
+	wantPhase(t, mistral, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
+	if msg := mistral.GetStatus().GetMessage(); msg != "3 of 4 clusters are serving the model." {
+		t.Errorf("mistral's message = %q", msg)
+	}
+	for _, w := range mistral.GetStatus().GetRollout().GetWorks() {
+		want := aigridv1.ModelPhase_MODEL_PHASE_READY
+		if w.GetClusterName() == "site-madrid-1" {
+			want = aigridv1.ModelPhase_MODEL_PHASE_FAILED
+		}
+		if w.GetPhase() != want {
+			t.Errorf("mistral on %s: %s, want %s", w.GetClusterName(), w.GetPhase(), want)
+		}
+	}
 	if len(granite.GetStatus().GetRollout().GetWorks()) != 2 || len(mistral.GetStatus().GetRollout().GetWorks()) != 4 {
 		t.Errorf("works: granite %d, mistral %d", len(granite.GetStatus().GetRollout().GetWorks()), len(mistral.GetStatus().GetRollout().GetWorks()))
 	}
@@ -583,6 +604,31 @@ func TestLLMISvcFailureModes(t *testing.T) {
 	}
 }
 
+// The API server serves metav1.Time in whole seconds; the fake's clock has
+// fractions, which it must not show.
+func TestKubernetesTimesAreWholeSeconds(t *testing.T) {
+	s, advance := modelServer(t, &Fixtures{})
+	advance(1500 * time.Millisecond)
+	createModel(t, s, hubModel("frac"))
+	advance(30*time.Second + 250*time.Millisecond)
+	m := getModel(t, s, "frac")
+	times := []*timestamppb.Timestamp{m.GetMetadata().GetCreationTimestamp()}
+	for _, c := range m.GetStatus().GetConditions() {
+		times = append(times, c.GetLastTransitionTime())
+	}
+	if len(times) < 2 {
+		t.Fatalf("no conditions yet: %v", m.GetStatus())
+	}
+	for _, ts := range times {
+		if ts != nil && ts.GetNanos() != 0 {
+			t.Errorf("time %s has a fraction of a second", ts.AsTime().Format(time.RFC3339Nano))
+		}
+	}
+	if got := m.GetMetadata().GetCreationTimestamp().AsTime(); !got.Equal(testStart.Add(time.Second)) {
+		t.Errorf("creationTimestamp = %s, want start + 1.5s truncated to 1s", got)
+	}
+}
+
 func TestSpeedScalesTheModelLifecycle(t *testing.T) {
 	s, advance := modelServer(t, &Fixtures{Speed: 10})
 	createModel(t, s, hubModel("fast"))
@@ -591,8 +637,10 @@ func TestSpeedScalesTheModelLifecycle(t *testing.T) {
 	advance(5 * time.Second) // 50 scenario seconds
 	m := getModel(t, s, "fast")
 	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_READY, "")
-	if lt := condition(m.GetStatus().GetConditions(), CondReady).GetLastTransitionTime().AsTime(); !lt.Equal(testStart.Add(4500 * time.Millisecond)) {
-		t.Errorf("Ready at wall %s, want start + 4.5s", lt)
+	// Ready at scenario 45 s is wall 4.5 s, served in whole seconds as the API
+	// server does (metav1.Time): 4 s.
+	if lt := condition(m.GetStatus().GetConditions(), CondReady).GetLastTransitionTime().AsTime(); !lt.Equal(testStart.Add(4 * time.Second)) {
+		t.Errorf("Ready at wall %s, want start + 4.5s truncated to 4s", lt)
 	}
 }
 
@@ -1025,7 +1073,8 @@ func TestAllRolloutAndClusterChanges(t *testing.T) {
 	if len(works) != 3 || works[1].GetWorkName() != "model-allw0004" || !condition(works[1].GetConditions(), CondWorkApplied).GetLastTransitionTime().AsTime().Equal(testStart.Add(time.Minute)) {
 		t.Errorf("site-b gets a fresh work, applied when its label came back: %v", works)
 	}
-	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonProcessing)
+	// Still serving on site-a and site-c while site-b's work starts.
+	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
 }
 
 func TestFailApplyAndTimeouts(t *testing.T) {
@@ -1056,13 +1105,19 @@ func TestFailApplyAndTimeouts(t *testing.T) {
 	}
 	// While site-a still progresses the controller's rule reads Processing
 	// (progressing > 0, degraded == 0); once it is done, available != total
-	// gives NotAsExpected and the unapplied work makes the phase FAILED.
+	// gives NotAsExpected, and with site-a serving and site-b's work unapplied
+	// the model is partially available (P13), not FAILED. Each work says
+	// which: site-a READY, site-b FAILED with its Applied condition.
 	wantCond(t, m.GetStatus().GetRollout().GetConditions(), CondManifestworkApplied, cFalse, ReasonProcessing, "")
 	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonProcessing)
 	advance(2 * time.Minute)
 	m = getModel(t, s, "all")
 	wantCond(t, m.GetStatus().GetRollout().GetConditions(), CondManifestworkApplied, cFalse, ReasonNotAsExpected, "")
-	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_FAILED, ReasonNotAsExpected)
+	wantPhase(t, m, aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
+	if works := m.GetStatus().GetRollout().GetWorks(); works[0].GetPhase() != aigridv1.ModelPhase_MODEL_PHASE_READY || works[0].GetReason() != "" ||
+		works[1].GetPhase() != aigridv1.ModelPhase_MODEL_PHASE_FAILED || works[1].GetReason() != ReasonAppliedManifestWorkFailed || works[1].GetMessage() != MessageAppliedManifestWorkFailed {
+		t.Errorf("site-a READY, site-b FAILED with its Applied condition: %v", works)
+	}
 
 	// Progressive with the broken cluster first: ToApply (Applied not True)
 	// has no timeout in sdk-go, so it holds its slot indefinitely, never counts
@@ -2120,4 +2175,82 @@ func TestWorkSuffixGeneratorRenamesExistingWorks(t *testing.T) {
 	if strings.Join(first, ",") != strings.Join(second, ",") {
 		t.Errorf("work names differ between two identical servers:\n%v\n%v", first, second)
 	}
+}
+
+// A work's phase (P13) follows what the agent reported, in order: the spoke's
+// ready feedback, a failed apply, a degraded spoke, then pending with the
+// reason of the condition still in the way.
+func TestDeriveWorkPhase(t *testing.T) {
+	cond := func(typ string, status aigridv1.ConditionStatus, reason, message string) *aigridv1.Condition {
+		c := &aigridv1.Condition{Type: typ, Status: status}
+		if reason != "" {
+			c.Reason = proto.String(reason)
+		}
+		if message != "" {
+			c.Message = proto.String(message)
+		}
+		return c
+	}
+	ready := func(v string) []*aigridv1.ManifestStatus {
+		return []*aigridv1.ManifestStatus{{Feedback: []*aigridv1.FeedbackValue{{Name: FeedbackReady, Type: FeedbackTypeString, Value: v}}}}
+	}
+	for _, tc := range []struct {
+		name            string
+		work            *aigridv1.ManifestWorkStatus
+		phase           aigridv1.ModelPhase
+		reason, message string
+	}{
+		{"not reported yet", &aigridv1.ManifestWorkStatus{}, aigridv1.ModelPhase_MODEL_PHASE_PENDING, "", ""},
+		{"applied, not synced", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{cond(CondWorkApplied, cTrue, ReasonAppliedManifestWorkComplete, "")}}, aigridv1.ModelPhase_MODEL_PHASE_PENDING, "", ""},
+		{"unknown availability", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{
+			cond(CondWorkApplied, cTrue, ReasonAppliedManifestWorkComplete, ""), cond(CondWorkAvailable, cUnknown, ReasonResourcesStatusUnknown, "1 of 2 resources have unknown status"),
+		}}, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonResourcesStatusUnknown, "1 of 2 resources have unknown status"},
+		{"progressing", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{
+			cond(CondWorkApplied, cTrue, "", ""), cond(CondWorkAvailable, cTrue, "", ""), cond(CondWorkProgressing, cTrue, ReasonConditionRulesAggregated, "starting"), cond(CondWorkDegraded, cFalse, "", ""),
+		}, Manifests: ready("False")}, aigridv1.ModelPhase_MODEL_PHASE_PENDING, ReasonConditionRulesAggregated, "starting"},
+		{"degraded", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{
+			cond(CondWorkApplied, cTrue, "", ""), cond(CondWorkAvailable, cTrue, "", ""), cond(CondWorkDegraded, cTrue, ReasonConditionRulesAggregated, "config not found"),
+		}, Manifests: ready("False")}, aigridv1.ModelPhase_MODEL_PHASE_FAILED, ReasonConditionRulesAggregated, "config not found"},
+		{"failed to apply, before degraded", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{
+			cond(CondWorkApplied, cFalse, ReasonAppliedManifestWorkFailed, MessageAppliedManifestWorkFailed), cond(CondWorkDegraded, cTrue, "other", ""),
+		}}, aigridv1.ModelPhase_MODEL_PHASE_FAILED, ReasonAppliedManifestWorkFailed, MessageAppliedManifestWorkFailed},
+		{"ready", &aigridv1.ManifestWorkStatus{Conditions: []*aigridv1.Condition{
+			cond(CondWorkApplied, cTrue, "", ""), cond(CondWorkProgressing, cFalse, "", ""),
+		}, Manifests: ready("True")}, aigridv1.ModelPhase_MODEL_PHASE_READY, "", ""},
+	} {
+		phase, reason, message := deriveWorkPhase(tc.work)
+		if phase != tc.phase || reason != tc.reason || message != tc.message {
+			t.Errorf("%s: %s/%q/%q, want %s/%q/%q", tc.name, phase, reason, message, tc.phase, tc.reason, tc.message)
+		}
+	}
+}
+
+// The fail-apply label fails every model with "true", or the models it names.
+func TestFailApplyNamesModels(t *testing.T) {
+	for _, tc := range []struct {
+		value, model string
+		want         bool
+	}{
+		{"true", "any", true},
+		{"", "any", false},
+		{"false", "any", false},
+		{"granite-8b-instruct", "granite-8b-instruct", true},
+		{" mistral-7b-instruct , granite-8b-instruct ", "granite-8b-instruct", true},
+		{"granite-8b-instruct", "mistral-7b-instruct", false},
+	} {
+		if got := failsApply(tc.value, tc.model); got != tc.want {
+			t.Errorf("failsApply(%q, %q) = %v, want %v", tc.value, tc.model, got, tc.want)
+		}
+	}
+
+	// One cluster fails one model and serves another: the first model is
+	// partially available, the second Ready.
+	split := enrolled("site-b")
+	split.Labels[LabelFailApply] = "only"
+	s, advance := modelServer(t, &Fixtures{Clusters: []*aigridv1.ManagedCluster{enrolled("site-a"), split}})
+	createModel(t, s, placedModel("only", nil))
+	createModel(t, s, placedModel("other", nil))
+	advance(3 * time.Minute)
+	wantPhase(t, getModel(t, s, "only"), aigridv1.ModelPhase_MODEL_PHASE_PARTIALLY_AVAILABLE, ReasonPartiallyAvailable)
+	wantPhase(t, getModel(t, s, "other"), aigridv1.ModelPhase_MODEL_PHASE_READY, ReasonRolloutComplete)
 }

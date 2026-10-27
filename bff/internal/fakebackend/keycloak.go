@@ -31,7 +31,7 @@ const (
 	// Create and update.
 	MsgNameRequired        = "Name can not be null"                              // jpa/JpaOrganizationProvider.java L103-104
 	MsgNameNotAliasPrefix  = "Name cannot be used as alias: "                    // jpa/JpaOrganizationProvider.java L107-111
-	MsgDuplicateName       = "A organization with the same name already exists." // jpa/JpaOrganizationProvider.java L116-117; resource/OrganizationResource.java L123-125
+	MsgDuplicateName       = "A organization with the same name already exists." // sic, Keycloak's own words, which the backend passes on; jpa/JpaOrganizationProvider.java L116-117; resource/OrganizationResource.java L123-125
 	MsgDuplicateAlias      = "A organization with the same alias already exists" // sic, no period; jpa/JpaOrganizationProvider.java L120-121
 	MsgAliasImmutable      = "Cannot change the alias"                           // jpa/OrganizationAdapter.java L107-108
 	MsgOrganizationMissing = "Organization not found."                           // resource/OrganizationsResource.java L212-214

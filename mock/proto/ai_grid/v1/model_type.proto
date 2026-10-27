@@ -329,7 +329,12 @@ message ModelStatus {
 //   `Ready=False/MinimumReplicasUnavailable`, which the template's Degraded
 //   rule does not match, so its work stays Progressing and the model reads
 //   PENDING/`Processing`; a Progressive rollout times that cluster out after
-//   `progress_deadline`.
+//   `progress_deadline`. Between READY and FAILED, a placed model whose works
+//   are mixed (at least one work READY and at least one not, see
+//   ManifestWorkStatus.phase) is PARTIALLY_AVAILABLE with reason
+//   `PartiallyAvailable` and message "<n> of <m> clusters are serving the
+//   model." (proposal P13). So the precedence is READY, PARTIALLY_AVAILABLE,
+//   FAILED, then the PENDING cases.
 enum ModelPhase {
   // No status yet.
   MODEL_PHASE_UNSPECIFIED = 0;
@@ -340,6 +345,9 @@ enum ModelPhase {
   // `Ready` is False with a terminal reason (hub), or a work is degraded or
   // failed to apply.
   MODEL_PHASE_FAILED = 3;
+  // Placed model: serving on some of its clusters but not all (a work is
+  // READY and another is PENDING or FAILED). Proposal P13.
+  MODEL_PHASE_PARTIALLY_AVAILABLE = 4;
 }
 
 // `status.addresses[]` (`SourcedAddress`).
@@ -473,6 +481,21 @@ message ManifestWorkStatus {
   int64 generation = 5;
   // `observedGeneration` of the `Applied` condition.
   int64 observed_generation = 6;
+  // Summary of the model on this one cluster, derived by the server
+  // (proposal P13), output only:
+  //   READY when the spoke reports the model ready (the `ready` feedback
+  //   value of the LLMInferenceService manifest is "True"), with no reason;
+  //   FAILED when the work's `Applied` is False, or its `Degraded` is True
+  //   (the spoke's Ready is False with a terminal reason), with that
+  //   condition's reason and message, Applied first;
+  //   PENDING otherwise: with no reason when the cluster's agent has not
+  //   reported the work yet, else the reason and message of `Available` when
+  //   it is not True, else of `Progressing`.
+  ModelPhase phase = 7;
+  // Reason of the condition that decided `phase`.
+  string reason = 8;
+  // Message of the condition that decided `phase`.
+  string message = 9;
 }
 
 // One `status.resourceStatus.manifests[]` entry.

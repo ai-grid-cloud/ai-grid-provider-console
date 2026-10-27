@@ -12,7 +12,7 @@ test('the masthead and the fake-backend banner fit a phone-width screen', async 
   await expect(menu).toBeVisible();
   await expect(page.getByTestId('masthead-user')).toBeHidden();
 
-  const title = await page.getByRole('heading', { name: 'Cloud Provider Admin Console' }).boundingBox();
+  const title = await page.getByText('Cloud Provider Admin Console', { exact: true }).boundingBox();
   const user = await menu.boundingBox();
   const bar = await banner.boundingBox();
   expect(title && user && bar).toBeTruthy();
@@ -41,7 +41,7 @@ test.describe('on a laptop', () => {
 
   test('the masthead shows the console name on one line, level with the signed-in user', async ({ page }) => {
     await page.goto('/clusters');
-    const heading = page.getByRole('heading', { name: 'Cloud Provider Admin Console' });
+    const heading = page.getByText('Cloud Provider Admin Console', { exact: true });
     const name = page.getByTestId('masthead-user');
     await expect(name).toBeVisible();
     await expect(name).toContainText('provider admin');

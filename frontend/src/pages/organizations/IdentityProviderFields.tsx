@@ -101,7 +101,7 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
           onChange={(_event, description) => onChange({ ...value, description })}
         />
       </FormGroup>
-      <FormSection title="Connection" titleElement="h3">
+      <FormSection title="Connection" titleElement="h2">
         {textField(connectionFields[0])}
         <FormGroup label="Client secret reference" fieldId="idp-secret-reference" isRequired>
           <TextInput
@@ -136,7 +136,7 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
           onChange={(_event, validateSignature) => setConfig({ validateSignature })}
         />
       </FormSection>
-      <FormSection title="OIDC endpoints" titleElement="h3">
+      <FormSection title="OIDC endpoints" titleElement="h2">
         <HelperText>
           <HelperTextItem>
             The provider lists these in its OpenID configuration, at the issuer URL followed by

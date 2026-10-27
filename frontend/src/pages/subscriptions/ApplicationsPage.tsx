@@ -5,8 +5,8 @@
 // not-available state. A load error replaces the content only until the content first shows:
 // the governance data polls, and a failed poll must not unmount a form with the user's input.
 import { useState } from 'react';
-import { Alert, AlertActionLink, PageSection } from '@patternfly/react-core';
-import { ServiceError } from '../../api/ConsoleService';
+import { PageSection } from '@patternfly/react-core';
+import type { NotFound } from '../../components/LoadError';
 import { LoadError } from '../../components/LoadError';
 import { PageHeader } from '../../components/PageHeader';
 import { PageLoading } from '../../components/PageLoading';
@@ -20,6 +20,8 @@ type Props = {
   loadError?: Error;
   errorMessage?: string;
   onRetry: () => void;
+  /** For a page of one subscription: what a 404 says. */
+  notFound?: NotFound;
   children?: React.ReactNode;
 };
 
@@ -33,6 +35,7 @@ export const ApplicationsPage: React.FC<Props> = ({
   loadError,
   errorMessage,
   onRetry,
+  notFound,
   children,
 }) => {
   const [contentShown, setContentShown] = useState(false);
@@ -42,23 +45,16 @@ export const ApplicationsPage: React.FC<Props> = ({
   let body: React.ReactNode = children;
   if (!contentShown && !loaded) {
     body = <PageLoading label="Loading data" />;
-  } else if (!contentShown && loadError instanceof ServiceError && loadError.isNotImplemented) {
-    body = (
-      <PageSection isFilled>
-        <LoadError subject="Subscriptions" error={loadError} />
-      </PageSection>
-    );
   } else if (!contentShown && loadError) {
     body = (
       <PageSection isFilled>
-        <Alert
-          variant="danger"
-          isInline
+        <LoadError
+          subject="Subscriptions"
+          error={loadError}
           title={errorMessage ?? 'Unable to load subscriptions'}
-          actionLinks={<AlertActionLink onClick={onRetry}>Retry</AlertActionLink>}
-        >
-          {loadError.message}
-        </Alert>
+          onRetry={onRetry}
+          notFound={notFound}
+        />
       </PageSection>
     );
   }

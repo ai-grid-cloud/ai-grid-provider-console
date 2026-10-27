@@ -2,8 +2,8 @@
 // Adapted from opendatahub-io/odh-dashboard
 // packages/maas/frontend/src/app/pages/subscriptions/allSubscriptions/columns.ts
 // upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
-// The console adds the Organization column, sorted by the name it shows. Groups and models show
-// their first name and "+N more" instead of expanding a nested table (PatternFly's table guidelines).
+// The console adds the Organization column, sorted by the name it shows. Groups and Models show
+// counts that expand the row (SubscriptionTableRow), sorted by count.
 import type { ThProps } from '@patternfly/react-table';
 import type { MaaSSubscription } from '../../../api/types';
 import { normalizePhase } from '../../../utilities/phaseLabelUtils';
@@ -34,12 +34,12 @@ export const subscriptionsColumns = (organizationName: (s: MaaSSubscription) => 
   },
   {
     label: 'Groups',
-    width: 15,
+    width: 10,
     sortable: (a, b) => a.owner.groups.length - b.owner.groups.length,
   },
   {
     label: 'Models',
-    width: 15,
+    width: 10,
     sortable: (a, b) => a.modelRefs.length - b.modelRefs.length,
   },
   {

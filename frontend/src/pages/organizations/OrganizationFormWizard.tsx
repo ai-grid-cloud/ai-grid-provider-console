@@ -119,7 +119,7 @@ export const OrganizationFormWizard: React.FC<Props> = ({ service, organization 
           </Form>
         </WizardStep>
         <WizardStep name="Review" id="tenant-review" isDisabled={!form.detailsValid || !form.idpValid || saving}>
-          <ReviewStep organization={values} />
+          <ReviewStep organization={form.toSave} />
         </WizardStep>
       </Wizard>
       {discardModal}

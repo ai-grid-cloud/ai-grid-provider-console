@@ -1,0 +1,31 @@
+{{- $name := include "console.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $oauth := include "console.oauthSecretName" . -}}
+The AI Grid provider console is release {{ .Release.Name }} in namespace {{ $ns }}.
+
+The chart creates none of these. Without the Secrets the pod does not start; without the OAuthClient
+nobody can sign in:
+
+  - Secret {{ $oauth }}, for kube-auth-proxy: OAUTH2_PROXY_CLIENT_ID, OAUTH2_PROXY_CLIENT_SECRET,
+    OAUTH2_PROXY_COOKIE_SECRET (16, 24 or 32 bytes) and OAUTH2_PROXY_REDIRECT_URL.
+  - An OAuthClient (cluster-scoped) named as OAUTH2_PROXY_CLIENT_ID, with the same secret. Its
+    redirect URI and OAUTH2_PROXY_REDIRECT_URL must both be https://<the Route's host>/oauth2/callback,
+    or sign-in fails after the OpenShift login. When the host changes, change both.
+  - Secret {{ include "console.keycloakSecretName" . }}, for the backend: url, realm, admin-realm, username and password.
+{{- if .Values.backend.git.url }}
+  - Secret {{ .Values.backend.git.tokenSecretName }}, with key token: the backend's token for {{ .Values.backend.git.url }}.
+{{- end }}
+{{- if not .Values.tls.serviceCA }}
+  - Secret {{ include "console.tlsSecretName" . }} (kubernetes.io/tls) with tls.crt and tls.key, the proxy's HTTPS
+    certificate: tls.serviceCA is off, so OpenShift's service CA does not issue it.
+{{- end }}
+
+hack/deploy.sh in https://github.com/ai-grid-cloud/ai-grid-provider-console creates the OAuth and
+Keycloak Secrets and the OAuthClient, then installs this chart; on a hub that ai-grid-env-setup
+manages, its bootstrap/60-console.sh creates them. To see what is missing:
+
+  kubectl -n {{ $ns }} get secret {{ $oauth }} {{ include "console.keycloakSecretName" . }}{{ if .Values.backend.git.url }} {{ .Values.backend.git.tokenSecretName }}{{ end }}{{ if not .Values.tls.serviceCA }} {{ include "console.tlsSecretName" . }}{{ end }}
+  kubectl -n {{ $ns }} get pods -l app.kubernetes.io/name=ai-grid-provider-console
+{{- if .Values.route.enabled }}
+  kubectl -n {{ $ns }} get route {{ $name }} -o jsonpath='{.spec.host}'
+{{- end }}

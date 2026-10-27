@@ -255,6 +255,7 @@
           "ai-grid/enabled": "true",
           "ai-grid/provisioned": "false",
           "ai-grid/region": "us-east",
+          "ai-grid/role": "inference",
           "ai-grid/site": "ashburn-dc1",
           "cloud": "Amazon",
           "cluster.open-cluster-management.io/clusterset": "default",
@@ -584,9 +585,11 @@
         ],
         "resourceVersion": "48812499",
         "labels": {
+          "ai-grid-mock/fail-apply": "mistral-7b-instruct",
           "ai-grid/enabled": "true",
           "ai-grid/provisioned": "true",
           "ai-grid/region": "europe-south",
+          "ai-grid/role": "ingress",
           "ai-grid/site": "madrid-dc1",
           "cloud": "Amazon",
           "cluster.open-cluster-management.io/clusterset": "default",
@@ -719,6 +722,7 @@
           "ai-grid/enabled": "true",
           "ai-grid/provisioned": "true",
           "ai-grid/region": "europe-west",
+          "ai-grid/role": "combined",
           "ai-grid/site": "paris-dc1",
           "cloud": "BareMetal",
           "cluster.open-cluster-management.io/clusterset": "default",
@@ -745,6 +749,11 @@
           "open-cluster-management/created-via": "other"
         }
       }
-    ]
+    ],
+    "meta": {
+      "size": 10,
+      "total": 10,
+      "offset": 0
+    }
   }
 }

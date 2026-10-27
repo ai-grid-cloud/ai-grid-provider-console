@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { App } from '../App';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { OverflowList } from '../components/OverflowList';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { PageLoading } from '../components/PageLoading';
 import { StatusLabel } from '../components/StatusLabel';
 import { tickLabel } from '../pages/grid/chartScale';
@@ -74,4 +75,34 @@ it('offers Log out while the console configuration is still loading', async () =
   );
   await user.click(await screen.findByRole('button', { name: /dev-user/ }));
   expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
+});
+
+it('offers a reload when a page fails to load, and tries again on another page', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  const reload = vi.fn();
+  vi.stubGlobal('location', { ...window.location, reload });
+  try {
+    // What React.lazy throws when a page's chunk is gone after a redeploy.
+    const Missing = () => {
+      throw new TypeError('Failed to fetch dynamically imported module: /assets/ModelsPage-abc123.js');
+    };
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <PageErrorBoundary resetKey="/models">
+        <Missing />
+      </PageErrorBoundary>,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'This page could not be loaded' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(reload).toHaveBeenCalled();
+    rerender(
+      <PageErrorBoundary resetKey="/clusters">
+        <p>Clusters</p>
+      </PageErrorBoundary>,
+    );
+    expect(screen.getByText('Clusters')).toBeVisible();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  }
 });

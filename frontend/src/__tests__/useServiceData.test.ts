@@ -88,3 +88,76 @@ it('keeps the newest error when an older request succeeds after it', async () =>
   expect(result.current[0]).toBe('initial');
   expect(result.current[2]?.message).toBe('newer failed');
 });
+
+describe('in a hidden tab', () => {
+  let hidden = false;
+  const setHidden = (value: boolean) => {
+    hidden = value;
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+
+  beforeEach(() => {
+    hidden = false;
+    vi.spyOn(document, 'hidden', 'get').mockImplementation(() => hidden);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('skips polls while the tab is hidden and asks again when it shows after the interval', async () => {
+    const request = vi.fn(() => Promise.resolve('answer'));
+    renderHook(() => useServiceData(request, '', 1000));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    act(() => setHidden(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not ask again when the tab shows before the answer is an interval old', async () => {
+    const request = vi.fn(() => Promise.resolve('answer'));
+    renderHook(() => useServiceData(request, '', 1000));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    act(() => setHidden(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+    // The next tick polls as usual.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not ask again on showing the tab for data loaded once', async () => {
+    const request = vi.fn(() => Promise.resolve('answer'));
+    renderHook(() => useServiceData(request, '', 0));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    act(() => setHidden(true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+});

@@ -45,6 +45,9 @@ type Client struct {
 	http    *http.Client
 }
 
+// maxIdleConnsPerHost is how many connections to the hub stay open for reuse.
+const maxIdleConnsPerHost = 16
+
 // Config locates the API server.
 type Config struct {
 	// URL is the API server, for example https://10.0.0.1:443.
@@ -72,6 +75,10 @@ func New(cfg Config) (*Client, error) {
 		}
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// One page fires 3 to 7 API calls at once, each with its own access review
+	// to the one hub; the default 2 idle connections per host would make most
+	// of them open a new TLS connection every time.
+	transport.MaxIdleConnsPerHost = maxIdleConnsPerHost
 	if cfg.CAFile != "" {
 		pem, err := os.ReadFile(cfg.CAFile)
 		if err != nil {

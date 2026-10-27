@@ -150,16 +150,12 @@ func toTenant(t *aigridv1.Tenant) Tenant {
 	if attributes == nil {
 		attributes = map[string]string{}
 	}
-	alias := t.GetAlias()
-	if alias == "" {
-		alias = t.GetName() // Keycloak defaults the alias to the name; today's backend does not send it
-	}
 	// A backend that does not fill `enabled` (today's, fields 1-3 only) is
 	// read as enabled: Keycloak's default, and the only value under which
 	// every organization is usable.
 	enabled := t.Enabled == nil || t.GetEnabled()
 	out := Tenant{
-		ID: t.GetId(), Name: t.GetName(), Alias: alias, Enabled: enabled, Description: t.GetDescription(),
+		ID: t.GetId(), Name: t.GetName(), Alias: t.GetAlias(), Enabled: enabled, Description: t.GetDescription(),
 		Domains: domains, DomainDetails: details, Attributes: attributes, ResourceVersion: t.GetResourceVersion(),
 		IdentityProvider: toIdentityProvider(t.GetIdentityProvider()),
 	}
@@ -172,8 +168,12 @@ func toTenant(t *aigridv1.Tenant) Tenant {
 
 // queryInt reads an optional non-negative integer query parameter. The
 // request fields are int32, so the value is parsed as one: a larger number
-// is 422 instead of wrapping on its way into the proto.
+// is 422 instead of wrapping on its way into the proto. A repeated one is
+// 422 too, like a repeated `filter`: there is no telling which one was meant.
 func queryInt(r *http.Request, name string) (*int, error) {
+	if len(r.URL.Query()[name]) > 1 {
+		return nil, Errorf(http.StatusUnprocessableEntity, fmt.Sprintf("query parameter %q must be sent once", name))
+	}
 	raw := strings.TrimSpace(r.URL.Query().Get(name))
 	if raw == "" {
 		return nil, nil
@@ -208,6 +208,16 @@ func listFilter(r *http.Request, removed ...string) (*string, error) {
 		return proto.String(f), nil
 	}
 	return nil, nil
+}
+
+// noQuery refuses query parameters on a list that takes none (subscriptions:
+// ListSubscriptionsRequest carries no filter or page the BFF could forward),
+// so `?filter=false` is 422 rather than the whole list read as a filtered one.
+func noQuery(r *http.Request, what string) error {
+	if r.URL.RawQuery == "" {
+		return nil
+	}
+	return Errorf(http.StatusUnprocessableEntity, fmt.Sprintf("the %s list takes no query parameters; filter, sort and page it in the client", what))
 }
 
 // listTenants answers GET /api/v1/tenants?offset=&limit=&filter=. The
@@ -265,9 +275,7 @@ func pagedOrFiltered(offset, limit *int, filtered bool) bool {
 	return filtered || limit != nil || (offset != nil && *offset > 0)
 }
 
-// getTenant answers GET /api/v1/tenants/{id}. Unlike GET /clusters/{name} it
-// has no list fallback: the shipped backend has no GetTenant RPC, so against
-// it this is 501 (Unimplemented), like every tenant write.
+// getTenant answers GET /api/v1/tenants/{id}.
 func (a *App) getTenant(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := a.backend.Context(r.Context())
 	defer cancel()
@@ -315,7 +323,7 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := toTenant(resp.GetObject())
-	a.logger.Info("tenant created", "id", t.ID, "name", t.Name)
+	a.log(r).Info("tenant created", "tenant", t.ID, "name", t.Name)
 	w.Header().Set("Location", APIPrefix+"/tenants/"+url.PathEscape(t.ID))
 	setETag(w, t.ResourceVersion)
 	writeData(w, http.StatusCreated, t)
@@ -324,8 +332,8 @@ func (a *App) createTenant(w http.ResponseWriter, r *http.Request) {
 // TenantPatch is the body of PATCH /api/v1/tenants/{id}. Every field is
 // optional and an absent field is left alone; a present field replaces the
 // stored one as a whole (`domains: []` removes every domain, `attributes: {}`
-// every attribute). `alias` may be sent, but the backend refuses a value
-// other than the stored alias.
+// every attribute). The fake backend accepts `alias` only with the stored
+// value; the real backend's Tenants API refuses any `alias` (501).
 type TenantPatch struct {
 	Name        *string            `json:"name"`
 	Alias       *string            `json:"alias"`
@@ -407,7 +415,7 @@ func (a *App) patchTenant(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
-	a.logger.Info("tenant updated", "id", id, "paths", paths)
+	a.log(r).Info("tenant updated", "tenant", id, "paths", paths)
 	setETag(w, resp.GetObject().GetResourceVersion())
 	writeData(w, http.StatusOK, toTenant(resp.GetObject()))
 }
@@ -428,7 +436,7 @@ func (a *App) deleteTenant(w http.ResponseWriter, r *http.Request) {
 		a.respondError(w, r, err)
 		return
 	}
-	a.logger.Info("tenant deleted", "id", id)
+	a.log(r).Info("tenant deleted", "tenant", id)
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusNoContent)
 }

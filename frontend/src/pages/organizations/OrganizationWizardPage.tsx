@@ -51,7 +51,7 @@ export const OrganizationWizardPage: React.FC<Props> = ({ service }) => {
       ) : (
         <PageSection hasBodyWrapper={false} isFilled>
           {error ? (
-            <OrganizationLoadError error={error} />
+            <OrganizationLoadError error={error} id={id} />
           ) : (
             <OrganizationFormWizard key={organization?.id} service={service} organization={organization} />
           )}

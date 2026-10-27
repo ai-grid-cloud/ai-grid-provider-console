@@ -2,3 +2,11 @@ packages:
   - .
 allowBuilds:
   esbuild: true
+# Fixes in dependencies until upstream has them (`pnpm patch`); each patch applies to that exact
+# version, and an install fails if it no longer does.
+patchedDependencies:
+  # The pie chart imports `format` from 'echarts', whose index registers every ECharts chart and
+  # component (about 120 kB gzipped more in the Monitoring chunk); 'echarts/core' exports the same
+  # `format`, as the other Perses plugins import it. Fixed upstream by perses/plugins#893; drop
+  # this patch once a pie chart release with that fix is in use.
+  '@perses-dev/pie-chart-plugin@0.14.0': patches/@perses-dev__pie-chart-plugin@0.14.0.patch

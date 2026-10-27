@@ -10,6 +10,8 @@ set -euo pipefail
 BFF_URL="${BFF_URL:-http://127.0.0.1:8080}"
 TOKEN="${AUTH_TOKEN:-$(oc whoami -t)}"
 USER_NAME="${AUTH_USER:-$(oc whoami)}"
+# ${args[@]+...} below, not "${args[@]}": macOS's /bin/bash 3.2 calls an empty array unbound
+# under set -u.
 args=()
 path=""
 for a in "$@"; do
@@ -18,5 +20,5 @@ done
 [[ -n "$path" ]] || { echo "usage: hack/api.sh [curl options] /api/v1/<path>" >&2; exit 2; }
 curl -sS -H "x-forwarded-access-token: ${TOKEN}" -H "x-forwarded-user: ${USER_NAME}" \
   ${AUTH_GROUPS:+-H "x-forwarded-groups: ${AUTH_GROUPS}"} \
-  -H 'Content-Type: application/json' "${args[@]}" "${BFF_URL}${path}"
+  -H 'Content-Type: application/json' ${args[@]+"${args[@]}"} "${BFF_URL}${path}"
 echo

@@ -32,11 +32,11 @@ What keeps it honest:
   backend's `proto/ai_grid/v1` at the commit in `mock/proto/upstream/COMMIT`, and
   `mock/proto/upstream/image.binpb` is those files compiled with their imports by `buf build`.
   `hack/sync-upstream-proto.sh <ref>` refreshes all three.
-- **A test guards the BFF's copy.** Against the real backend the BFF calls `Clusters` and
-  `Tenants` with a copy of their messages, `mock/proto/ai_grid/backend/v1`.
+- **A test guards the BFF's copy.** Against the real backend the BFF calls `Clusters`,
+  `Tenants`, `Subscriptions` and `Models` with a copy of their messages, `mock/proto/ai_grid/backend/v1`.
   `bff/internal/protodrift` loads the vendored image and checks that every copied message,
   field (same number, name, cardinality, presence, oneof and type) and enum value is still
-  the backend's, and that the four RPCs the BFF calls still take and return those messages.
+  the backend's, and that the RPCs the BFF calls still take and return those messages.
   The day the backend changes one of them, the sync script plus this test name every
   difference. `TestFakeImplementsEveryProtoMethod` in
   `bff/internal/fakebackend` then calls every method of every draft service and fails on an
@@ -132,6 +132,7 @@ comment in the draft says the same. Proposals the port first made and PR 12 late
 | P7 | `Models.ListLocations`, `ListLocationsResponse.locations = 1` | The `location` labels of the clusters that are AI Grid members (`ai-grid/enabled` and `ai-grid/provisioned` both `true`) and Available, unique and sorted: the PoC's eligible locations on PR 12's cluster state |
 | P8 | So far `PlacementStatus.locations = 4` | The `location` labels of the decided clusters, unique and sorted; a decided cluster without the label adds nothing |
 | P11 | The bodies of `subscriptions_service.proto` and `Grid/GetOverview`, which filled the placeholders | Subscriptions: create, read, update and delete with the CRD's rules and `BadRequest` field violations, `If-Match` as `resource_version` (set means checked, `Aborted` when stale). The overview: the PoC's metric contract with a deterministic demo generator, `range` limited to `1h`, `6h` and `24h`, a metric status per series, and the cluster inventory read from PR 12's cluster state |
+| P13 | `ModelPhase.MODEL_PHASE_PARTIALLY_AVAILABLE = 4`, and `ManifestWorkStatus.phase = 7`, `reason = 8` and `message = 9`, output only | Each work's phase on its cluster: READY when the spoke's `ready` feedback is True; FAILED when `Applied` is False or `Degraded` is True, with that condition's reason and message, Applied first; otherwise PENDING, with no reason before the agent reports, else `Available`'s reason and message while it is not True, else `Progressing`'s. A placed model with some works READY and others not reads PARTIALLY_AVAILABLE, reason `PartiallyAvailable`, message "<n> of <m> clusters are serving the model.", after READY and before FAILED. The console's Models page lists each cluster's phase under the model (jgiardino's "models per cluster" design) |
 | P12 | The MaaS status the research implies (`mock/research/models-maas.md` 8.1). `Subscription.phase = 10` is `Active`, `Degraded`, `Failed` or `Invalid`, and empty until the first reconcile (the controller never writes `Pending`), fields 11 and 12 are `reserved`, and `conditions = 16`, `model_ref_statuses = 17` and `token_rate_limit_statuses = 18` are new. `AuthPolicy` gains `conditions = 7` and `model_refs = 8` (`AuthPolicyModelRef {name, namespace}`, replacing the reserved bare names in 5). New messages `ResourceRefStatus`, `TokenRateLimitStatus` and `ModelRegistration`, and `GetSubscriptionResponse.model_registrations = 4`. All output only | The controller's phases, conditions, reasons and messages, word for word, derived on every read; the timing is in `mock/README.md`, area 4. A model ref with a namespace pairs with a policy that names the same namespace |
 
 P2, P4 and P5 were dropped: PR 12 covers them (`Tenant.resource_version`,

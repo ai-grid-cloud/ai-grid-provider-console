@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
 import { execFileSync } from 'node:child_process';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type ProxyOptions } from 'vite';
 
 /**
  * Local development against a real cluster.
@@ -59,33 +59,37 @@ const caller = (): Caller => {
   return cached;
 };
 
+/** The BFF's paths: its API, and the Monitoring page's relay to the hub's Perses. */
+const toBff: ProxyOptions = {
+  target: bffUrl,
+  changeOrigin: true,
+  configure: (proxy) => {
+    proxy.on('proxyReq', (proxyReq) => {
+      const { token, user } = caller();
+      if (token) {
+        proxyReq.setHeader(tokenHeader, token);
+        proxyReq.setHeader(userHeader, user);
+        if (process.env.AUTH_GROUPS) {
+          proxyReq.setHeader(groupsHeader, process.env.AUTH_GROUPS);
+        }
+      }
+    });
+    proxy.on('proxyRes', (proxyRes) => {
+      if (proxyRes.statusCode === 401) {
+        cached = undefined;
+      }
+    });
+  },
+};
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: Number(process.env.FRONTEND_PORT ?? 9000),
     strictPort: true,
     proxy: {
-      '/api': {
-        target: bffUrl,
-        changeOrigin: true,
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            const { token, user } = caller();
-            if (token) {
-              proxyReq.setHeader(tokenHeader, token);
-              proxyReq.setHeader(userHeader, user);
-              if (process.env.AUTH_GROUPS) {
-                proxyReq.setHeader(groupsHeader, process.env.AUTH_GROUPS);
-              }
-            }
-          });
-          proxy.on('proxyRes', (proxyRes) => {
-            if (proxyRes.statusCode === 401) {
-              cached = undefined;
-            }
-          });
-        },
-      },
+      '/api': toBff,
+      '/perses/api': toBff,
     },
   },
   build: {

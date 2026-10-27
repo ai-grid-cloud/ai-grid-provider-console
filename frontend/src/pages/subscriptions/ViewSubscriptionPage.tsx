@@ -15,7 +15,7 @@ import type { GovernanceService } from '../../context/useMaaSGovernanceContext';
 import { useMaaSGovernanceContext } from '../../context/useMaaSGovernanceContext';
 import { useGetSubscriptionInfo } from '../../hooks/useGetSubscriptionInfo';
 import { modelRefsToSummaries } from '../../utilities/authpolicies';
-import { getBackUrl, getSubscriptionEditUrl } from '../../utilities/maasGovernanceNavigation';
+import { getBackUrl, getSubscriptionEditUrl, subscriptionNotFound } from '../../utilities/maasGovernanceNavigation';
 import { ApplicationsPage } from './ApplicationsPage';
 import { DeleteSubscriptionModal } from './DeleteSubscriptionModal';
 import { SubscriptionDetailsSection } from './viewSubscription/SubscriptionDetailsSection';
@@ -108,6 +108,7 @@ export const ViewSubscriptionPage: React.FC<Props> = ({ service }) => {
       loadError={loadError}
       errorMessage="Unable to load subscription details."
       onRetry={() => void reload()}
+      notFound={subscriptionNotFound(subscriptionName, backUrl)}
     >
       {loaded && subscriptionInfo && (
         <PageSection isFilled>

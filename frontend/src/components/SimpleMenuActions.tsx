@@ -33,6 +33,9 @@ export const SimpleMenuActions: React.FC<Props> = ({ testId, ariaLabel, dropdown
     <Dropdown
       isOpen={open}
       onOpenChange={setOpen}
+      // An item often opens a dialog and then disappears with the closed menu; focusing the toggle
+      // first gives the dialog somewhere to return focus to when it closes, instead of <body>.
+      shouldFocusToggleOnSelect
       popperProps={{ position: 'right' }}
       toggle={(ref) => (
         <MenuToggle

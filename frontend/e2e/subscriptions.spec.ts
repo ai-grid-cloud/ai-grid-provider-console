@@ -66,7 +66,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
   await expect(row).toContainText('42');
   await row.getByRole('button', { name: 'Kebab toggle' }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
-  await page.getByLabel('Delete modal input').fill(unique);
+  await page.getByLabel(/^Type .* to confirm/).fill(unique);
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.getByTestId('subscription-row').filter({ hasText: unique })).toHaveCount(0);
 });

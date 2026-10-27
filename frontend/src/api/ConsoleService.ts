@@ -1,6 +1,7 @@
 import type { ClustersService } from './clusters';
 import type { GridService } from './grid';
 import type { ModelsService } from './models';
+import type { MonitoringService } from './monitoring';
 import type { OrganizationsService } from './organizations';
 import type { SubscriptionsService } from './subscriptions';
 import type { ConsoleConfig, User } from './types';
@@ -16,7 +17,14 @@ export interface UserService {
  * use an in-memory one.
  */
 export interface ConsoleService
-  extends ClustersService, OrganizationsService, ModelsService, SubscriptionsService, GridService, UserService {
+  extends
+    ClustersService,
+    OrganizationsService,
+    ModelsService,
+    SubscriptionsService,
+    GridService,
+    MonitoringService,
+    UserService {
   getConfig(): Promise<ConsoleConfig>;
 }
 
@@ -44,5 +52,16 @@ export class ServiceError extends Error {
   /** The session is gone; the proxy will start a new login on reload. */
   get isUnauthenticated(): boolean {
     return this.status === 401;
+  }
+}
+
+/**
+ * An answer the BFF relayed from the hub's Perses (the Monitoring page). Its 401 can be Perses's or
+ * a datasource's own refusal, so it doesn't say the console's session has ended by itself: the
+ * page asks the console to check (checkSession) instead.
+ */
+export class RelayedError extends ServiceError {
+  override get isUnauthenticated(): boolean {
+    return false;
   }
 }

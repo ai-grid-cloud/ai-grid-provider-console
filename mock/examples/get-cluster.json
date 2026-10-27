@@ -77,6 +77,7 @@
         "ai-grid/enabled": "true",
         "ai-grid/provisioned": "true",
         "ai-grid/region": "europe-west",
+        "ai-grid/role": "combined",
         "ai-grid/site": "paris-dc1",
         "cloud": "BareMetal",
         "cluster.open-cluster-management.io/clusterset": "default",

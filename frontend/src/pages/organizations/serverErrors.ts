@@ -33,7 +33,7 @@ export const errorsUnder = (errors: Record<string, string>, prefix: string): Rec
   );
 
 /** A new organization: no domains and an empty OIDC identity provider. */
-export const emptyOrganizationInput = (): OrganizationInput => ({
+export const emptyOrganizationInput = (): Required<OrganizationInput> => ({
   name: '',
   domains: [],
   identityProvider: {

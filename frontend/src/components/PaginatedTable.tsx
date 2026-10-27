@@ -10,6 +10,14 @@ type Props<T> = {
   rows: T[];
   /** The list's toolbar items (search, filters, actions), on the left of the pagination. */
   toolbar?: React.ReactNode;
+  /**
+   * Clears the toolbar's filters. Needed when the toolbar shows its filters as labels
+   * (ToolbarFilter): PatternFly then adds its own Clear all filters, which calls this. The labels
+   * then fold away only below md, where such a toolbar's filters fold behind its ToolbarToggleGroup
+   * (breakpoint="md") and show there; PatternFly's default, lg, would hide them with nowhere to see
+   * them between the two.
+   */
+  clearAllFilters?: () => void;
   /** Renders the table for the rows of the current page. */
   children: (pageRows: T[]) => React.ReactNode;
 };
@@ -20,7 +28,7 @@ type Props<T> = {
  * when there is more than one page. The page is clamped to the last one when the rows shrink,
  * for example after filtering.
  */
-export const PaginatedTable = <T,>({ rows, toolbar, children }: Props<T>) => {
+export const PaginatedTable = <T,>({ rows, toolbar, clearAllFilters, children }: Props<T>) => {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PER_PAGE_DEFAULT);
   const safePage = Math.min(page, Math.max(1, Math.ceil(rows.length / perPage)));
@@ -40,7 +48,7 @@ export const PaginatedTable = <T,>({ rows, toolbar, children }: Props<T>) => {
   );
   return (
     <>
-      <Toolbar>
+      <Toolbar clearAllFilters={clearAllFilters} collapseListedFiltersBreakpoint={clearAllFilters ? 'md' : undefined}>
         <ToolbarContent>
           {toolbar}
           <ToolbarItem variant="pagination" align={{ default: 'alignEnd' }}>

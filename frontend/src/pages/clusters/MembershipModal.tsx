@@ -18,6 +18,8 @@ import type { ClusterRole, GridMembership } from '../../api/clusters';
 import { ServiceError } from '../../api/ConsoleService';
 import type { GridCluster } from '../../api/types';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
+import { ClusterChangedError } from './ClusterChangedError';
+import { clusterRoles, roleOf } from './roles';
 
 export type MembershipChange = { cluster: GridCluster; join: boolean };
 
@@ -26,12 +28,6 @@ type Props = MembershipChange & {
   onConfirm: (membership?: GridMembership) => Promise<void>;
   onClose: () => void;
 };
-
-const roles: { value: ClusterRole; label: string; description: string }[] = [
-  { value: 'combined', label: 'Combined', description: 'Takes tenant traffic and serves models.' },
-  { value: 'ingress', label: 'Ingress', description: 'Takes tenant traffic and routes it to inference clusters.' },
-  { value: 'inference', label: 'Inference', description: 'Serves models behind an ingress cluster.' },
-];
 
 // A Kubernetes label value: what the hub accepts for `location`.
 const labelValue = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
@@ -46,13 +42,18 @@ const locationError = (location: string) => {
 
 /** The cluster's role label when it's one of ours; otherwise combined for the hub itself. */
 const defaultRole = (cluster: GridCluster): ClusterRole | '' => {
-  const current = roles.find((r) => r.value === cluster.labels['ai-grid/role']);
-  return current?.value ?? (cluster.name === 'local-cluster' ? 'combined' : '');
+  return roleOf(cluster.labels)?.value ?? (cluster.name === 'local-cluster' ? 'combined' : '');
 };
 
 const errorMessage = (err: unknown, join: boolean) => {
   if (err instanceof ServiceError && err.isNotImplemented) {
     return `${join ? 'Adding clusters to' : 'Removing clusters from'} AI Grid is not available on this backend yet.`;
+  }
+  if (err instanceof ClusterChangedError) {
+    // With `current`, the page has given the dialog that version, so a second try sends it.
+    return err.current
+      ? 'This cluster changed since you opened this dialog. Check it and try again.'
+      : "This cluster changed since you opened this dialog, and the console couldn't load it again. Cancel, refresh the list, and try again.";
   }
   return err instanceof Error ? err.message : 'The cluster could not be changed.';
 };
@@ -79,7 +80,23 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
     try {
       await onConfirm(join && role ? { location: location.trim(), role } : undefined);
     } catch (err) {
-      setError(errorMessage(err, join));
+      const current = err instanceof ClusterChangedError ? err.current : undefined;
+      if (
+        join &&
+        current &&
+        ((current.location ?? '') !== (cluster.location ?? '') || defaultRole(current) !== defaultRole(cluster))
+      ) {
+        // Someone else set the location or role meanwhile: show theirs rather than send this
+        // dialog's choices over them without the user seeing what changed.
+        setLocation(current.location ?? '');
+        setRole(defaultRole(current));
+        setTouched({ location: false, role: false });
+        setError(
+          'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+        );
+      } else {
+        setError(errorMessage(err, join));
+      }
       setBusy(false);
     }
   };
@@ -89,11 +106,24 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
       <ModalHeader title={title} titleIconVariant={join ? undefined : 'warning'} />
       <ModalBody>
         <Stack hasGutter>
-          <p>
-            {join
-              ? 'The hub installs AI Grid on the cluster for its role, and model placements can then choose its location.'
-              : 'The hub stops delivering AI Grid to this cluster, and model placements stop choosing it. Nothing is uninstalled: OpenShift AI, the grid and the models already on the cluster keep running.'}
-          </p>
+          {join ? (
+            <p>
+              The hub installs AI Grid on the cluster for its role, and model placements can then choose its location.
+            </p>
+          ) : (
+            <>
+              {/* Every cluster but the hub's own also leaves the cross-cluster network (Submariner):
+                  ai-grid-env-setup's network Placement selects local-cluster plus the members.
+                  A model deployed from the Models page (a ManifestWorkReplicaSet) is removed with the
+                  cluster's ManifestWork; models delivered by env-setup's GitOps apps stay. */}
+              <p>
+                {cluster.name === 'local-cluster'
+                  ? 'AI Grid stops managing this cluster, and models are no longer placed on it.'
+                  : 'AI Grid stops managing this cluster, and models are no longer placed on it. It is also disconnected from the other AI Grid clusters.'}
+              </p>
+              <p>Models deployed to it from the Models page are removed from it. OpenShift AI is not uninstalled.</p>
+            </>
+          )}
           {join && (
             <Form id="cluster-membership-form" onSubmit={(e) => e.preventDefault()}>
               <FormGroup label="Location" fieldId="cluster-location" isRequired>
@@ -121,7 +151,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
                   id="cluster-role"
                   aria-label="Role"
                   value={role}
-                  options={roles}
+                  options={clusterRoles}
                   placeholder="Select a role"
                   status={shownRoleError ? 'danger' : undefined}
                   aria-describedby="cluster-role-help"

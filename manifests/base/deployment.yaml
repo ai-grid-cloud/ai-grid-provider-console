@@ -4,6 +4,11 @@ metadata:
   name: ai-grid-provider-console
 spec:
   replicas: 1
+  # Recreate, so a Deployment rollout never runs two pods at once: the backend serializes each
+  # organization's writes with in-process locks, which hold only with one backend
+  # (ai-grid-cloud/ai-grid-provider-backend#16). An upgrade stops the console until the new pod is ready.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: ai-grid-provider-console
@@ -38,6 +43,12 @@ spec:
             - --pass-access-token=true
             - --pass-user-headers=true
             - --set-xauthrequest=true
+            # Drop the X-Forwarded-* identity headers (user, email, groups, preferred
+            # username, access token) a client sends before setting its own: the BFF
+            # trusts them. The proxy's default, stated so that a change of default can't
+            # let a caller name itself; hack/test-chart-kind.sh sends forged ones.
+            # (--set-xauthrequest sets X-Auth-Request-* on responses, not requests.)
+            - --skip-auth-strip-headers=true
             - --skip-jwt-bearer-tokens=true
             - --enable-k8s-token-validation=true
             - --use-system-trust-store=true
@@ -125,6 +136,8 @@ spec:
               value: ""
             - name: MAP_TILE_URL
               value: ""
+            - name: MAP_TILE_ATTRIBUTION
+              value: ""
             - name: BILLING_URL
               value: ""
             - name: LOG_LEVEL
@@ -155,14 +168,17 @@ spec:
               drop: [ALL]
 
         # ai-grid-backend: owns every call to the hub API, Keycloak and
-        # metrics using the pod's ServiceAccount. It binds to loopback so only
-        # the BFF can reach it; nothing on the pod network can. The kubelet
-        # therefore cannot probe it directly: the BFF's /readyz pings it and
-        # takes the pod out of the Service when it does not answer.
+        # metrics using the pod's ServiceAccount. Its gRPC port and its REST
+        # gateway (with Swagger UI, unauthenticated, on every interface by
+        # default) bind to loopback, so only the BFF can reach the backend;
+        # nothing on the pod network can. The kubelet therefore cannot probe
+        # it directly: the BFF's /readyz pings it and takes the pod out of the
+        # Service when it does not answer.
         - name: ai-grid-backend
           image: ai-grid-backend
           args:
             - --listen-address=127.0.0.1:9090
+            - --http-listen-address=127.0.0.1:8081
           env:
             # Keycloak settings and credentials all come from one secret that
             # hack/deploy.sh creates from KEYCLOAK_URL, KEYCLOAK_REALM,
