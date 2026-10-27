@@ -1,8 +1,8 @@
 # AI Grid Provider Console
 
 The administrative interface a cloud provider uses to run an AI Grid: enrolling clusters,
-onboarding tenants, deploying models across locations, and watching the result. It is one of
-three faces of the product, alongside the tenant administrator's and the end user's.
+onboarding organizations, deploying models across locations, and watching the result. It is
+one of three faces of the product, alongside the organization administrator's and the end user's.
 
 ## Language
 
@@ -14,13 +14,15 @@ behind a shared gateway.
 _Avoid_: the grid, fleet, mesh
 
 **Provider admin**:
-A person who administers the grid itself, as opposed to a tenant's use of it. The console
-shows or hides actions based on whether the caller is one; the backend enforces it.
+A person who administers the grid itself, as opposed to an organization's use of it. The console
+shows or hides actions based on whether the caller is one. Backend enforcement is the target
+([ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md)); today the BFF enforces this gate.
 _Avoid_: cluster admin, superuser, operator
 
 **Location**:
 Where a cluster physically is, as a single label shared by everything in that place. Models
-are placed on locations, not on clusters.
+are deployed to locations in the console; underneath, a Placement selects grid clusters,
+including by cluster set, labels, claims or a cluster count.
 _Avoid_: datacenter, zone, geo
 
 ### Resources
@@ -34,28 +36,23 @@ A cluster that has been enrolled in the grid and provisioned for it. The distinc
 the console lists every cluster the hub manages, but only members can host models.
 _Avoid_: enrolled cluster, participating cluster, active cluster
 
-**Organization**, **Tenant** — _unsettled, do not standardise yet_:
-A customer that consumes models through the grid. Two words are in active use and a rename is
-under discussion elsewhere, so this entry records the split rather than resolving it.
+**Organization**:
+A customer that consumes models through the grid. This name was agreed at the 2026-10-15
+workstream standup and is used by the console and environment. The backend's `Tenants`
+service is the legacy contract name for these Keycloak Organizations until it is renamed;
+preserve existing API identifiers when referring to that contract.
+_Avoid_: tenant (for this customer resource)
 
-- The UI says **Organization** for the Keycloak object the console creates, lists and edits —
-  including the user-visible copy ("Create organization") and the `/organizations` route.
-- The contract and the BFF say **Tenant**: the `Tenants` service, which manages exactly those
-  Keycloak Organizations.
-- Separately, `metadata.tenant` is an OSAC field on *every* object, naming who a resource
-  belongs to. That is a scope, not the resource the console manages, and it may or may not
-  turn out to be the same idea. Nothing populates it while the product is single-tenant, so
-  the two have not yet collided.
-
-Until the rename is settled: match the layer you are editing, and do not convert existing
-usages in passing.
+**Tenant scope**:
+The owner of a resource, represented by the OSAC `metadata.tenant` field. This is distinct
+from the Organization resource the console manages. It is unpopulated in the single-tenant MVP.
 
 **Model**:
 A deployed inference service, either on the hub alone or placed across grid members.
 _Avoid_: ManagedModel, deployment, inference service
 
 **Subscription**:
-A tenant's agreed access to a set of models, carrying its priority, rate limits and
+An organization's agreed access to a set of models, carrying its priority, rate limits and
 authorization policy.
 _Avoid_: plan, entitlement, tier
 
@@ -74,18 +71,21 @@ _Avoid_: deployment strategy, release, rollout strategy
 **Backend**:
 `ai-grid-provider-backend`. The provider API: it owns every decision about what data means and
 what a request may do, and it is designed to stand on its own, with the console as one client
-among several.
+among several. Authorization is still pending; see
+[ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md) for the current boundary.
 _Avoid_: API server, service, gRPC service, provider service
 
 **Contract**:
-The protobuf definition in the backend, which is the single declaration of every shape the
-system exchanges. There is no second copy.
+The protobuf definition of the shapes the system exchanges. The backend is the target source
+of truth ([ADR-0001](docs/adr/0001-the-contract-lives-in-the-backend.md)); today the console
+still carries its draft and generated copies during the migration.
 _Avoid_: schema, API spec, proto definition, draft proto
 
 **BFF**:
 The console's own small server: it relays calls to the backend with the caller's token,
-serves the single-page app, and answers for the console's configuration and health. It
-translates nothing and decides nothing.
+serves the single-page app, and answers for the console's configuration and health. That is the
+target ([ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md)); today it also maps legacy API
+shapes and enforces the provider-admin gate through a hub access review.
 _Avoid_: proxy, gateway, middle tier, API layer
 
 **Fake infrastructure**:
@@ -95,11 +95,14 @@ faked, it cannot drift from what ships.
 _Avoid_: fake backend, mock, stub, test server
 
 **Fake backend**:
-The console's own reimplementation of the contract, serving fixtures. Superseded by fake
-infrastructure and being retired: it can drift from the real backend precisely because it is a
-second implementation. Use the term only for the thing being removed.
-_Avoid_: using this for [[fake infrastructure]], which is a different idea
+The legacy reimplementation of the draft contract, serving fixtures. It originated in the
+console and now also exists in the backend during migration. Superseded by fake infrastructure
+and being retired: it can drift from the real backend because it is a second implementation.
+Use the term only for the thing being removed.
+_Avoid_: using this for **fake infrastructure**, which is a different idea
 
 **Hub**:
-The cluster running ACM that manages all the others. Only the backend talks to it.
+The cluster running ACM that manages all the others. The backend is its target API client
+([ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md)); today the BFF also calls it for the
+provider-admin access review.
 _Avoid_: management cluster, control plane, local-cluster

@@ -13,10 +13,10 @@ hand-written JSON the BFF produced and the hand-written TypeScript the frontend 
 
 ## Why not keep grpc-gateway
 
-The backend serves REST today through grpc-gateway's **in-process** registration
-(`internal/restgateway/server.go`, `RegisterClustersHandlerServer`), whose handlers take
+At the time of the decision, the backend served REST through grpc-gateway's **in-process**
+registration (`internal/restgateway/server.go`, `RegisterClustersHandlerServer`), whose handlers take
 grpc-go service implementations. connect-go generates a different handler interface, so
-adopting Connect breaks that path outright — the choice could not be deferred. The options were
+adopting Connect broke that path outright — the choice could not be deferred. The options were
 vanguard (one handler, four protocols, no `.pb.gw.go` codegen), grpc-gateway dialling the
 Connect server over loopback (mature, extra hop, keeps the gateway codegen), two parallel
 implementations (rejected outright: it reintroduces the duplication this work exists to remove),
@@ -51,13 +51,35 @@ migration with a tool that exists precisely because the change is breaking.
 Two things keep the blast radius small. Vanguard is mounted on the ports that exist today
 (gRPC and REST), so nothing in `deploy/`, `hack/` or the Makefile moves. And the OpenAPI
 document is produced by `protoc-gen-openapiv2` from the same annotations, independently of what
-serves them — an unchanged `ai_grid.swagger.json` is the evidence that REST did not shift.
+serves them — an unchanged `ai_grid.swagger.json` shows only that the schema is unchanged.
+Runtime compatibility needs REST tests for request decoding, error bodies and status codes,
+PATCH masks, and query parameters.
+
+## Backend delivery (2026-10-22)
+
+[Backend PR #9](https://github.com/ai-grid-cloud/ai-grid-provider-backend/pull/9) merged the
+Connect server and vanguard. The backend now constructs `connect.NewServer()` and serves the
+existing `/api/v1/` REST routes through vanguard, with gRPC reflection registered.
+
+Unknown query parameters illustrate why schema comparison is insufficient: grpc-gateway
+ignored them, while vanguard rejects them by default. The merged implementation sets
+`WithDiscardUnknownQueryParams(true)` and covers it with
+`TestRESTIgnoresUnknownQueryParameters` in `internal/servers/protocols_test.go`. Tests there
+and in `internal/restgateway/server_test.go` also exercise errors, status mapping and PATCH
+behavior. These runtime checks provide evidence for the cases they cover.
 
 The grpc-go plugin stays even though the gateway goes: `client/client.go` and
 `integration/kind_test.go` use the generated gRPC client, and `hack/smoke-apis.sh` calls the
 server with `grpcurl`, including `grpcurl list`, which needs reflection. A connect-go handler
 serves Connect, gRPC and gRPC-Web together, so those consumers keep working — this adds a
 protocol rather than swapping one.
+
+## Console delivery (2026-10-27)
+
+Console [PR #63](https://github.com/ai-grid-cloud/ai-grid-provider-console/pull/63) added real
+Models and Subscriptions RPCs behind the existing BFF JSON API. The browser still uses that
+API for these pages. [PR #70](https://github.com/ai-grid-cloud/ai-grid-provider-console/pull/70)
+proposes the shared Connect relay and pinned generated-client foundation; it is still open.
 
 ## The frontend
 
@@ -66,8 +88,9 @@ objects for proto3). The console generates TypeScript locally from `.proto` file
 the backend; publishing a Buf Schema Registry module is the better end state but needs a
 pipeline nobody owns yet.
 
-Deleted: `useServiceData`, `HttpConsoleService`, `ConsoleService`, `MockConsoleService`,
-`frontend/src/api/types.ts` and `frontend/src/api/adapters.ts`. Zod stays for form input only —
+To delete as pages migrate: `useServiceData`, `HttpConsoleService`, `ConsoleService`,
+`MockConsoleService`, `frontend/src/api/types.ts` and `frontend/src/api/adapters.ts`.
+Zod stays for form input only —
 validating a response whose type is already generated is a fourth declaration of the same shape.
 
 ## Consequences

@@ -1,42 +1,55 @@
 ---
-status: accepted
+status: proposed
 date: 2026-10-19
 ---
 
-# The resource version stays a string
+# Proposal: expose resource versions as strings
 
 `mpaulgreen/osac-service-standards` specifies `metadata.version` as an `int32`,
-"auto-incremented on every change". Our resources are Kubernetes objects read through ACM, and
-a Kubernetes `resourceVersion` is an **opaque string**: the API server makes no guarantee that
-it is numeric, ordered, or bounded, and clients are explicitly told to treat it as opaque and
-only ever compare it for equality. We keep it as a string and deviate from the standard here.
+auto-incremented on every change. Kubernetes-backed resources carry a `resourceVersion` that
+clients must treat as an **opaque string**, comparing it only for equality. This ADR proposes
+exposing that string unchanged, as a deviation from the standard. The backend team still needs
+to agree the shared contract change; the backend currently ships `int32` versions.
 
-The standard's shape is correct for the service it was written against, where Postgres owns the
-row and therefore owns the counter. Our backend owns no counter; it forwards one. Conforming
-would mean the backend inventing a second version number, stored alongside the object, that can
-disagree with the hub's — and a stale-write check that passes while the object has in fact
-changed. A silently wrong optimistic lock is worse than a documented deviation.
+The standard's counter fits a service that owns its stored rows. For clusters, our backend
+forwards the hub's version. A separate counter would need to stay synchronized with changes
+made outside the backend; converting the hub's version to `int32` already loses values that
+do not fit. Passing the opaque value through would preserve the hub's concurrency semantics.
 
-## This is not yet true of the backend
+## What has shipped (verified 2026-10-27)
 
-The backend has **already shipped `Metadata.version` as `int32`** (field 8), following the
-standard. Nothing populates it yet, and `ClustersUpdateRequest.lock` is documented there as
-"Not enforced yet", so the conflict is latent rather than live — but it is real, and it is in a
-message shared by every resource.
+The backend exposes `Metadata.version` as `int32` (field 8). In
+`internal/servers/managed_cluster_mapper.go`, `resourceVersionToVersion` parses the hub's
+resource version as `int32`; overflow, negative or nonnumeric values map to zero.
 
-Changing it is a breaking change to a shared type in a repository with other work in flight, so
-it is not done as part of adding new services. New services use `Metadata` as it stands. The
-change is tracked separately and must land before optimistic locking is implemented against
-anything Kubernetes-backed, because the first implementation is what freezes the semantics.
+`Clusters.Update` in `internal/servers/clusters_server.go` enforces optimistic locking:
+`lock: true` without a nonzero version is `InvalidArgument`, and a nonzero version that
+differs from the current hub resource version is `Aborted`. The version also goes into the
+Kubernetes merge patch so a concurrent hub change can fail the write. The console BFF already
+maps `If-Match` through its draft `resource_version` to this integer field. A version mapped
+to zero cannot be used for a locked update; without a version, an unlocked update skips the
+version precondition.
 
-Mark it in the proto with a `// buf:lint:ignore` comment and a pointer to this ADR, the same
-escape hatch the standard provides for its object-shape rule.
+[Backend PR #16](https://github.com/ai-grid-cloud/ai-grid-provider-backend/pull/16) merged on
+2026-10-23 and added organization versions. Keycloak supplies no version, so the backend stores
+its own counter in the `ai-grid/resource-version` organization attribute and exposes it through
+the same `int32` metadata field. Organizations without a valid stored counter read as version
+1. Update and Delete require a version and reject stale versions. Backend writes are serialized
+within one process; edits made directly in Keycloak do not advance this counter.
 
-## Consequences
+Models and Subscriptions now use backend-owned counters as well: in Git mode, the backend
+stores `ai-grid/version` on each resource's YAML and returns it as `metadata.version`.
+A supplied nonzero version is checked on Update and Delete; `lock: true` on Update requires
+one. These counters are distinct from both Kubernetes resource versions and Git commit SHAs.
 
-- Reviewers coming from the standard will flag this; the comment in the proto is what stops it
-  being "fixed".
-- Comparison is equality only. No ordering, no arithmetic, no "is this newer than that".
-- Tenants are the exception that proves the rule: Keycloak Organizations have no server-side
-  version, so the backend maintains one itself in an organization attribute. That one *is* a
-  counter the backend owns, and it is still exposed as a string for consistency.
+## Proposed change and consequences
+
+- Agree a migration for the shared `Metadata.version` field and version-bearing requests with
+  the backend team. Changing the protobuf field type is breaking and affects clients and
+  existing locks, so new services continue to use the shipped contract until that migration.
+- For Kubernetes resources, return the opaque version and compare it only for equality.
+  No ordering or arithmetic is needed.
+- Organization, Model and Subscription versions remain backend-owned counters, proposed as strings
+  for consistency with the shared metadata type.
+- If agreed, document the standard deviation in the proto with the applicable lint exception
+  and a pointer to this ADR.

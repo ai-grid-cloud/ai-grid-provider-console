@@ -9,12 +9,19 @@
 > table on this page all go away. Don't invest in the parts marked for deletion; do read
 > ADR-0001 before adding an RPC.
 >
-> **The move is in flight** (backend PR #10, open at the time of writing). The draft lands
-> there as `ai_grid.draft.v1` on its own port, the fake as `internal/fakeinfra/draft/`, and the
-> fixtures as `fixtures/draft/{default,poc}`. It is **not** reconciled to OSAC conventions in
+> **The backend copy has landed** ([backend PR #10](https://github.com/ai-grid-cloud/ai-grid-provider-backend/pull/10),
+> merged 2026-10-22). It carries the draft as `ai_grid.draft.v1` on its own port, the fake as
+> `internal/fakeinfra/draft/`, and the fixtures as `fixtures/draft/{default,poc}`.
+> It is **not** reconciled to OSAC conventions in
 > one step: each area is reshaped and deleted from the draft as the real backend implements it,
-> so the other pages keep working meanwhile. A follow-up console change then deletes
-> `mock/proto/`, `bff/gen/` and `bff/internal/fakebackend` from here.
+> so the other pages keep working meanwhile. Console cleanup remains pending and removes
+> the draft proto, generated draft code and `bff/internal/fakebackend` from here. Models
+> and Subscriptions have already moved to real backend services (backend PRs #27 and #29);
+> console PR #63 uses them through the existing BFF adapters. The
+> vendored upstream proto and drift guard remain during migration.
+
+Monitoring uses the hub's Perses dashboards when configured. Its fallback page uses the
+draft grid overview described below.
 
 The entry point for a coding agent (or a person) building console pages against the fake
 `ai-grid-backend`. It says what runs, what the BFF answers and what the fixtures seed, and

@@ -7,23 +7,25 @@ read [mock/AGENTS.md](mock/AGENTS.md).
 ## This architecture is being replaced
 
 On 2026-10-19 we decided to consolidate the contract into the backend and move the console to
-Connect end to end. **Nothing below has changed yet** — the rules in this file are still the
-rules, and work landing today should follow them. But do not invest in the parts that are
-going away, and read the decisions before designing anything new:
+Connect end to end. The backend now serves Connect, with vanguard for REST; the console
+migration is in progress. The rules below still apply to the legacy JSON API. Read the
+decisions before designing anything new:
 
 - [ADR-0001](docs/adr/0001-the-contract-lives-in-the-backend.md): the contract lives in
   `ai-grid-cloud/ai-grid-provider-backend`, reconciled to the OSAC service standards. The
-  console's draft proto, the vendored upstream copy and the drift machinery are deleted.
+  draft and fake were copied into the backend by PR #10; their console copies are pending
+  removal. The vendored upstream copy and drift guard remain, aimed at the real backend.
 - [ADR-0002](docs/adr/0002-connect-end-to-end-with-vanguard-for-rest.md): the browser speaks
   Connect; the backend serves Connect, gRPC, gRPC-Web and REST from one handler via vanguard.
   The JSON envelope, the `ETag`/`If-Match` protocol and the hand-written TypeScript go away.
-- [ADR-0003](docs/adr/0003-the-resource-version-stays-a-string.md): a deliberate deviation from
-  the standard, because a Kubernetes `resourceVersion` is opaque.
-- [ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md): the BFF keeps only relaying, static
-  assets, health and console config — and is kept as the seam OSAC's proxy layer replaces.
+- [ADR-0003](docs/adr/0003-the-resource-version-stays-a-string.md): a proposed string version
+  instead of the backend's shipped `int32`, because a Kubernetes `resourceVersion` is opaque.
+- [ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md): the target BFF relays backend calls, serves
+  static assets, health and console config, and keeps the optional Perses relay. It is the
+  seam OSAC's proxy layer later replaces.
 
 Two things are worth knowing before you touch anything in `bff/internal/api` or
-`frontend/src/api`: every shape in this repository is currently declared four times (contract,
+`frontend/src/api`: legacy shapes in this repository are declared four times (contract,
 BFF structs, `frontend/src/api/types.ts`, UI types), with `toGridCluster` existing in both Go
 and TypeScript; and the backend performs **no authentication or authorization at all** today,
 so the token the BFF forwards is read by nothing (ADR-0004).
@@ -69,20 +71,18 @@ without one could never be updated or deleted.
 
 ## Adding a feature
 
-> Superseded in direction by [ADR-0001](docs/adr/0001-the-contract-lives-in-the-backend.md):
-> once the contract moves, step 1 happens in the backend repository and there is no draft to
-> reconcile. Until then, the steps below are still how a feature lands — but a new RPC drafted
-> now will have to be reshaped to OSAC conventions, so agree the shape with the backend first
-> and draft it there if you can.
+New API work starts in the backend's `ai_grid.v1`, following
+[ADR-0001](docs/adr/0001-the-contract-lives-in-the-backend.md). Clusters, Organizations,
+Models and Subscriptions already have real services. Models and Subscriptions use Git writes
+and Argo CD delivery; their draft implementations have been removed from the backend.
 
-Follow `mock/proto/README.md`, "Working with the backend team":
+1. Agree and implement the contract in the backend, with its infrastructure fakes and tests.
+2. Update the console's pinned or vendored contract and the relevant adapter or Connect client.
+3. Build the page against that real service. Keep any legacy BFF mapping to transport and the
+   documented compatibility exceptions below.
 
-1. Draft the RPC or field in `mock/proto/ai_grid/v1`, then run `make -C bff generate`.
-2. Implement it in the fake, with the source of each behaviour cited next to the code, and test it
-   there.
-3. Map it in the BFF (`bff/internal/api`): transport only, as above. Add it to
-   `docs/plan/bff-api.md`.
-4. Build the page against it (`frontend/`).
+For maintenance of an existing legacy draft path, follow `mock/proto/README.md` and
+[mock/AGENTS.md](mock/AGENTS.md). Retire those paths as their pages migrate.
 
 Afterwards run `make -C bff golden` when the BFF's JSON or a fixture changed, and update the
 docs (`docs/plan/bff-api.md`, `mock/AGENTS.md`, `mock/areas/*.md`) in the same change.

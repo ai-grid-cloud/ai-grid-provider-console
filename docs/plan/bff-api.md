@@ -8,14 +8,16 @@
 > (the contract moves to the backend) and
 > [ADR-0004](../adr/0004-the-bff-is-a-thin-relay.md) (what the BFF keeps doing).
 >
-> Two corrections to what follows, both verified on 2026-10-19:
+> Current boundary (verified 2026-10-27):
 >
-> - The backend is **`ai-grid-cloud/ai-grid-provider-backend`**, not `yuvalturg/ai-grid-backend`.
->   The repository referenced below, and vendored in `mock/proto/upstream/COMMIT`, is a
->   different one — so the nightly drift job has been green while real divergence accumulated.
-> - "The backend decides what the caller may do" is **aspirational, not current**. The backend
->   builds its gRPC server with no interceptors and talks to Kubernetes with its own
->   ServiceAccount, so the forwarded token is read by nothing. ADR-0004 has the agreed fix.
+> - The backend is **`ai-grid-cloud/ai-grid-provider-backend`**. The vendored source in
+>   `mock/proto/upstream/COMMIT` and the drift guard now track that repository; the old
+>   `yuvalturg/ai-grid-backend` target was corrected.
+> - The backend now uses `connect.NewServer()` and vanguard for REST. It still has no
+>   authentication or authorization interceptor and uses its own Kubernetes ServiceAccount.
+>   The BFF's `requireProviderAdmin` hub access review protects the console path today.
+>   [ADR-0004](../adr/0004-the-bff-is-a-thin-relay.md) records the target ownership and a
+>   proposed impersonation model; the identity mechanism remains to be agreed.
 
 The console is a React and PatternFly frontend served by a thin Go backend-for-frontend
 (BFF). The BFF owns login, static assets and the JSON API the browser uses. Everything
