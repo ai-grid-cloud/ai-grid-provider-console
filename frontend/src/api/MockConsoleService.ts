@@ -284,7 +284,7 @@ export class MockConsoleService implements ConsoleService {
       locations: this.decidedLocations(input.locations),
       selectedClusters: this.decidedClusters(input.locations),
       modelUri: input.modelUri.trim(),
-      modelName: input.modelName.trim(),
+      modelName: input.name, // served as its id, as the backend does
       runtimeImage: input.runtimeImage.trim(),
       replicas: input.replicas,
       autoscaled: false,
@@ -739,7 +739,7 @@ export const seedModels = (): ManagedModel[] =>
     // The seed clusters' location label is their name, and site1 is a provisioned member.
     selectedClusters: [...locations],
     modelUri: `hf://example-org/${name}`,
-    modelName: `example-org/${name}`,
+    modelName: name,
     runtimeImage: 'quay.io/example/vllm:v1',
     replicas: 1,
     autoscaled: false,

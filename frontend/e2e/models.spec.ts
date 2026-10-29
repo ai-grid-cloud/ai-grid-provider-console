@@ -10,7 +10,6 @@ test('deploys a model to a location, edits it in the same wizard, and deletes it
 
   // Source
   await page.getByRole('textbox', { name: /^Model URI/ }).fill(`hf://e2e/${unique}`);
-  await page.getByRole('textbox', { name: /^Model name/ }).fill(`e2e/${unique}`);
   await page.getByRole('button', { name: 'Next' }).click();
 
   // Deployment: the name starts from the model's.

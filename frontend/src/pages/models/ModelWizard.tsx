@@ -72,13 +72,13 @@ const NOT_SET = 'Not set';
 
 const fixedReason = {
   source: 'The model a deployment serves is fixed. Deploy a new model to serve another one.',
+  served: 'A model is served as its resource name, which tenants send as the model in their requests.',
   resources: 'Resources are set when the model is deployed. Deploy it again to change them.',
 };
 
 /** The wizard's starting values: the defaults when deploying, the model's own when editing. */
 const initialValues = (model?: ManagedModel) => ({
   modelUri: model?.modelUri ?? '',
-  modelName: model?.modelName ?? '',
   runtimeImage: model?.runtimeImage ?? '',
   replicas: model?.replicas !== undefined ? String(model.replicas) : defaults.replicas,
   cpu: model ? (model.cpu ?? '') : defaults.cpu,
@@ -142,8 +142,16 @@ const goneLocationsError = (names: string[]) =>
     ? undefined
     : `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} no longer available. Remove ${names.length === 1 ? 'it' : 'them'} to continue.`;
 
-/** "org/model" names a deployment "model": the last path segment, as a starting point. */
-const deploymentNameFor = (modelName: string) => modelName.trim().split('/').filter(Boolean).pop() ?? '';
+/** "hf://org/model" or "oci://registry/model:tag" names a deployment "model": the URI's last path segment, as a starting point. */
+const deploymentNameFor = (modelUri: string) =>
+  (
+    modelUri
+      .trim()
+      .replace(/^[a-z0-9]+:\/\//, '')
+      .split('/')
+      .filter(Boolean)
+      .pop() ?? ''
+  ).split(':')[0];
 
 /**
  * The Review step: a warning about the choices first, if there is one, spaced as the sections are;
@@ -216,7 +224,6 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
       : undefined,
   });
   const [modelUri, setModelUri] = useState(start.modelUri);
-  const [modelName, setModelName] = useState(start.modelName);
   const [runtimeImage, setRuntimeImage] = useState(start.runtimeImage);
   const [replicas, setReplicas] = useState(start.replicas);
   const [cpu, setCpu] = useState(start.cpu);
@@ -249,7 +256,6 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
     displayName: nameDescData.name,
     description: nameDescData.description,
     modelUri: modelUri.trim(),
-    modelName,
     runtimeImage,
     replicas: Number(replicas),
     cpu,
@@ -265,7 +271,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
     : {};
   const isDirty = model
     ? Object.keys(update).length > 0
-    : [modelUri, modelName, runtimeImage, nameDescData.name, nameDescData.description].some((v) => v !== '') ||
+    : [modelUri, runtimeImage, nameDescData.name, nameDescData.description].some((v) => v !== '') ||
       replicas !== defaults.replicas ||
       cpu !== defaults.cpu ||
       memory !== defaults.memory ||
@@ -285,7 +291,6 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
         ? fieldMessage(createModelSchema.shape[field], value, parse)
         : 'Required.';
   const modelUriError = shownError('modelUri', modelUri);
-  const modelNameError = shownError('modelName', modelName);
   const runtimeImageError = shownError('runtimeImage', runtimeImage);
   const replicasError = shownError('replicas', replicas, Number);
   const cpuError = shownError('cpu', cpu);
@@ -297,8 +302,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
     shownError('gpuCount', gpuCount, Number) ??
     (touched.has('gpuCount') && gpusMissing ? 'A GPU model server needs at least 1 GPU.' : undefined);
   // A deployed model's source, name and resources are fixed, so only what an edit can change is checked.
-  const sourceValid =
-    editing || createModelSchema.pick({ modelUri: true, modelName: true }).safeParse({ modelUri, modelName }).success;
+  const sourceValid = editing || createModelSchema.pick({ modelUri: true }).safeParse({ modelUri }).success;
   const deploymentValid = editing
     ? createModelSchema
         .pick({ displayName: true, description: true })
@@ -470,7 +474,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
       step: steps.source,
       items: [
         { term: 'Model URI', value: modelUri },
-        { term: 'Model name', value: modelName },
+        ...(editing ? [{ term: 'Model name', value: model?.modelName ?? model?.name }] : []),
       ],
     },
     {
@@ -478,6 +482,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
       step: steps.deployment,
       items: [
         { term: 'Deployment name', value: nameDescData.name },
+        { term: 'Name tenants call', value: nameDescData.k8sName.value },
         { term: 'Description', value: nameDescData.description },
         { term: 'Model server', value: modelServerLabel(input.baseRefs) },
         { term: 'Runtime image', value: runtimeImage },
@@ -528,7 +533,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
           onStepChange={(_event, current, previous) => {
             // Start a new deployment's name from the model's, once.
             if (!editing && previous.id === steps.source && !nameDescData.name) {
-              onNameDescChange('name', deploymentNameFor(modelName));
+              onNameDescChange('name', deploymentNameFor(modelUri));
             }
             // A cluster can change state while the earlier steps are filled in, so offer what is available now.
             if (current.id === steps.locations && locationsEditable) {
@@ -562,8 +567,8 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
                   <ReadOnlyField
                     label="Model name"
                     fieldId="model-alias"
-                    value={modelName}
-                    reason={fixedReason.source}
+                    value={model?.modelName ?? model?.name ?? ''}
+                    reason={fixedReason.served}
                   />
                 </>
               ) : (
@@ -583,20 +588,6 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
                       or pvc://claim/path.
                     </Help>
                   </FormGroup>
-                  <FormGroup label="Model name" fieldId="model-alias" isRequired>
-                    <TextInput
-                      id="model-alias"
-                      aria-describedby="model-alias-help"
-                      value={modelName}
-                      onChange={(_event, value) => setModelName(value)}
-                      onBlur={() => touch('modelName')}
-                      validated={modelNameError ? 'error' : 'default'}
-                      isRequired
-                    />
-                    <Help id="model-alias-help" error={modelNameError}>
-                      The model name exposed by the inference service, for example org/model.
-                    </Help>
-                  </FormGroup>
                 </>
               )}
             </Form>
@@ -608,7 +599,11 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
                 onDataChange={onNameDescChange}
                 dataTestId="model-name-desc"
                 nameLabel="Deployment name"
-                nameHelperText={editing ? undefined : 'Choose a resource name of at most 63 characters.'}
+                nameHelperText={
+                  editing
+                    ? undefined
+                    : 'Choose a resource name of at most 63 characters. Tenants send it as the model in their requests.'
+                }
               />
               {editing ? (
                 <ReadOnlyField

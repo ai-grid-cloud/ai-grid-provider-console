@@ -11,7 +11,7 @@
         "displayName": "Code Llama 13B",
         "description": "Placed in a region with no enrolled site yet.",
         "modelUri": "s3://models-example/codellama-13b/",
-        "modelName": "example-org/codellama-13b",
+        "modelName": "codellama-13b",
         "runtimeImage": "quay.io/example/vllm-cuda:v0.11.0",
         "replicas": 1,
         "baseRefs": [
@@ -126,7 +126,7 @@
         "displayName": "Granite 8B Instruct",
         "description": "Served on every enrolled and provisioned site.",
         "modelUri": "hf://example-org/granite-8b-instruct",
-        "modelName": "example-org/granite-8b-instruct",
+        "modelName": "granite-8b-instruct",
         "runtimeImage": "quay.io/example/vllm-cuda:v0.11.0",
         "replicas": 1,
         "baseRefs": [
@@ -284,7 +284,7 @@
         "displayName": "Llama 3 70B",
         "description": "References a TPU preset this hub does not have.",
         "modelUri": "hf://example-org/llama-3-70b",
-        "modelName": "example-org/llama-3-70b",
+        "modelName": "llama-3-70b",
         "replicas": 1,
         "baseRefs": [
           "v3-6-0-kserve-config-llm-template-tpu"
@@ -352,7 +352,7 @@
         "displayName": "Mistral 7B Instruct",
         "description": "Rolled out to every OpenShift spoke one site at a time.",
         "modelUri": "oci://registry.example.com/models/mistral-7b-instruct:v0.3",
-        "modelName": "example-org/mistral-7b-instruct",
+        "modelName": "mistral-7b-instruct",
         "runtimeImage": "quay.io/example/vllm-cuda:v0.11.0",
         "replicas": 2,
         "baseRefs": [
@@ -495,7 +495,7 @@
         "displayName": "Tiny LLM (CPU)",
         "description": "Small CPU-only model served on the hub itself for smoke tests.",
         "modelUri": "hf://example-org/tiny-llm",
-        "modelName": "example-org/tiny-llm",
+        "modelName": "tiny-llm",
         "replicas": 1,
         "baseRefs": [
           "v3-6-0-kserve-config-llm-template-cpu"
@@ -527,46 +527,46 @@
             "name": "gateway-internal-model-routing",
             "url": "https://openshift-ai-inference-openshift-default.openshift-ingress.svc.cluster.local/",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm"
             ]
           },
           {
             "name": "gateway-internal",
             "url": "https://openshift-ai-inference-openshift-default.openshift-ingress.svc.cluster.local/ai-grid-models/tiny-llm",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm",
-              "example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm",
+              "tiny-llm"
             ]
           },
           {
             "name": "gateway-internal",
-            "url": "https://openshift-ai-inference-openshift-default.openshift-ingress.svc.cluster.local/publishers/ai-grid-models/models/example-org/tiny-llm",
+            "url": "https://openshift-ai-inference-openshift-default.openshift-ingress.svc.cluster.local/publishers/ai-grid-models/models/tiny-llm",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm",
-              "example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm",
+              "tiny-llm"
             ]
           },
           {
             "name": "gateway-external-model-routing",
             "url": "https://openshift-ai-inference.apps.hub.example.com/",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm"
             ]
           },
           {
             "name": "gateway-external",
             "url": "https://openshift-ai-inference.apps.hub.example.com/ai-grid-models/tiny-llm",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm",
-              "example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm",
+              "tiny-llm"
             ]
           },
           {
             "name": "gateway-external",
-            "url": "https://openshift-ai-inference.apps.hub.example.com/publishers/ai-grid-models/models/example-org/tiny-llm",
+            "url": "https://openshift-ai-inference.apps.hub.example.com/publishers/ai-grid-models/models/tiny-llm",
             "models": [
-              "publishers/ai-grid-models/models/example-org/tiny-llm",
-              "example-org/tiny-llm"
+              "publishers/ai-grid-models/models/tiny-llm",
+              "tiny-llm"
             ]
           }
         ],

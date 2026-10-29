@@ -86,8 +86,6 @@ describe('routes', () => {
   const toLocationsStep = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
     await user.paste('hf://org/widget');
-    await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-    await user.paste('org/widget');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await user.click(await screen.findByTestId('model-name-desc-name'));
     await user.paste('Widget');

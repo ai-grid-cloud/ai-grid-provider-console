@@ -76,6 +76,10 @@ const (
 	MsgModelURIRequired   = "spec.model.uri is required"
 	MsgModelURISchemeFm   = "spec.model.uri %q: unsupported scheme; expected one of hf://, s3://, pvc://, oci://"
 	MsgRolloutNoPlacement = "spec.rollout requires spec.placement"
+	// MsgServedNameFm is the provider backend's rule (ai-grid-provider-backend
+	// checkServedName): a model is served as its name, as in odh-dashboard, so
+	// spec.model.name is empty or the name.
+	MsgServedNameFm = "spec.model.name %q must be empty or the model id %q: a model is served as its id, which is the name tenants send; set a human-readable name in annotation openshift.io/display-name"
 )
 
 var (
@@ -305,6 +309,16 @@ func normalizeModel(obj *aigridv1.Model) *aigridv1.Model {
 	return m
 }
 
+// validateServedName refuses a spec.model.name other than the model's name,
+// as the provider backend does: the name is what vLLM serves and tenants send.
+// Empty is the name (normalizeModel).
+func validateServedName(obj *aigridv1.Model) error {
+	if served := obj.GetSpec().GetModel().GetName(); served != "" && served != obj.GetName() {
+		return status.Errorf(codes.InvalidArgument, MsgServedNameFm, served, obj.GetName())
+	}
+	return nil
+}
+
 // seedModel validates one fixture model as CreateModel would and stores it
 // as created at its creationTimestamp, or at the fake's start when the fixture
 // carries none (so it starts its lifecycle live). Must be called before Serve.
@@ -316,6 +330,9 @@ func (s *Server) seedModel(obj *aigridv1.Model) error {
 		return fmt.Errorf("fixture model %q: %s", obj.GetName(), status.Convert(err).Message())
 	}
 	if err := validateModelSpec(obj.GetSpec()); err != nil {
+		return fmt.Errorf("fixture model %q: %s", obj.GetName(), status.Convert(err).Message())
+	}
+	if err := validateServedName(obj); err != nil {
 		return fmt.Errorf("fixture model %q: %s", obj.GetName(), status.Convert(err).Message())
 	}
 	key := modelKey(obj.GetMetadata().GetNamespace(), obj.GetName())
@@ -1001,6 +1018,9 @@ func (s *Server) CreateModel(ctx context.Context, req *aigridv1.CreateModelReque
 		return nil, err
 	}
 	if err := validateModelSpec(obj.GetSpec()); err != nil {
+		return nil, err
+	}
+	if err := validateServedName(obj); err != nil {
 		return nil, err
 	}
 	s.mu.Lock()

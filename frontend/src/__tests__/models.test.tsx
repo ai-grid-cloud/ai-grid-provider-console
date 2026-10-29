@@ -33,7 +33,6 @@ const input: CreateModelRequest = {
   name: 'widget',
   displayName: 'Widget',
   modelUri: 'hf://org/widget',
-  modelName: 'org/widget',
   runtimeImage: 'registry.example/runtime:test',
   replicas: 1,
   cpu: '2',
@@ -69,8 +68,6 @@ const chooseServer = async (user: User, label = 'vLLM on CPU') =>
 const fillModel = async (user: User) => {
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await nameDeployment(user, 'Widget');
   await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
@@ -109,6 +106,9 @@ it('walks the deployment wizard, selects locations and saves the model', async (
   expect(review).toHaveTextContent(`${site1}, ${site2}`);
   // Empty optional fields are left out of the review.
   expect(review).not.toHaveTextContent('Additional runtime arguments');
+  // The wizard asks for no served name: tenants call the model by its resource name.
+  expect(review).toHaveTextContent('Name tenants callwidget');
+  expect(review).not.toHaveTextContent('Model name');
   await user.click(await screen.findByRole('button', { name: 'Deploy' }));
 
   const table = await screen.findByTestId('model-deployments-table');
@@ -122,7 +122,7 @@ it('walks the deployment wizard, selects locations and saves the model', async (
   expect(saved).toMatchObject({
     namespace: 'ai-grid-models',
     modelUri: 'hf://org/widget',
-    modelName: 'org/widget',
+    modelName: 'widget',
     modelRef: { kind: 'LLMInferenceService', name: 'widget' },
     locations: ['site1', 'site2'],
   });
@@ -562,8 +562,6 @@ it("shows the Model URI rule's message once the user leaves an invalid URI", asy
   const user = userEvent.setup();
   renderAt('/models/deploy', new MockConsoleService());
   const uri = await screen.findByRole('textbox', { name: /Model URI/ });
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(uri);
   await user.paste('https:///123.com');
   expect(screen.queryByText('Enter a model URI using hf, oci, s3 or pvc.')).not.toBeInTheDocument();
@@ -581,15 +579,17 @@ it("shows the Model URI rule's message once the user leaves an invalid URI", asy
 it('says a required field is required once the user leaves it empty', async () => {
   const user = userEvent.setup();
   renderAt('/models/deploy', new MockConsoleService());
-  const uri = await screen.findByRole('textbox', { name: /Model URI/ });
-  const name = screen.getByRole('textbox', { name: /^Model name/ });
-  await user.click(name);
-  await user.paste('org/widget');
-  await user.clear(name);
+  await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
+  await user.paste('hf://org/widget');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  const image = screen.getByRole('textbox', { name: /Runtime image/ });
+  await user.click(image);
+  await user.paste('registry.example/runtime:test');
+  await user.clear(image);
   await user.tab();
-  expect(name).toHaveAttribute('aria-invalid', 'true');
+  expect(image).toHaveAttribute('aria-invalid', 'true');
   expect(screen.getAllByText('Required.')).toHaveLength(1);
-  expect(uri).not.toHaveAttribute('aria-invalid', 'true');
+  expect(screen.getByRole('textbox', { name: /^CPU/ })).not.toHaveAttribute('aria-invalid', 'true');
 });
 
 it('says why the deployment step cannot continue when the CPU is invalid', async () => {
@@ -597,8 +597,6 @@ it('says why the deployment step cannot continue when the CPU is invalid', async
   renderAt('/models/deploy', new MockConsoleService());
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await nameDeployment(user, 'Widget');
   await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
@@ -633,8 +631,6 @@ it("takes only the fake backend's URI schemes and sends the URI trimmed", async 
   const user = userEvent.setup();
   renderAt('/models/deploy', service);
   const uri = await screen.findByRole('textbox', { name: /Model URI/ });
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(uri);
   await user.paste('https://models.example.com/widget');
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
@@ -789,8 +785,6 @@ it('takes a display name longer than a resource name', async () => {
   renderAt('/models/deploy', new MockConsoleService());
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await nameDeployment(user, 'W'.repeat(70));
   await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
@@ -800,14 +794,12 @@ it('takes a display name longer than a resource name', async () => {
   expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
 });
 
-it('starts the deployment name from the model name, and keeps a name the user typed', async () => {
+it('starts the deployment name from the model URI, and keeps a name the user typed', async () => {
   const user = userEvent.setup();
   renderAt('/models/deploy', new MockConsoleService());
   expect(await screen.findByRole('button', { name: 'Back' })).toBeDisabled();
   await user.click(screen.getByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   expect(await screen.findByTestId('model-name-desc-name')).toHaveValue('widget');
   await nameDeployment(user, 'My widget');
@@ -821,8 +813,6 @@ it('folds the runtime arguments away under Advanced settings, with no dead contr
   renderAt('/models/deploy', new MockConsoleService());
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   const args = await screen.findByTestId('runtime-args-textarea');
   expect(args).not.toBeVisible();
@@ -902,8 +892,6 @@ it('takes only whole numbers in the number fields, so the shown and sent counts 
   renderAt('/models/deploy', service);
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
   await user.paste('registry.example/runtime:test');
@@ -932,8 +920,6 @@ it('keeps an emptied Replicas or GPUs field empty and says it is required', asyn
   renderAt('/models/deploy', new MockConsoleService());
   await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
   await user.paste('hf://org/widget');
-  await user.click(screen.getByRole('textbox', { name: /^Model name/ }));
-  await user.paste('org/widget');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.selectOptions(screen.getByRole('combobox', { name: 'Model server' }), 'vLLM on NVIDIA GPU');
   for (const name of ['Replicas', 'GPUs']) {
@@ -985,7 +971,6 @@ describe('the model server', () => {
     const create = vi.spyOn(service, 'createModel');
     renderAt('/models/deploy', service);
     await user.type(await screen.findByRole('textbox', { name: /Model URI/ }), 'hf://org/widget');
-    await user.type(screen.getByRole('textbox', { name: /^Model name/ }), 'org/widget');
     await user.click(screen.getByRole('button', { name: 'Next' }));
     return create;
   };

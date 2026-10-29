@@ -32,7 +32,7 @@ func hubModel(name string) *aigridv1.Model {
 		Name:     name,
 		Metadata: &aigridv1.ObjectMeta{Namespace: testNS, Annotations: map[string]string{AnnotationDisplayName: "Model " + name}},
 		Spec: &aigridv1.ModelSpec{
-			Model:    &aigridv1.ModelSource{Uri: "hf://example-org/" + name, Name: "example-org/" + name},
+			Model:    &aigridv1.ModelSource{Uri: "hf://example-org/" + name},
 			Replicas: proto.Int32(1),
 			BaseRefs: []string{"v3-6-0-kserve-config-llm-template-cpu"},
 			Router:   &aigridv1.Router{GatewayRefs: []*aigridv1.GatewayRef{{Name: GatewayAIInference, Namespace: GatewayNamespace}}, ManagedRoute: true, Scheduler: true},
@@ -452,12 +452,12 @@ func TestLLMISvcLifecycle(t *testing.T) {
 	internal := "https://openshift-ai-inference-openshift-default.openshift-ingress.svc.cluster.local"
 	external := "https://openshift-ai-inference.apps.hub.example.com"
 	wantAddresses := []string{
-		AddressGatewayInternalModelRouting + " " + internal + "/ [publishers/ai-grid-models/models/example-org/tiny]",
-		AddressGatewayInternal + " " + internal + "/ai-grid-models/tiny [publishers/ai-grid-models/models/example-org/tiny example-org/tiny]",
-		AddressGatewayInternal + " " + internal + "/publishers/ai-grid-models/models/example-org/tiny [publishers/ai-grid-models/models/example-org/tiny example-org/tiny]",
-		AddressGatewayExternalModelRouting + " " + external + "/ [publishers/ai-grid-models/models/example-org/tiny]",
-		AddressGatewayExternal + " " + external + "/ai-grid-models/tiny [publishers/ai-grid-models/models/example-org/tiny example-org/tiny]",
-		AddressGatewayExternal + " " + external + "/publishers/ai-grid-models/models/example-org/tiny [publishers/ai-grid-models/models/example-org/tiny example-org/tiny]",
+		AddressGatewayInternalModelRouting + " " + internal + "/ [publishers/ai-grid-models/models/tiny]",
+		AddressGatewayInternal + " " + internal + "/ai-grid-models/tiny [publishers/ai-grid-models/models/tiny tiny]",
+		AddressGatewayInternal + " " + internal + "/publishers/ai-grid-models/models/tiny [publishers/ai-grid-models/models/tiny tiny]",
+		AddressGatewayExternalModelRouting + " " + external + "/ [publishers/ai-grid-models/models/tiny]",
+		AddressGatewayExternal + " " + external + "/ai-grid-models/tiny [publishers/ai-grid-models/models/tiny tiny]",
+		AddressGatewayExternal + " " + external + "/publishers/ai-grid-models/models/tiny [publishers/ai-grid-models/models/tiny tiny]",
 	}
 	var gotAddresses []string
 	for _, a := range st.GetAddresses() {
@@ -695,6 +695,7 @@ func TestCreateModelValidation(t *testing.T) {
 			m.Spec.Scaling = &aigridv1.Scaling{MinReplicas: 5, MaxReplicas: 3, Keda: true, Triggers: trigger}
 		}, codes.InvalidArgument, MsgMinMaxReplicas},
 		{"uri missing", func(m *aigridv1.Model) { m.Spec.Model.Uri = "" }, codes.InvalidArgument, MsgModelURIRequired},
+		{"served name other than the name", func(m *aigridv1.Model) { m.Spec.Model.Name = "example-org/candidate" }, codes.InvalidArgument, fmt.Sprintf(MsgServedNameFm, "example-org/candidate", "candidate")},
 		{"uri scheme", func(m *aigridv1.Model) { m.Spec.Model.Uri = "https://example.com/model" }, codes.InvalidArgument, `spec.model.uri "https://example.com/model": unsupported scheme; expected one of hf://, s3://, pvc://, oci://`},
 		{"name case", func(m *aigridv1.Model) { m.Name = "Tiny" }, codes.InvalidArgument, fmt.Sprintf(MsgDNS1123SubdomainFm, "metadata.name", "Tiny")},
 		{"name empty", func(m *aigridv1.Model) { m.Name = "" }, codes.InvalidArgument, "metadata.name is required"},

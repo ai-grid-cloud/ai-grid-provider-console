@@ -20,7 +20,7 @@
         }
       },
       "spec": {
-        "model": { "uri": "hf://example-org/tiny-llm", "name": "example-org/tiny-llm" },
+        "model": { "uri": "hf://example-org/tiny-llm" },
         "replicas": 1,
         "baseRefs": ["v3-6-0-kserve-config-llm-template-cpu"],
         "router": {
@@ -50,7 +50,7 @@
         }
       },
       "spec": {
-        "model": { "uri": "hf://example-org/granite-8b-instruct", "name": "example-org/granite-8b-instruct" },
+        "model": { "uri": "hf://example-org/granite-8b-instruct" },
         "replicas": 1,
         "baseRefs": ["v3-6-0-kserve-config-llm-template"],
         "router": {
@@ -82,7 +82,7 @@
         }
       },
       "spec": {
-        "model": { "uri": "oci://registry.example.com/models/mistral-7b-instruct:v0.3", "name": "example-org/mistral-7b-instruct" },
+        "model": { "uri": "oci://registry.example.com/models/mistral-7b-instruct:v0.3" },
         "replicas": 2,
         "baseRefs": ["v3-6-0-kserve-config-llm-template"],
         "router": {
@@ -126,7 +126,7 @@
         }
       },
       "spec": {
-        "model": { "uri": "hf://example-org/llama-3-70b", "name": "example-org/llama-3-70b" },
+        "model": { "uri": "hf://example-org/llama-3-70b" },
         "replicas": 1,
         "baseRefs": ["v3-6-0-kserve-config-llm-template-tpu"],
         "router": {
@@ -155,7 +155,7 @@
         }
       },
       "spec": {
-        "model": { "uri": "s3://models-example/codellama-13b/", "name": "example-org/codellama-13b" },
+        "model": { "uri": "s3://models-example/codellama-13b/" },
         "replicas": 1,
         "baseRefs": ["v3-6-0-kserve-config-llm-template"],
         "router": {

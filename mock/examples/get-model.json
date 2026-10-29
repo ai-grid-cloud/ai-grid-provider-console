@@ -13,7 +13,7 @@
       "displayName": "Mistral 7B Instruct",
       "description": "Rolled out to every OpenShift spoke one site at a time.",
       "modelUri": "oci://registry.example.com/models/mistral-7b-instruct:v0.3",
-      "modelName": "example-org/mistral-7b-instruct",
+      "modelName": "mistral-7b-instruct",
       "runtimeImage": "quay.io/example/vllm-cuda:v0.11.0",
       "replicas": 2,
       "baseRefs": [

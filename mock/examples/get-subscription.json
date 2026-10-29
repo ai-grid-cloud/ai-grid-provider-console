@@ -192,7 +192,7 @@
           "displayName": "Granite 8B Instruct",
           "description": "Served on every enrolled and provisioned site.",
           "modelUri": "hf://example-org/granite-8b-instruct",
-          "modelName": "example-org/granite-8b-instruct",
+          "modelName": "granite-8b-instruct",
           "runtimeImage": "quay.io/example/vllm-cuda:v0.11.0",
           "replicas": 1,
           "baseRefs": [

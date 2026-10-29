@@ -20,8 +20,7 @@
       },
       "spec": {
         "model": {
-          "uri": "hf://example-org/granite-3-8b",
-          "name": "example-org/granite-3-8b"
+          "uri": "hf://example-org/granite-3-8b"
         },
         "replicas": 1,
         "baseRefs": [
@@ -69,8 +68,7 @@
       },
       "spec": {
         "model": {
-          "uri": "hf://example-org/llama-3-70b",
-          "name": "example-org/llama-3-70b"
+          "uri": "hf://example-org/llama-3-70b"
         },
         "replicas": 1,
         "baseRefs": [
@@ -118,8 +116,7 @@
       },
       "spec": {
         "model": {
-          "uri": "hf://example-org/granite-research",
-          "name": "example-org/granite-research"
+          "uri": "hf://example-org/granite-research"
         },
         "replicas": 1,
         "baseRefs": [

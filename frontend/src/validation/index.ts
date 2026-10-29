@@ -233,7 +233,6 @@ export const createModelSchema = z
       .trim()
       .max(2048)
       .regex(/^(hf|oci|s3|pvc):\/\/[^\s]+$/, 'Enter a model URI using hf, oci, s3 or pvc.'),
-    modelName: z.string().trim().min(1).max(253),
     runtimeImage: z.string().trim().min(1).max(2048).regex(/^\S+$/, 'Enter a container image without spaces.'),
     replicas: z.number().int().min(1).max(99),
     cpu: z

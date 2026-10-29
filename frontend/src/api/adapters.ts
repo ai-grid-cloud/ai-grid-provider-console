@@ -320,7 +320,7 @@ export const toModelCreate = (input: CreateModelRequest, namespace: string): Api
     ...(input.description ? { 'openshift.io/description': input.description } : {}),
   },
   modelUri: input.modelUri,
-  modelName: input.modelName,
+  // No modelName: the backend serves a model as its id, the name tenants call.
   runtimeImage: input.runtimeImage,
   replicas: input.replicas,
   cpu: input.cpu,

@@ -269,7 +269,6 @@ export type CreateModelRequest = {
   displayName: string;
   description?: string;
   modelUri: string;
-  modelName: string;
   runtimeImage: string;
   replicas: number;
   cpu: string;
@@ -291,7 +290,6 @@ export type ApiModelCreate = {
   /** `openshift.io/display-name` and `openshift.io/description`. */
   annotations: Record<string, string>;
   modelUri: string;
-  modelName: string;
   runtimeImage: string;
   replicas: number;
   cpu: string;
