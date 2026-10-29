@@ -17,6 +17,7 @@ import { ModelStatusDetails, ModelStatusLabel } from './ModelStatus';
 import { PARTIALLY_AVAILABLE, hasModelStatusDetails, modelPhase, modelStatusTitle } from './modelStatusInfo';
 import type { ModelDeleteService } from './useDeleteModel';
 import { useDeleteModel } from './useDeleteModel';
+import { modelApiOf } from './modelApis';
 import { modelServerLabel } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
@@ -69,6 +70,7 @@ export const ModelDetailsPage: React.FC<Props> = ({ service }) => {
               { term: 'Model', value: model.modelName ?? model.modelRef.name },
               { term: 'Model URI', value: model.modelUri },
               { term: 'Model server', value: modelServerLabel(model.baseRefs) || undefined },
+              { term: 'Model API', value: modelApiOf(model.annotations).label },
               { term: 'Runtime image', value: model.runtimeImage },
               { term: 'Replicas', value: model.replicas },
               { term: 'Endpoint', value: model.endpoint },

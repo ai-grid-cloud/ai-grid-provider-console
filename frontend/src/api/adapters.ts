@@ -318,6 +318,7 @@ export const toModelCreate = (input: CreateModelRequest, namespace: string): Api
   annotations: {
     ...(input.displayName ? { 'openshift.io/display-name': input.displayName } : {}),
     ...(input.description ? { 'openshift.io/description': input.description } : {}),
+    'ai-grid/api': input.api,
   },
   modelUri: input.modelUri,
   modelName: input.modelName,

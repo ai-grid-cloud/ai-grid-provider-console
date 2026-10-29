@@ -324,6 +324,7 @@ const wizardInput = (overrides: Partial<CreateModelRequest> = {}): CreateModelRe
   gpuCount: 1,
   runtimeArgs: [],
   baseRefs: [],
+  api: 'chat',
   locations: ['site-paris-1', 'site-madrid-1'],
   ...overrides,
 });
@@ -350,6 +351,13 @@ describe('toModelCreate', () => {
       runtimeImage: '',
     });
     expect(toModelCreate(wizardInput(), 'ns').baseRefs).toEqual([]);
+  });
+
+  it('sends the model API as annotation ai-grid/api, which picks the path MaaS calls', () => {
+    expect(toModelCreate(wizardInput({ api: 'completions' }), 'ns').annotations).toMatchObject({
+      'ai-grid/api': 'completions',
+    });
+    expect(toModelCreate(wizardInput(), 'ns').annotations).toMatchObject({ 'ai-grid/api': 'chat' });
   });
 
   it('omits env without runtime arguments', () => {

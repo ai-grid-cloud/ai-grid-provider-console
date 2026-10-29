@@ -42,6 +42,7 @@ const input: CreateModelRequest = {
   locations: ['site1', 'site2'],
   runtimeArgs: [],
   baseRefs: [],
+  api: 'chat',
 };
 
 /** A user the console couldn't load: the pages show, but without write actions. A viewer
@@ -1072,6 +1073,32 @@ describe('the model server', () => {
     );
     expect(await screen.findByRole('textbox', { name: 'Model server' })).toHaveValue('custom-preset');
     expect(screen.getByRole('textbox', { name: 'Model server' })).toHaveAttribute('readonly');
+  });
+
+  it('offers the model API, chat by default, and sends the choice', async () => {
+    const user = userEvent.setup();
+    const create = await openDeployment(user);
+    const api = screen.getByRole('combobox', { name: 'Model API' });
+    expect(api).toHaveValue('chat');
+    await user.selectOptions(api, 'completions');
+    expect(api).toHaveAccessibleDescription(/\/v1\/completions/);
+    await user.type(screen.getByRole('textbox', { name: /Runtime image/ }), 'registry.example/vllm-cpu:test');
+    await chooseServer(user);
+    const review = await deploy(user);
+    expect(review).toHaveTextContent('Model APICompletions');
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0][0]).toMatchObject({ api: 'completions' });
+  });
+
+  it("names the model's API on its page, chat when the model has no choice recorded", async () => {
+    const service = new MockConsoleService();
+    service.models[0].annotations = { ...service.models[0].annotations, 'ai-grid/api': 'completions' };
+    const page = renderAt(`/models/ai-grid-models/${service.models[0].name}`, service);
+    expect(await screen.findByText('Completions')).toBeVisible();
+    page.unmount();
+    service.models[0].annotations = {};
+    renderAt(`/models/ai-grid-models/${service.models[0].name}`, service);
+    expect(await screen.findByText('Chat completions')).toBeVisible();
   });
 
   it("names the model's server on its page", async () => {

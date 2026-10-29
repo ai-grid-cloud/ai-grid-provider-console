@@ -296,6 +296,7 @@ export class MockConsoleService implements ConsoleService {
       annotations: {
         ...(input.displayName.trim() ? { 'openshift.io/display-name': input.displayName.trim() } : {}),
         ...(input.description ? { 'openshift.io/description': input.description } : {}),
+        'ai-grid/api': input.api,
       },
       placementSpec: consolePlacement(input.locations),
     };

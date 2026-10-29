@@ -246,6 +246,8 @@ export const createModelSchema = z
     gpuCount: z.number().int().min(0).max(64),
     runtimeArgs: z.array(z.string().max(4096)).max(64),
     baseRefs: z.array(z.string().min(1, 'Enter a preset name.').max(253)).max(8),
+    // Optional: the shared validation cases (mock/validation/cases.json) predate it.
+    api: z.enum(['chat', 'completions']).optional(),
     locations: locationsSchema.refine((values) => values.length > 0, 'Select at least one location.'),
   })
   .strict();

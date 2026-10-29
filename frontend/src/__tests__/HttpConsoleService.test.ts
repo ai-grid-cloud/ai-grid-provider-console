@@ -101,6 +101,7 @@ describe('HttpConsoleService', () => {
       gpuCount: 0,
       runtimeArgs: [],
       baseRefs: ['v3-6-0-kserve-config-llm-template-cpu'],
+      api: 'chat' as const,
       locations: ['site-paris-1'],
     };
     await expect(service.createModel(input)).resolves.toMatchObject({ name: 'widget', namespace: 'team-models' });

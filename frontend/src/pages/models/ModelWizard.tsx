@@ -45,6 +45,7 @@ import { createModelSchema, fieldMessage } from '../../validation';
 import { RuntimeArgsField } from './fields/RuntimeArgsField';
 import { filterRuntimeArgsForContainer, type RuntimeArgsFieldData } from './fields/runtimeArgs';
 import { locationLabel, modelPath, siteNamesOf } from './modelUtils';
+import { type ModelApi, modelApiOf, modelApis } from './modelApis';
 import { type ModelServer, modelServerLabel, modelServers } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
@@ -224,6 +225,9 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
     else if (gpuCount === defaults.gpuCount || gpuCount === '') setGpuCount('1');
   };
   const usesGpus = editing || Boolean(server?.usesGpus);
+  // Chat unless the user picks completions; a deployed model shows its own, read-only.
+  const [apiId, setApiId] = useState<ModelApi['id']>(modelApiOf(model?.annotations).id);
+  const api = modelApis.find((a) => a.id === apiId) ?? modelApis[0];
   const [runtimeArgs, setRuntimeArgs] = useState<RuntimeArgsFieldData>({
     enabled: start.runtimeArgs.length > 0,
     args: start.runtimeArgs,
@@ -248,6 +252,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
     gpuCount: usesGpus ? Number(gpuCount) : 0,
     runtimeArgs: filterRuntimeArgsForContainer(runtimeArgs.args),
     baseRefs: model ? model.baseRefs : (server?.baseRefs ?? []),
+    api: apiId,
     locations,
   };
   const update = model
@@ -470,6 +475,7 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
         { term: 'Deployment name', value: nameDescData.name },
         { term: 'Description', value: nameDescData.description },
         { term: 'Model server', value: modelServerLabel(input.baseRefs) },
+        { term: 'Model API', value: api.label },
         { term: 'Runtime image', value: runtimeImage },
         { term: 'Replicas', value: replicasEditable ? replicas : 'Autoscaled' },
         { term: 'CPU', value: cpu },
@@ -626,6 +632,24 @@ export const ModelWizard: React.FC<Props> = ({ service, model }) => {
                   <Help id="model-server-help" error={serverError}>
                     {server?.description ?? 'Choose the build that matches the hardware of the clusters you deploy to.'}
                   </Help>
+                </FormGroup>
+              )}
+              {editing ? (
+                <ReadOnlyField label="Model API" fieldId="model-api" value={api.label} reason={fixedReason.resources} />
+              ) : (
+                <FormGroup label="Model API" fieldId="model-api" isRequired>
+                  <FormSelect
+                    id="model-api"
+                    aria-describedby="model-api-help"
+                    value={apiId}
+                    onChange={(_event, value) => setApiId(value as ModelApi['id'])}
+                    isRequired
+                  >
+                    {modelApis.map((a) => (
+                      <FormSelectOption key={a.id} value={a.id} label={a.label} />
+                    ))}
+                  </FormSelect>
+                  <Help id="model-api-help">{api.description}</Help>
                 </FormGroup>
               )}
               <FormGroup label="Runtime image" fieldId="runtime-image" isRequired>

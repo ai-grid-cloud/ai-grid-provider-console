@@ -278,6 +278,8 @@ export type CreateModelRequest = {
   runtimeArgs: string[];
   /** The model server's presets (spec.baseRefs); empty for KServe's default. */
   baseRefs: string[];
+  /** The OpenAI API MaaS calls on the model (annotation ai-grid/api). */
+  api: 'chat' | 'completions';
   locations: string[];
 };
 
