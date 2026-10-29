@@ -15,7 +15,7 @@ import { PARTIALLY_AVAILABLE, hasModelStatusDetails, modelPhase, modelStatusTitl
 import { titleOf } from './modelView';
 import { useDeleteModel } from './useDeleteModel';
 import { useModel } from './useModels';
-import { modelServerLabel } from './modelServers';
+import { modelServerLabel, modelServerOf, PRESET_IMAGE } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
 /** A model deployment at /models/:id: its status explained, its configuration and its locations. */
@@ -63,7 +63,11 @@ export const ModelDetailsPage: React.FC = () => {
               { term: 'Model', value: model.modelName },
               { term: 'Model URI', value: model.modelUri },
               { term: 'Model server', value: modelServerLabel(model.baseRefs) || undefined },
-              { term: 'Runtime image', value: model.runtimeImage },
+              {
+                term: 'Runtime image',
+                // As the wizard reads it: only a server the console knows sets the image.
+                value: model.runtimeImage || (modelServerOf(model.baseRefs)?.setsImage ? PRESET_IMAGE : undefined),
+              },
               { term: 'Replicas', value: model.autoscaled ? 'Autoscaled' : model.replicas },
               { term: 'Endpoint', value: model.url },
               { term: 'Created', value: model.creationTimestamp && <RelativeTime time={model.creationTimestamp} /> },
