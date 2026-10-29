@@ -57,10 +57,21 @@ export const useLoaded = <R, T>(query: UseQueryResult<R, unknown>, select: (answ
   };
 };
 
-/** The query options both loads share: poll until the session ends, and no retries (the page offers Retry). */
-export const useLoadOptions = () => {
+/** How often a page polls while something it shows is still changing, such as a Pending model. */
+export const UNSETTLED_POLL_MS = 10_000;
+
+/**
+ * The query options the pages' loads share: poll until the session ends, and no retries (the page
+ * offers Retry). With `unsettled`, the load polls every UNSETTLED_POLL_MS while the last answer has
+ * something still changing, and every `settledMs` (POLL_MS, or `false` for none) once nothing does.
+ */
+export const useLoadOptions = <T>(unsettled?: (answer: T) => boolean, settledMs: number | false = POLL_MS) => {
   const { sessionEnded } = useConsoleSession();
-  return { refetchInterval: sessionEnded ? (false as const) : POLL_MS, retry: false };
+  const refetchInterval = (query: { state: { data: T | undefined } }) => {
+    const answer = query.state.data;
+    return answer !== undefined && unsettled?.(answer) ? UNSETTLED_POLL_MS : settledMs;
+  };
+  return { refetchInterval: sessionEnded ? (false as const) : refetchInterval, retry: false };
 };
 
 const clusterViews = (answer: ClustersListResponse | undefined) => answer?.items.map(toClusterView) ?? [];

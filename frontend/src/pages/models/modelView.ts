@@ -178,3 +178,13 @@ export const olderServedNameOf = (model: Pick<ModelView, 'id' | 'modelName'>): s
 
 /** The name a page shows for the model: its display name, else its id. */
 export const titleOf = (model: Pick<ModelView, 'id' | 'displayName'>) => model.displayName ?? model.id;
+
+/** Phases a model or one of its clusters leaves on its own, so the pages poll sooner while one shows. */
+const unsettledPhases: ReadonlySet<ModelPhaseWord> = new Set(['Pending', 'Saved to Git', 'Unknown']);
+
+/**
+ * Whether the model, or any cluster it is placed on, is in a phase that is still changing. A model
+ * without a placement goes to no cluster, so nothing changes until it is edited.
+ */
+export const isUnsettled = (model: Pick<ModelView, 'phase' | 'clusters' | 'placed'>): boolean =>
+  model.placed && (unsettledPhases.has(model.phase) || model.clusters.some((c) => unsettledPhases.has(c.phase)));

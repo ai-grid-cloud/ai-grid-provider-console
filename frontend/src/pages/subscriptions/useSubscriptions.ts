@@ -25,15 +25,18 @@ import type { TenantsListResponse } from '../../gen/ai_grid/v1/tenants_service_p
 import { list as listTenants } from '../../gen/ai_grid/v1/tenants_service-Tenants_connectquery';
 import { useLoadOptions, useLoaded, type Loaded } from '../clusters/useClusters';
 import { toModelView, type ModelView } from '../models/modelView';
+import { isUnsettledSubscription, isUnsettledSubscriptionInfo } from './subscriptionText';
 
 const subscriptionItems = (answer: SubscriptionsListResponse | undefined) => answer?.items ?? [];
 const subscriptionInfo = (answer: SubscriptionsGetResponse | undefined) => (answer?.object ? answer : undefined);
 const modelViews = (answer: ModelsListResponse | undefined) => answer?.items.map(toModelView) ?? [];
 const tenantItems = (answer: TenantsListResponse | undefined) => answer?.items ?? [];
 
+const anyUnsettled = (answer: SubscriptionsListResponse) => answer.items.some(isUnsettledSubscription);
+
 /** Every subscription, from Subscriptions/List. */
 export const useSubscriptionList = (): Loaded<Subscription[]> =>
-  useLoaded(useQuery(list, {}, useLoadOptions()), subscriptionItems);
+  useLoaded(useQuery(list, {}, useLoadOptions(anyUnsettled)), subscriptionItems);
 
 /**
  * The CEL filter for the models with these ids (Model.id, DNS labels, so they need no escaping;
@@ -62,12 +65,19 @@ export const useTenantList = (): Loaded<Tenant[]> =>
   useLoaded(useQuery(listTenants, {}, useLoadOptions()), tenantItems);
 
 /**
- * One subscription with its auth policies and model registrations, from Subscriptions/Get, loaded
- * once. The edit page keeps the first answer (EditSubscriptionPage), so a save is checked against
- * the version it started from.
+ * One subscription with its auth policies and model registrations, from Subscriptions/Get. By
+ * default it loads once: the edit page keeps the first answer (EditSubscriptionPage), so a save is
+ * checked against the version it started from. `poll: true`, as its page passes, polls while the
+ * subscription or a model registration is still changing (isUnsettledSubscriptionInfo), and stops
+ * once nothing is.
  */
-export const useSubscription = (id: string): Loaded<SubscriptionsGetResponse | undefined> =>
-  useLoaded(useQuery(get, { id }, { retry: false, refetchInterval: false }), subscriptionInfo);
+export const useSubscription = (
+  id: string,
+  { poll = false }: { poll?: boolean } = {},
+): Loaded<SubscriptionsGetResponse | undefined> => {
+  const options = useLoadOptions(isUnsettledSubscriptionInfo, false);
+  return useLoaded(useQuery(get, { id }, poll ? options : { retry: false, refetchInterval: false }), subscriptionInfo);
+};
 
 /** Subscriptions/Create, Update and Delete; each refetches the subscriptions once it lands. */
 export const useSubscriptionWrites = () => {
