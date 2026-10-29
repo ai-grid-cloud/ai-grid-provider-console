@@ -173,6 +173,8 @@ it('gives clusters at one position one pin, which names each and lists them to c
     shared.openPopup();
   });
   const list = await screen.findByRole('list', { name: '2 clusters here' });
+  // The popup lists the clusters, so the tooltip that summarises them steps aside.
+  expect(shared.isTooltipOpen()).toBe(false);
   await userEvent.setup().click(within(list).getByRole('button', { name: `us-east-2 · ${b.name} · Offline` }));
   expect(onSelect).toHaveBeenCalledWith(b.name);
 });

@@ -205,6 +205,12 @@ export const GridFleetMap: React.FC<Props> = ({ clusters, selected, onSelect, ti
         }
         // Wide enough for "site name · cluster name · status" on one line.
         marker.bindPopup(list, { minWidth: 240 });
+        // The popup lists what the tooltip summarises, so the tooltip steps aside while it is open
+        // (a selected pin's label comes back when the popup closes).
+        marker.on('popupopen', () => marker.closeTooltip());
+        marker.on('popupclose', () => {
+          if (focused) marker.openTooltip();
+        });
       } else {
         marker.on('click', () => select.current(first.name));
       }

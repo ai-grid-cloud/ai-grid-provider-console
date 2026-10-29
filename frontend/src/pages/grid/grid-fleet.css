@@ -24,9 +24,9 @@
   position: absolute;
   inset: 0;
 }
-/* Leaflet's stylesheet colours its sea, controls and tooltips with fixed light colours; these give
-   them PatternFly's tokens, so they follow the console's theme. The sea keeps the grey Leaflet's
-   own was (#ddd) in the light theme, and is darker than the land in the dark one. */
+/* Leaflet's stylesheet colours its sea, controls, tooltips and popups with fixed light colours;
+   these give them PatternFly's tokens, so they follow the console's theme. The sea keeps the grey
+   Leaflet's own was (#ddd) in the light theme, and is darker than the land in the dark one. */
 .fleet-map {
   --fleet-map--sea: var(--pf-t--color--gray--20);
 }
@@ -76,6 +76,20 @@
 }
 .fleet-map .leaflet-tooltip-right::before {
   border-right-color: var(--pf-t--global--background--color--floating--default);
+}
+/* The popup a pin opens when it stands for several clusters (GridFleetMap's bindPopup). */
+.fleet-map .leaflet-popup-content-wrapper,
+.fleet-map .leaflet-popup-tip {
+  color: var(--pf-t--global--text--color--regular);
+  background: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--md);
+}
+.fleet-map .leaflet-container a.leaflet-popup-close-button {
+  color: var(--pf-t--global--icon--color--subtle);
+}
+.fleet-map .leaflet-container a.leaflet-popup-close-button:hover,
+.fleet-map .leaflet-container a.leaflet-popup-close-button:focus {
+  color: var(--pf-t--global--icon--color--regular);
 }
 
 /* The bundled land outline drawn when no tile server is configured. */
