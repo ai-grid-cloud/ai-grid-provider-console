@@ -60,6 +60,13 @@ const steps = {
   review: 'summary-step',
 } as const;
 
+/**
+ * The longest id a new model can have, as Models/Create allows (backend checkNewModelIDLength):
+ * ai-gateway-controller names a Service provider-selection-required-<id> without shortening it, so a
+ * longer id breaks routing for every model on that ingress site. An existing model keeps its id.
+ */
+const MAX_NEW_MODEL_ID_LENGTH = 63 - 'provider-selection-required-'.length;
+
 const defaults = { replicas: String(DEFAULT_REPLICAS), cpu: '2', memory: '4Gi', gpuCount: '0' };
 
 /** A resource the model was deployed without, shown in its read-only field. */
@@ -170,7 +177,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   // Like the text fields, Locations shows its error only once the user has changed it.
   const [locationsTouched, setLocationsTouched] = useState(false);
   const { data: nameDescData, onDataChange: onNameDescChange } = useK8sNameDescriptionFieldData({
-    maxLength: 63,
+    maxLength: MAX_NEW_MODEL_ID_LENGTH,
     // A k8sName makes the resource name read-only, as a deployed one is.
     initialData: model ? { name: titleOf(model), description: model.description ?? '', k8sName: model.id } : undefined,
   });
@@ -264,6 +271,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         replicas === start.replicas ||
         (replicas !== '' && createModelSchema.shape.replicas.safeParse(input.replicas).success))
     : server !== undefined &&
+      // The schema allows any model's id (63); a new one is held to MAX_NEW_MODEL_ID_LENGTH by the field.
+      !nameDescData.k8sName.state.invalidLength &&
       replicas !== '' &&
       gpuCount !== '' &&
       !gpusMissing &&
@@ -550,7 +559,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                 nameHelperText={
                   editing
                     ? undefined
-                    : 'Users send the resource name as the model in their requests. Up to 63 characters.'
+                    : `Users send the resource name as the model in their requests. The resource name can be up to ${MAX_NEW_MODEL_ID_LENGTH} characters.`
                 }
               />
               {editing ? (
