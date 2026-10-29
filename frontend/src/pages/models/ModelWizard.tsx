@@ -44,7 +44,7 @@ import { titleOf, type ModelView } from './modelView';
 import { OlderServedNameAlert } from './OlderServedNameAlert';
 import { useModelWrites, usePlacementClusters } from './useModels';
 import { deploymentNameFromUri, locationLabel, modelPath, siteNamesOf } from './modelUtils';
-import { type ModelServer, modelServerLabel, modelServers } from './modelServers';
+import { type ModelServer, modelServerLabel, modelServerOf, modelServers, PRESET_IMAGE } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
 type Props = {
@@ -239,8 +239,11 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       : value.trim()
         ? fieldMessage(createModelSchema.shape[field], value, parse)
         : 'Required.';
+  // A server whose presets set the image (vLLM on CPU) lets the field stay empty: the preset's applies.
+  const imageOptional = Boolean((editing ? modelServerOf(model?.baseRefs) : server)?.setsImage);
+  const imageFromPreset = imageOptional && runtimeImage.trim() === '';
   const modelUriError = shownError('modelUri', modelUri);
-  const runtimeImageError = shownError('runtimeImage', runtimeImage);
+  const runtimeImageError = imageFromPreset ? undefined : shownError('runtimeImage', runtimeImage);
   const replicasError = shownError('replicas', replicas, Number);
   const cpuError = shownError('cpu', cpu);
   const memoryError = shownError('memory', memory);
@@ -258,6 +261,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         .safeParse({ displayName: input.displayName, description: input.description }).success &&
       // A model deployed without an image keeps none until one is entered.
       (runtimeImage === start.runtimeImage ||
+        imageFromPreset ||
         createModelSchema.shape.runtimeImage.safeParse(input.runtimeImage).success) &&
       // The deploy wizard's limits apply to a count the user sets, not to one the model already has.
       (!replicasEditable ||
@@ -267,7 +271,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       replicas !== '' &&
       gpuCount !== '' &&
       !gpusMissing &&
-      createModelSchema.omit({ locations: true }).strip().safeParse(input).success;
+      createModelSchema.omit({ locations: true, runtimeImage: true }).strip().safeParse(input).success &&
+      (imageFromPreset || createModelSchema.shape.runtimeImage.safeParse(input.runtimeImage).success);
   // An edit that keeps the locations doesn't depend on which locations are offered right now.
   const locationsChanged = !editing || !sameSet(locations, start.locations);
   const locationsValid =
@@ -435,7 +440,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         ...(model ? [] : [{ term: 'Name tenants call', value: nameDescData.k8sName.value }]),
         { term: 'Description', value: nameDescData.description },
         { term: 'Model server', value: modelServerLabel(input.baseRefs) },
-        { term: 'Runtime image', value: runtimeImage },
+        { term: 'Runtime image', value: imageFromPreset ? PRESET_IMAGE : runtimeImage },
         { term: 'Replicas', value: replicasEditable ? replicas : 'Autoscaled' },
         { term: 'CPU', value: cpu },
         { term: 'Memory', value: memory },
@@ -584,7 +589,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   </Help>
                 </FormGroup>
               )}
-              <FormGroup label="Runtime image" fieldId="runtime-image" isRequired>
+              <FormGroup label="Runtime image" fieldId="runtime-image" isRequired={!imageOptional}>
                 <TextInput
                   id="runtime-image"
                   aria-describedby="runtime-image-help"
@@ -592,11 +597,12 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   onChange={(_event, value) => setRuntimeImage(value)}
                   onBlur={() => touch('runtimeImage')}
                   validated={runtimeImageError ? 'error' : 'default'}
-                  isRequired
+                  isRequired={!imageOptional}
                 />
                 <Help id="runtime-image-help" error={runtimeImageError}>
-                  Container image for the serving runtime. It must match the model server, such as a vLLM CPU image for
-                  vLLM on CPU.
+                  {imageOptional
+                    ? 'Optional. Left empty, the model server’s image applies; an image entered here replaces it.'
+                    : 'Container image for the serving runtime. It must match the model server, such as a vLLM CPU image for vLLM on CPU.'}
                 </Help>
               </FormGroup>
               {replicasEditable ? (
