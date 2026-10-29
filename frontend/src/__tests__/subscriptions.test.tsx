@@ -27,7 +27,7 @@ import {
   SUBSCRIPTION_NAMESPACE,
   subscriptionsOf,
 } from './connectSubscriptions';
-import { deferred, renderAt } from './render';
+import { deferred, renderAt, findVisible } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/subscriptions/CreateSubscriptionPage';
 import '../pages/subscriptions/EditSubscriptionPage';
@@ -273,7 +273,7 @@ describe('administrator subscription flows', () => {
     expect(within(table).queryByRole('button', { name: 'Kebab toggle' })).not.toBeInTheDocument();
     await user.click(actions);
     expect(actions).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await findVisible('menuitem', 'Delete');
     // A subscription being deleted can still be viewed; Edit and Delete stay, disabled.
     await user.keyboard('{Escape}');
     await user.click(within(table).getByRole('button', { name: 'Actions for Research' }));

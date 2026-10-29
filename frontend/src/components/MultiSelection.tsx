@@ -154,7 +154,7 @@ export const MultiSelection: React.FC<MultiSelectionProps> = ({
   const [focusedItemIndex, setFocusedItemIndex] = React.useState<number | null>(null);
   const [activeItemId, setActiveItemId] = React.useState<string | null>(null);
   const textInputRef = React.useRef<HTMLInputElement | null>(null);
-  const focusTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const focusTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const closeMenuRef = React.useRef<() => void>(() => undefined);
   const generatedInstanceId = React.useId().replace(/:/g, '');
   const instanceId = id ?? `multi-select-${generatedInstanceId}`;

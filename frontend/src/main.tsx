@@ -9,7 +9,6 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { HttpConsoleService } from './api/HttpConsoleService';
-import { routerProps } from './router';
 
 const container = document.getElementById('root');
 if (!container) {
@@ -19,7 +18,7 @@ createRoot(container).render(
   <React.StrictMode>
     {/* Outside the router, so a crash anywhere in the console still shows something. */}
     <AppErrorBoundary>
-      <BrowserRouter {...routerProps}>
+      <BrowserRouter>
         <App service={new HttpConsoleService()} />
       </BrowserRouter>
     </AppErrorBoundary>

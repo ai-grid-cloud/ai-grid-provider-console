@@ -12,7 +12,7 @@ import { ServiceError } from '../api/ConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { ModelPhase } from '../gen/ai_grid/v1/model_type_pb';
 import { modelObject, modelsOf, subscriptionUsing } from './connectModels';
-import { deferred, renderAt } from './render';
+import { deferred, renderAt, findVisible } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/models/ModelDetailsPage';
 import '../pages/models/ModelEditPage';
@@ -260,7 +260,7 @@ it('loads the placement clusters again when the Locations step opens', async () 
   renderAt('/models/deploy', service);
   await fillModel(user);
   await user.click(await screen.findByRole('combobox', { name: 'Locations' }));
-  expect(await screen.findByRole('option', { name: site3 })).toBeVisible();
+  await findVisible('option', site3);
   expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([site1, site2, site3]);
 });
 

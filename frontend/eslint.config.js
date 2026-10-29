@@ -30,7 +30,22 @@ export default defineConfig(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'zod',
+              message: "Import z from src/validation/zod, which sets the console's wording for every issue.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    files: ['src/validation/zod.ts'],
+    rules: { 'no-restricted-imports': 'off' },
   },
   {
     files: ['vite.config.ts', 'vitest.setup.ts'],

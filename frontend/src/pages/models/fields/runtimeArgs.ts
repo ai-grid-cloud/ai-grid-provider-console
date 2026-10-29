@@ -3,7 +3,7 @@
 // upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
 // The schema, helpers and hook, in their own module so the component file exports only the component.
 import React from 'react';
-import { z } from 'zod';
+import { z } from '../../../validation/zod';
 
 /** A container environment variable, as ModelContainer.env lists them. */
 export type EnvVar = { name: string; value: string };

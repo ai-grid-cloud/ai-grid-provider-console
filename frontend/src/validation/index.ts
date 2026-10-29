@@ -1,10 +1,10 @@
-import { z } from 'zod';
+import { z } from './zod';
 
 /**
  * Field errors keyed by JSON path, the last message per path, as the PoC keeps them
- * (Object.fromEntries over the zod issues) and as bff/internal/validation does.
+ * (Object.fromEntries over the zod issues).
  */
-export const fieldErrorsOf = (schema: z.ZodTypeAny, input: unknown): Record<string, string> => {
+export const fieldErrorsOf = (schema: z.ZodType, input: unknown): Record<string, string> => {
   const result = schema.safeParse(input);
   if (result.success) return {};
   const out: Record<string, string> = {};
@@ -20,7 +20,7 @@ export const fieldErrorsOf = (schema: z.ZodTypeAny, input: unknown): Record<stri
  * `Number` as `parse`.
  */
 export const fieldMessage = (
-  schema: z.ZodTypeAny,
+  schema: z.ZodType,
   value: string,
   parse: (text: string) => unknown = (text) => text,
 ): string | undefined => {
@@ -119,7 +119,7 @@ export const resourceName = z
   .string()
   .min(1)
   .max(253)
-  .regex(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
+  .regex(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/, 'Use lowercase letters, numbers, and hyphens.');
 
 // Ported from krisv/ai-grid-cloud-provider-poc shared/model-validation.mjs at 62319b8.
 export const modelNameSchema = resourceName.max(63);

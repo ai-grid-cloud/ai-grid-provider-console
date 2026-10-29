@@ -35,6 +35,10 @@ describe('RelayDatasourceApi', () => {
     );
   });
 
+  it("refuses an unsaved datasource, whose proxy the relay doesn't serve", () => {
+    expect(() => api.buildProxyUrl({ project: 'p' })).toThrow(/only saved datasources/);
+  });
+
   it("finds a named datasource, or the project's default one of the kind", async () => {
     const fetchFn = answer([datasource('a'), datasource('b', true)]);
     expect((await api.getDatasource('p', { kind: 'PrometheusDatasource', name: 'a' }))?.metadata.name).toBe('a');

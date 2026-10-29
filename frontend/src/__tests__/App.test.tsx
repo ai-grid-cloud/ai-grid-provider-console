@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { ServiceError } from '../api/ConsoleService';
 import type { ConsoleConfig, User } from '../api/types';
-import { deferred } from './render';
+import { deferred, findVisible } from './render';
 import { TestApp } from './TestApp';
 import { SIGN_IN_AGAIN_KEY, SIGN_IN_AGAIN_WINDOW_MS, type Navigation } from '../utilities/signInAgain';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
@@ -93,8 +93,8 @@ describe('App', () => {
       </MemoryRouter>,
     );
     await user.click(await screen.findByRole('button', { name: 'User menu: Signing in...' }));
-    expect(screen.getByRole('menuitem', { name: 'About' })).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
+    await findVisible('menuitem', 'About');
+    await findVisible('menuitem', 'Log out');
   });
 
   it('does not call a viewer a provider admin', async () => {
@@ -131,7 +131,7 @@ describe('App', () => {
     const calls = listClusters.mock.calls.length;
     // The masthead stays, with the user menu.
     await user.click(screen.getByRole('button', { name: 'User menu: viewer' }));
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
+    await findVisible('menuitem', 'Log out');
     expect(listClusters).toHaveBeenCalledTimes(calls);
   });
 
@@ -243,7 +243,7 @@ describe('user menu', () => {
     );
     await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user'));
     await user.click(screen.getByRole('button', { name: /dev-user/ }));
-    expect(screen.getByRole('menuitem', { name: 'About' })).toBeVisible();
+    await findVisible('menuitem', 'About');
     expect(screen.queryByRole('menuitem', { name: 'Log out' })).not.toBeInTheDocument();
   });
 

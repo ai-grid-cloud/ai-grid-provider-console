@@ -2,7 +2,7 @@
 // Adapted from opendatahub-io/odh-dashboard
 // packages/maas/frontend/src/app/utilities/rateLimits.ts
 // upstream commit: 8051fbbea117457b4da4074fb2856b732e6677a4
-import { z } from 'zod';
+import { z } from '../validation/zod';
 
 /**
  * A subscription's token limit as the form keeps it: the generated TokenRateLimit's fields, with its

@@ -1062,8 +1062,10 @@ func TestConfigReportsFakeBackend(t *testing.T) {
 // with a BadRequest comes back as 422 with its fieldErrors.
 func TestBFFForwardsWhatItDecodes(t *testing.T) {
 	t.Parallel()
-	st, err := status.New(codes.InvalidArgument, "String must contain at least 1 character(s)").WithDetails(&errdetails.BadRequest{
-		FieldViolations: []*errdetails.BadRequest_FieldViolation{{Field: "name", Description: "String must contain at least 1 character(s)"}},
+	// Whatever the backend says; the BFF passes it on word for word.
+	const msg = "the backend's message about the name"
+	st, err := status.New(codes.InvalidArgument, msg).WithDetails(&errdetails.BadRequest{
+		FieldViolations: []*errdetails.BadRequest_FieldViolation{{Field: "name", Description: msg}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1074,7 +1076,7 @@ func TestBFFForwardsWhatItDecodes(t *testing.T) {
 	if got := fake.LastCreateTenant.GetObject().GetName(); got != "   " {
 		t.Fatalf("forwarded name %q", got)
 	}
-	if rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.FieldErrors["name"] != "String must contain at least 1 character(s)" {
+	if rec.Code != http.StatusUnprocessableEntity || decodeError(t, rec).Error.FieldErrors["name"] != msg {
 		t.Fatalf("backend's field errors: %d %s", rec.Code, rec.Body)
 	}
 }

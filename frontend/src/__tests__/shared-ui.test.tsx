@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ServiceError } from '../api/ConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
-import { renderAt } from './render';
+import { renderAt, findVisible } from './render';
 import { modelsOf } from './connectModels';
 import { ModelPhase } from '../gen/ai_grid/v1/model_type_pb';
 import '../pages/models/ModelsPage';
@@ -131,7 +131,7 @@ it('offers Log out while the console configuration is still loading', async () =
     </MemoryRouter>,
   );
   await user.click(await screen.findByRole('button', { name: /dev-user/ }));
-  expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
+  await findVisible('menuitem', 'Log out');
 });
 
 it('offers a reload when a page fails to load, and tries again on another page', async () => {

@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { MockConsoleService } from '../api/MockConsoleService';
@@ -177,7 +177,8 @@ it("offers the theme in the user menu, for a phone's masthead", async () => {
   expect(screen.getByRole('menuitem', { name: 'Light' })).not.toHaveClass('pf-m-selected');
   await user.click(screen.getByRole('menuitem', { name: 'Dark' }));
   expect(isDark()).toBe(true);
-  expect(screen.queryByRole('menuitem', { name: 'Dark' })).not.toBeInTheDocument();
+  // PatternFly closes the menu from a timer, so it goes after the click has returned.
+  await waitFor(() => expect(screen.queryByRole('menuitem', { name: 'Dark' })).not.toBeInTheDocument());
 
   await user.click(screen.getByRole('button', { name: /^User menu/ }));
   expect(screen.getByRole('menuitem', { name: 'Dark' })).toHaveClass('pf-m-selected');

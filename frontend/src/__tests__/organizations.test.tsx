@@ -11,7 +11,7 @@ import { ServiceError } from '../api/ConsoleService';
 import { HttpConsoleService } from '../api/HttpConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
 import type { Organization, OrganizationInput } from '../api/types';
-import { deferred, renderAt } from './render';
+import { deferred, renderAt, findVisible } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/organizations/OrganizationDetailsPage';
 import '../pages/organizations/OrganizationListPage';
@@ -363,7 +363,7 @@ it('deletes an organization from the list and says so', async () => {
   const user = userEvent.setup();
   renderAt('/organizations', service);
   await user.click(await screen.findByRole('button', { name: 'Actions for tenant1' }));
-  expect(screen.getByRole('menuitem', { name: 'View details' })).toBeVisible();
+  await findVisible('menuitem', 'View details');
   await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
   const modal = await screen.findByRole('dialog', { name: /Delete organization\?/ });
   await user.click(within(modal).getByRole('textbox'));

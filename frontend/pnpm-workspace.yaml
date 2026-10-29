@@ -2,16 +2,8 @@ packages:
   - .
 allowBuilds:
   esbuild: true
-# Fixes in dependencies until upstream has them (`pnpm patch`); each patch applies to that exact
-# version, and an install fails if it no longer does.
-patchedDependencies:
-  # The pie chart imports `format` from 'echarts', whose index registers every ECharts chart and
-  # component (about 120 kB gzipped more in the Monitoring chunk); 'echarts/core' exports the same
-  # `format`, as the other Perses plugins import it. Fixed upstream by perses/plugins#893; drop
-  # this patch once a pie chart release with that fix is in use.
-  '@perses-dev/pie-chart-plugin@0.14.0': patches/@perses-dev__pie-chart-plugin@0.14.0.patch
 
-# Perses 0.54 declares Query v4. The real-renderer browser test in e2e/perses.spec.ts
+# Perses 0.56 still declares Query v4. The real-renderer browser test in e2e/perses.spec.ts
 # verifies its v5 integration; keep the console and all plugins on the same runtime.
 # Under v5, three things in Perses behave differently (docs/connect.md, "Perses on Query v5"):
 # the query summary table counts no active queries ('loading' is 'pending' in v5), a panel
@@ -19,4 +11,10 @@ patchedDependencies:
 # (`useErrorBoundary` is `throwOnError` in v5), and a disabled query without data is not
 # `isLoading`. Drop this override once the @perses-dev packages declare Query v5.
 overrides:
-  '@tanstack/react-query': 5.104.5
+  '@tanstack/react-query': 5.105.0
+  # GHSA-w74x-v6f9-j3xg (URI scheme spoofing): @perses-dev/plugin-system 0.56.0-beta.0 pins
+  # fast-uri 3.1.8. Drop this once the Perses release in use depends on fast-uri 3.1.9 or later.
+  'fast-uri@<3.1.9': 3.1.9
+  # GHSA-6pq8-jhm2-2vcw (qs.stringify denial of service): @perses-dev/explore 0.56.0-beta.0 pins
+  # qs 6.16.0. Drop this once the Perses release in use depends on qs 6.16.1 or later.
+  'qs@>=6.7.0 <6.16.1': 6.16.1

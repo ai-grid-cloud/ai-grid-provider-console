@@ -112,7 +112,7 @@ gives plain typed clients.
 
 ### Query v5 and the Monitoring page
 
-Query v5 is pinned for the console and Perses plugins in `pnpm-workspace.yaml`. Perses 0.54
+Query v5 is pinned for the console and Perses plugins in `pnpm-workspace.yaml`. Perses 0.56
 still declares v4 support; `e2e/perses.spec.ts` verifies the actual renderer on v5. Keep that
 regression passing when updating these dependencies.
 
@@ -235,8 +235,9 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
 
 ### Perses on Query v5
 
-Every `@perses-dev` package up to 0.55.0 declares `@tanstack/react-query` `^4.39.1` as its peer;
-the `overrides` entry in `frontend/pnpm-workspace.yaml` gives it the console's v5 instead, so
+The `@perses-dev` packages that use Query (dashboards, explore, plugin-system, and the Prometheus
+and Loki plugins) declare `@tanstack/react-query` `^4.39.1` as their peer, up to 0.56.0-beta.0;
+the `overrides` entry in `frontend/pnpm-workspace.yaml` gives them the console's v5 instead, so
 there is one Query runtime in the app. Perses's built code uses the object syntax v5 requires,
 but three v4 names it still uses mean something else, or nothing, in v5 ([TanStack's migration
 guide](https://tanstack.com/query/v5/docs/framework/react/guides/migrating-to-v5)):
@@ -263,11 +264,12 @@ Each one only changes what a dashboard shows in those cases. The exit: drop the 
 syntax, perses/perses#2139). If the integration regresses before then, the fallback is a second
 Query runtime for Perses alone.
 
-The console also renders navigations without React transitions (`frontend/src/router.ts`),
-because React 18 can drop an update that lands mid-render, which left Perses's time-range menu's
-invisible popover blocking the page. That goes with React 19 and Perses 0.56 or later: Perses
-supports React 19 from perses/shared#390 and perses/plugins#889 (merged 2026-10-28, first in
-0.56.0-beta.0).
+Navigations render as React transitions, React Router's default. On React 18 the console turned
+them off (f24e1aa, `routerProps` in the `frontend/src/router.ts` this move deletes): React 18 can drop a class component's update that lands mid-render, which left
+Perses's time-range menu's invisible popover blocking the page. React 19 fixed that
+(facebook/react#24663), so the setting went with the move to React 19 and the Perses 0.56
+prereleases, the first with React 19 support (perses/shared#390, perses/plugins#889).
+`e2e/perses.spec.ts` picks a time range and clicks the page right after, on the real renderer.
 
 ## Testing
 

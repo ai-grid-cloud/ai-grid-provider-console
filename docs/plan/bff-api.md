@@ -527,8 +527,8 @@ defines itself shows an error in the panel instead of querying it. It renders th
 Perses's own React components and the plugins bundled in `persesPlugins.ts` (Prometheus and
 Loki datasources and queries; time series, stat, table, gauge, pie and markdown panels), loaded
 with the page only. Not the bar chart: its tooltip is HTML built from unescaped series names, which
-are label values. Not the logs table either: its 0.54-compatible package imports a stylesheet it
-doesn't ship. Without
+are label values. Not the logs table either: its package imports a stylesheet it doesn't ship
+(`ansiColors.css`, missing from 0.4.0 and from 0.5.0-beta.0, the release for Perses 0.56). Without
 `monitoring.enabled`, `/monitoring` keeps the AI Grid overview's metrics (`Grid/GetOverview`).
 
 ### The Connect relay

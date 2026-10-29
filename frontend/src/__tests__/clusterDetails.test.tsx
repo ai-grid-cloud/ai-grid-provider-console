@@ -9,7 +9,7 @@ import type { GridCluster } from '../api/types';
 import { create } from '@bufbuild/protobuf';
 import { fakeClients } from '../api/connect/testing';
 import { ManagedClusterLocationSource, ManagedClusterSchema } from '../gen/ai_grid/v1/managed_cluster_type_pb';
-import { renderAt } from './render';
+import { renderAt, findVisible } from './render';
 import { EMPTY_VALUE } from '../utilities/format';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/clusters/ClusterDetailsPage';
@@ -349,7 +349,7 @@ it('shows the added membership while the reload is still running', async () => {
   expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioning');
   expect(screen.getByLabelText('AI Grid membership')).toHaveTextContent('Inference');
   await user.click(screen.getByRole('button', { name: 'Actions for site4' }));
-  expect(screen.getByRole('menuitem', { name: 'Remove from AI Grid' })).toBeVisible();
+  await findVisible('menuitem', 'Remove from AI Grid');
   service.getCluster = getCluster;
 });
 

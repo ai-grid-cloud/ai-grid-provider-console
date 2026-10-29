@@ -1,15 +1,12 @@
 {
-  "_comment": "Validation cases the frontend's zod schemas run (frontend/src/validation/cases.test.ts). Each case names a schema, an input, and the field errors expected (empty when valid): the last message per path, as the PoC keeps (Object.fromEntries over the zod issues). Messages are the PoC's (shared/*-validation.mjs at 62319b8), with 'tenant' read as 'organization'.",
+  "_comment": "Validation cases the frontend's zod schemas run (frontend/src/validation/cases.test.ts). Each case names a schema, an input, and the field errors expected (empty when valid): the last message per path, as the PoC keeps (Object.fromEntries over the zod issues). Messages are the schemas' own where they set one, and otherwise the console's wording for each zod issue (frontend/src/validation/zod.ts).",
   "cases": [
     {
       "schema": "organization",
       "name": "every identity provider field",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -37,10 +34,7 @@
       "name": "name with capitals",
       "input": {
         "name": "Acme",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -70,10 +64,7 @@
       "name": "empty name",
       "input": {
         "name": "",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -103,10 +94,7 @@
       "name": "duplicate domain after trimming and lowercasing",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "a.example.com",
-          "A.example.com "
-        ],
+        "domains": ["a.example.com", "A.example.com "],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -136,9 +124,7 @@
       "name": "one-label domain",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "localhost"
-        ],
+        "domains": ["localhost"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -196,10 +182,7 @@
       "name": "missing client ID",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -229,10 +212,7 @@
       "name": "ftp issuer",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -262,10 +242,7 @@
       "name": "issuer that is not a URL",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -295,10 +272,7 @@
       "name": "empty token URL",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -328,10 +302,7 @@
       "name": "invalid secret reference name",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -361,10 +332,7 @@
       "name": "empty secret reference",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -394,10 +362,7 @@
       "name": "empty userInfoUrl is valid",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -425,10 +390,7 @@
       "name": "optional fields take their defaults",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "description": "Acme employees sign in here.",
           "config": {
@@ -452,10 +414,7 @@
       "name": "disabled identity provider",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -477,7 +436,7 @@
         }
       },
       "fieldErrors": {
-        "identityProvider.enabled": "Invalid literal value, expected true"
+        "identityProvider.enabled": "Only true is allowed."
       }
     },
     {
@@ -485,10 +444,7 @@
       "name": "a client secret value is rejected",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ],
+        "domains": ["acme-robotics.example.com", "acme.example.org"],
         "identityProvider": {
           "title": "Acme SSO",
           "description": "Acme employees sign in here.",
@@ -511,7 +467,7 @@
         }
       },
       "fieldErrors": {
-        "identityProvider.config": "Unrecognized key(s) in object: 'clientSecret'"
+        "identityProvider.config": "Remove the unknown field \"clientSecret\"."
       }
     },
     {
@@ -519,10 +475,7 @@
       "name": "no identity provider",
       "input": {
         "name": "acme-robotics",
-        "domains": [
-          "acme-robotics.example.com",
-          "acme.example.org"
-        ]
+        "domains": ["acme-robotics.example.com", "acme.example.org"]
       },
       "fieldErrors": {}
     },
@@ -539,14 +492,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {}
     },
@@ -563,14 +511,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "modelUri": "Enter a model URI using hf, oci, s3 or pvc."
@@ -589,14 +532,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "runtimeImage": "Enter a container image without spaces."
@@ -615,14 +553,9 @@
         "cpu": "0",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "cpu": "Enter positive CPU cores or millicores, for example 2 or 500m."
@@ -641,14 +574,9 @@
         "cpu": "500m",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {}
     },
@@ -665,14 +593,9 @@
         "cpu": "1.5",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {}
     },
@@ -689,14 +612,9 @@
         "cpu": "2",
         "memory": "4G",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "memory": "Enter memory such as 4Gi or 512Mi."
@@ -715,17 +633,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "replicas": "Number must be greater than or equal to 1"
+        "replicas": "Enter a number from 1 to 99."
       }
     },
     {
@@ -741,17 +654,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "replicas": "Number must be less than or equal to 99"
+        "replicas": "Enter a number from 1 to 99."
       }
     },
     {
@@ -767,17 +675,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 65,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "gpuCount": "Number must be less than or equal to 64"
+        "gpuCount": "Enter a number from 0 to 64."
       }
     },
     {
@@ -793,9 +696,7 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
         "locations": []
       },
@@ -816,13 +717,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "bad location"
-        ]
+        "locations": ["bad location"]
       },
       "fieldErrors": {
         "locations.0": "Use a Kubernetes label value for the location."
@@ -841,14 +738,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site1"
-        ]
+        "locations": ["site1", "site1"]
       },
       "fieldErrors": {
         "locations": "Locations must be unique."
@@ -867,17 +759,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "name": "Invalid"
+        "name": "Use lowercase letters, numbers, and hyphens."
       }
     },
     {
@@ -893,17 +780,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "replicas": "Expected number, received string"
+        "replicas": "Enter a number."
       }
     },
     {
@@ -919,18 +801,13 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ],
+        "locations": ["site1", "site2"],
         "namespace": "maas"
       },
       "fieldErrors": {
-        "": "Unrecognized key(s) in object: 'namespace'"
+        "": "Remove the unknown field \"namespace\"."
       }
     },
     {
@@ -946,17 +823,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "displayName": "String must contain at least 1 character(s)"
+        "displayName": "Required."
       }
     },
     {
@@ -966,16 +838,16 @@
         "name": "widget"
       },
       "fieldErrors": {
-        "displayName": "Required",
-        "modelUri": "Required",
-        "runtimeImage": "Required",
-        "replicas": "Required",
-        "cpu": "Required",
-        "memory": "Required",
-        "gpuCount": "Required",
-        "runtimeArgs": "Required",
-        "baseRefs": "Required",
-        "locations": "Required"
+        "displayName": "Required.",
+        "modelUri": "Required.",
+        "runtimeImage": "Required.",
+        "replicas": "Required.",
+        "cpu": "Required.",
+        "memory": "Required.",
+        "gpuCount": "Required.",
+        "runtimeArgs": "Required.",
+        "baseRefs": "Required.",
+        "locations": "Required."
       }
     },
     {
@@ -991,14 +863,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "runtimeImage": "Enter a container image without spaces."
@@ -1017,16 +884,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
-        "baseRefs": [
-          ""
-        ],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "runtimeArgs": ["--max-model-len=8192"],
+        "baseRefs": [""],
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
         "baseRefs.0": "Enter a preset name."
@@ -1045,17 +905,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "replicas": "Number must be greater than or equal to 1"
+        "replicas": "Enter a whole number."
       }
     },
     {
@@ -1071,14 +926,9 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "bad location",
-          "bad location"
-        ]
+        "locations": ["bad location", "bad location"]
       },
       "fieldErrors": {
         "locations.0": "Use a Kubernetes label value for the location.",
@@ -1099,18 +949,13 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          1,
-          1
-        ]
+        "locations": [1, 1]
       },
       "fieldErrors": {
-        "locations.0": "Expected string, received number",
-        "locations.1": "Expected string, received number"
+        "locations.0": "Enter text.",
+        "locations.1": "Enter text."
       }
     },
     {
@@ -1126,17 +971,12 @@
         "cpu": "2",
         "memory": "4Gi",
         "gpuCount": 1,
-        "runtimeArgs": [
-          "--max-model-len=8192"
-        ],
+        "runtimeArgs": ["--max-model-len=8192"],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "name": "String must contain at most 63 character(s)"
+        "name": "Enter at most 63 characters."
       }
     },
     {
@@ -1220,13 +1060,10 @@
           "--arg64"
         ],
         "baseRefs": [],
-        "locations": [
-          "site1",
-          "site2"
-        ]
+        "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "runtimeArgs": "Array must contain at most 64 element(s)"
+        "runtimeArgs": "Enter at most 64 items."
       }
     }
   ]

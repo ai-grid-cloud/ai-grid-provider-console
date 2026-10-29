@@ -4,6 +4,7 @@
 // caller's own token, so Perses decides what the caller may read, within the one project the relay
 // passes and the global datasources.
 import type {
+  BuildDatasourceProxyUrlParams,
   DatasourceApi,
   DatasourceResource,
   DatasourceSelector,
@@ -51,9 +52,14 @@ export class RelayDatasourceApi implements DatasourceApi {
    * The relay path of a project's or a global datasource's proxy. A datasource a dashboard defines
    * has none: Perses would send the caller's token on to whatever server its author chose, so the
    * relay refuses it (docs/plan/bff-api.md, "The Perses relay"). Perses calls this inside its async
-   * datasource lookup, so the throw becomes the panel's query error, shown in the panel.
+   * datasource lookup, so the throw becomes the panel's query error, shown in the panel. Without a
+   * name, Perses asks for its unsaved-datasource proxy (to test a datasource before saving it),
+   * which the relay doesn't serve either.
    */
-  buildProxyUrl = ({ project, dashboard, name }: { project?: string; dashboard?: string; name: string }): string => {
+  buildProxyUrl = ({ project, dashboard, name }: BuildDatasourceProxyUrlParams): string => {
+    if (!name) {
+      throw new Error('The console queries only saved datasources.');
+    }
     if (dashboard) {
       throw new Error(
         `The datasource ${name} is defined in the dashboard itself; the console queries only its project's and the global datasources.`,

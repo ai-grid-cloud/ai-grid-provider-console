@@ -82,8 +82,22 @@ const toBff: ProxyOptions = {
   },
 };
 
-export default defineConfig({
+export default defineConfig(({ command, mode }) => ({
   plugins: [react()],
+  resolve: {
+    // The dev server only: Perses 0.56 is "type": "module" and default-imports mdi-material-ui's icons by
+    // extensionless paths (mdi-material-ui/Circle), which are CommonJS files; mdi-material-ui has no
+    // "exports" map. Vite's dependency pre-bundling (esbuild) then follows Node's rules for an ES
+    // module importing CommonJS, and the default import becomes the whole module.exports object
+    // ({ __esModule, default }), so rendering a Perses icon fails ("Element type is invalid"). The
+    // same icons in mdi-material-ui/esm/ are ES modules. The production build (Rollup) and Vitest
+    // (which inlines @perses-dev below) honour __esModule and don't need this. Remove it once
+    // Perses imports the icons in a form ES modules can load.
+    alias:
+      command === 'serve' && mode !== 'test'
+        ? [{ find: /^mdi-material-ui\/(?!esm\/)(.+)$/, replacement: 'mdi-material-ui/esm/$1' }]
+        : [],
+  },
   server: {
     port: Number(process.env.FRONTEND_PORT ?? 9000),
     strictPort: true,
@@ -97,6 +111,19 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      treeshake: {
+        // @perses-dev/components doesn't declare "sideEffects": false (client, dashboards, explore,
+        // plugin-system and spec do; the plugins don't either). So Rollup follows every import its
+        // index reaches, used or not, and keeps the top-level code of what they import: the YAML
+        // editor's yaml and @lezer/yaml (about 36 kB gzipped in the Monitoring chunk), which the
+        // console never shows. This only drops a components module none of whose exports is used:
+        // EChart.js, which registers the ECharts charts and components at its top level, stays,
+        // because the chart plugins import EChart; and the fonts come from @fontsource, outside this
+        // rule. Remove it once Perses declares "sideEffects" for components.
+        moduleSideEffects: (id) => !id.includes('/@perses-dev/components/'),
+      },
+    },
   },
   test: {
     globals: true,
@@ -112,6 +139,9 @@ export default defineConfig({
     env: { TZ: 'UTC', LC_ALL: 'en_US.UTF-8' },
     // Playwright specs run with `pnpm e2e`.
     exclude: ['**/node_modules/**', 'e2e/**'],
+    // Perses 0.56 is "type": "module" and imports mdi-material-ui/<Icon> without an extension, which
+    // Node's ES module resolver refuses ("Cannot find module"). Inlined, Vite resolves those imports.
+    server: { deps: { inline: [/@perses-dev\//] } },
     // Setting up jsdom costs far more per file than most logic tests take, so only components get
     // it. A *.test.ts file that needs the DOM says so with `// @vitest-environment jsdom`.
     projects: [
@@ -119,4 +149,4 @@ export default defineConfig({
       { extends: true, test: { name: 'jsdom', environment: 'jsdom', include: ['src/**/*.test.tsx'] } },
     ],
   },
-});
+}));

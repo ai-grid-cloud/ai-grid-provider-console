@@ -19,7 +19,7 @@ the caller's own token: may this user patch ManagedClusters? That answer is `isP
 |---|---|
 | `bff/` | Go backend-for-frontend: `/api/v1/*` as JSON over the backend's gRPC, plus the built frontend |
 | `bff/internal/relay` | The relay of the browser's Connect calls (`/ai_grid.v1.*`) to the backend's own RPCs, with the caller's identity |
-| `frontend/` | Vite, React 18, PatternFly 6 |
+| `frontend/` | Vite, React 19, PatternFly 6 |
 | `frontend/src/gen`, `.backend-api-version` | TypeScript generated from the backend's proto (`ai_grid.v1`) at the commit in `.backend-api-version` (`make generate-api`; never edited by hand); `frontend/src/api/connect` has its transport and clients |
 | `charts/ai-grid-provider-console/` | Helm chart: kube-auth-proxy, bff and ai-grid-backend in one pod, one per ACM hub |
 | `manifests/` | The same pod as kustomize. Not an install path: the chart is (ai-grid-env-setup deploys it, and so does `make deploy`). `manifests/base` is kept for `hack/undeploy.sh`'s fallback, which removes a console deployed before the chart, and for the takeover test in `make chart-test`; `make chart-check` keeps it equal to the chart's defaults |
