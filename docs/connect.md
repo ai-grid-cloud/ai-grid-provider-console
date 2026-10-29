@@ -67,23 +67,38 @@ generated Connect Query descriptors (`frontend/src/gen/ai_grid/v1/*_connectquery
 per RPC) with the hooks from `@connectrpc/connect-query`:
 
 ```tsx
-import { createConnectQueryKey, useMutation, useQuery } from '@connectrpc/connect-query';
-import { useQueryClient } from '@tanstack/react-query';
-import { Clusters } from '../gen/ai_grid/v1/clusters_service_pb';
-import { list, update } from '../gen/ai_grid/v1/clusters_service-Clusters_connectquery';
-import { describeError } from '../api/connect/errors';
+import {
+  createConnectQueryKey,
+  useMutation,
+  useQuery,
+} from "@connectrpc/connect-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { Clusters } from "../gen/ai_grid/v1/clusters_service_pb";
+import {
+  list,
+  update,
+} from "../gen/ai_grid/v1/clusters_service-Clusters_connectquery";
+import { describeError } from "../api/connect/errors";
 
 const queryClient = useQueryClient();
 const clusters = useQuery(list, { limit: 50 }, { refetchInterval: 30_000 });
 const save = useMutation(update, {
   // Refetch every Clusters query once the write lands.
   onSuccess: () =>
-    queryClient.invalidateQueries({ queryKey: createConnectQueryKey({ schema: Clusters, cardinality: undefined }) }),
+    queryClient.invalidateQueries({
+      queryKey: createConnectQueryKey({
+        schema: Clusters,
+        cardinality: undefined,
+      }),
+    }),
 });
 
 save.mutate({
-  object: { id: c.id, metadata: { labels: next, version: c.metadata?.version } },
-  updateMask: { paths: ['metadata.labels'] },
+  object: {
+    id: c.id,
+    metadata: { labels: next, version: c.metadata?.version },
+  },
+  updateMask: { paths: ["metadata.labels"] },
   lock: true, // the backend answers Aborted if someone changed it since c was read
 });
 // clusters.error and save.error are ConnectErrors: describeError(error) gives the page's state.
@@ -155,9 +170,10 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
 ### The Models area
 
 - **Reads.** `useModelList` and `useModel` (`frontend/src/pages/models/useModels.ts`) call
-  `Models/List` and `Models/Get`, polling every 30 s as the Clusters pages do (the edit page loads
-  its model once, and keeps the first answer, so an edit is checked against the version it
-  started from). `toModelView` (`modelView.ts`) words the generated `Model`: the display name and
+  `Models/List` and `Models/Get`, polling every 30 s as the Clusters pages do, and every 10 s while
+  a placed model, or one of its clusters, is Pending, Saved to Git or Unknown (`isUnsettled`); the
+  edit page loads its model once, and keeps the first answer, so an edit is checked against the
+  version it started from. `toModelView` (`modelView.ts`) words the generated `Model`: the display name and
   description from the `openshift.io/display-name` and `openshift.io/description` annotations
   the backend documents; the phase from `status.phase` (`MODEL_PHASE_PARTIALLY_AVAILABLE` is
   Partially available; `UNSPECIFIED` with reason `SavedToGit` is Saved to Git, any other
@@ -200,9 +216,13 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
 
 - **Reads.** `useSubscriptionList`, `useSubscription`, `useModelsByIds` and `useTenantList`
   (`frontend/src/pages/subscriptions/useSubscriptions.ts`) call `Subscriptions/List` and `Get`,
-  `Models/List` and `Tenants/List`; the lists poll every 30 s. A subscription's page and its edit
-  page load `Get` once, and the edit page keeps the first answer, so a save is checked against the
-  version it started from. Models are read with a CEL filter on their ids,
+  `Models/List` and `Tenants/List`; the lists poll every 30 s, and the subscriptions list every
+  10 s while a subscription isn't Active. A subscription's page polls `Get` every 10 s while the
+  subscription isn't Active or a model it names is Pending, Saved to Git or Unknown
+  (`isUnsettledSubscriptionInfo`), and stops once nothing is. A state that never settles, such as
+  a subscription no ingress cluster reports or a model whose placement matches no cluster, keeps
+  its page at 10 s while it is open. The edit page loads `Get` once and
+  keeps the first answer, so a save is checked against the version it started from. Models are read with a CEL filter on their ids,
   `this.id in ["<id>", ...]`: the list page asks for the models its subscriptions name, the edit
   page for its subscription's, and a subscription's page for none, because the backend joins the
   names it shows. The model picker reads every model when it opens, and the create page for its
@@ -278,7 +298,9 @@ supports React 19 from perses/shared#390 and perses/plugins#889 (merged 2026-10-
 const { clients } = fakeClients({
   clusters: {
     list: () => ({ items: [siteA], size: 1, total: 1 }), // checked against ClustersListResponse
-    update: () => { throw new ConnectError('stale', Code.Aborted); },
+    update: () => {
+      throw new ConnectError("stale", Code.Aborted);
+    },
   },
 });
 ```

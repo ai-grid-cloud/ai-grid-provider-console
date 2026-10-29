@@ -615,6 +615,73 @@ describe('a background poll', () => {
   });
 });
 
+describe('polling while a model is still changing', () => {
+  // Only the polls are faked (refetchInterval's setInterval); user-event, findBy and the tooltips keep real timers.
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
+  afterEach(() => vi.useRealTimers());
+
+  /** Sets granite-3-8b's phase, and its one cluster's, as the backend would report them. */
+  const setPhase = (service: MockConsoleService, phase: ModelPhase) => {
+    const granite = modelsOf(service).find('granite-3-8b');
+    granite.status!.phase = phase;
+    granite.status!.clusters[0].phase = phase;
+  };
+
+  it('polls the list every 10 seconds while a model is Pending, and every 30 once none is', async () => {
+    const service = new MockConsoleService();
+    setPhase(service, ModelPhase.PENDING);
+    renderAt('/models', service);
+    expect(await rowOf('granite-3-8b')).toHaveTextContent('Pending');
+    setPhase(service, ModelPhase.READY);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    await waitFor(async () => expect(await rowOf('granite-3-8b')).toHaveTextContent('Ready'));
+    setPhase(service, ModelPhase.PENDING);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(await rowOf('granite-3-8b')).toHaveTextContent('Ready');
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    await waitFor(async () => expect(await rowOf('granite-3-8b')).toHaveTextContent('Pending'));
+  });
+
+  it('polls sooner while one placed cluster is still Pending', async () => {
+    const service = new MockConsoleService();
+    modelsOf(service).find('granite-3-8b').status!.clusters[0].phase = ModelPhase.PENDING;
+    const list = vi.spyOn(modelsOf(service), 'list');
+    renderAt('/models', service);
+    await rowOf('granite-3-8b');
+    const loaded = list.mock.calls.length;
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(loaded));
+  });
+
+  it("polls a model's page every 10 seconds while it is Saved to Git", async () => {
+    const service = new MockConsoleService();
+    const granite = modelsOf(service).find('granite-3-8b');
+    const report = { ...granite.status! };
+    granite.status!.phase = ModelPhase.UNSPECIFIED;
+    granite.status!.reason = 'SavedToGit';
+    granite.status!.clusters = [];
+    renderAt('/models/granite-3-8b', service);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Granite 3.3 8B Instruct' })).toBeVisible();
+    expect(screen.getByTestId('model-phase')).toHaveTextContent('Saved to Git');
+    Object.assign(granite.status!, report);
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    await waitFor(() => expect(screen.getByTestId('model-phase')).toHaveTextContent('Ready'));
+  });
+
+  it('keeps 30 seconds for a model without a placement, which changes only when edited', async () => {
+    const service = new MockConsoleService();
+    const list = vi.spyOn(modelsOf(service), 'list');
+    // granite-research is Pending and has no placement; the other seeds are Ready.
+    renderAt('/models', service);
+    await rowOf('granite-research');
+    const loaded = list.mock.calls.length;
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(list.mock.calls.length).toBe(loaded);
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(loaded));
+  });
+});
+
 it('reloads the model after a stale delete, so a retry succeeds', async () => {
   const service = new MockConsoleService();
   const models = modelsOf(service);

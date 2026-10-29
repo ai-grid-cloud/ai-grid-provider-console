@@ -25,22 +25,30 @@ import type { Subscription } from '../../gen/ai_grid/v1/subscription_type_pb';
 import type { SubscriptionsListResponse } from '../../gen/ai_grid/v1/subscriptions_service_pb';
 import { useLoadOptions, useLoaded, type Loaded } from '../clusters/useClusters';
 import { createRequestOf, updateRequestOf, type ModelInput } from './modelRequests';
-import { toModelView, type ModelView } from './modelView';
+import { isUnsettled, toModelView, type ModelView } from './modelView';
 
 const modelViews = (answer: ModelsListResponse | undefined) => answer?.items.map(toModelView) ?? [];
 const modelView = (answer: ModelsGetResponse | undefined) => answer?.object && toModelView(answer.object);
 const clusterNames = (answer: ModelsListPlacementClustersResponse | undefined) => answer?.clusters ?? [];
 const subscriptionItems = (answer: SubscriptionsListResponse | undefined) => answer?.items ?? [];
 
+/** Whether any model in the answer is still changing (isUnsettled), so the page polls sooner. */
+const anyUnsettled = (answer: ModelsListResponse) => modelViews(answer).some(isUnsettled);
+const unsettledModel = (answer: ModelsGetResponse) => {
+  const model = modelView(answer);
+  return !!model && isUnsettled(model);
+};
+
 /** Every model, from Models/List. */
-export const useModelList = (): Loaded<ModelView[]> => useLoaded(useQuery(list, {}, useLoadOptions()), modelViews);
+export const useModelList = (): Loaded<ModelView[]> =>
+  useLoaded(useQuery(list, {}, useLoadOptions(anyUnsettled)), modelViews);
 
 /**
  * One model from Models/Get. `poll: false` loads it once, as the edit page does, so the wizard starts
  * from the version the user saw.
  */
 export const useModel = (id: string, { poll = true }: { poll?: boolean } = {}): Loaded<ModelView | undefined> => {
-  const options = useLoadOptions();
+  const options = useLoadOptions(unsettledModel);
   // The edit page passes poll: false on purpose: its wizard holds the snapshot it started from
   // (ModelEditPage), and a save is checked against that version.
   return useLoaded(useQuery(get, { id }, poll ? options : { retry: false, refetchInterval: false }), modelView);

@@ -12,8 +12,9 @@ import type {
   SubscriptionModelRef,
   TokenRateLimit,
 } from '../../gen/ai_grid/v1/subscription_type_pb';
+import type { SubscriptionsGetResponse } from '../../gen/ai_grid/v1/subscriptions_service_pb';
 import type { Tenant } from '../../gen/ai_grid/v1/tenant_type_pb';
-import { MODEL_NOT_FOUND_STATUS_MESSAGE, normalizePhase } from '../../utilities/phaseLabelUtils';
+import { MODEL_NOT_FOUND_STATUS_MESSAGE, normalizePhase, PhaseStatus } from '../../utilities/phaseLabelUtils';
 import type { TokenLimit } from '../../utilities/rateLimits';
 // A subscription and its policy keep their display name and description in the annotations a model
 // does (modelView.ts): the only prefixed keys the backend accepts on them (docs/UI_API_REFERENCE.md,
@@ -99,3 +100,21 @@ export const registrationStatusOf = (
 /** A ref's token limits as the form edits them. */
 export const toTokenLimits = (limits: TokenRateLimit[]): TokenLimit[] =>
   limits.map(({ limit, window }) => ({ limit: Number(limit), window }));
+
+/**
+ * Whether the subscription is still changing: Active is the one phase git mode settles on
+ * (phaseLabelUtils.tsx), so Pending, and no phase before a cluster reports, make the pages poll sooner.
+ */
+export const isUnsettledSubscription = (subscription: Subscription): boolean =>
+  normalizePhase(subscription.status?.phase) !== PhaseStatus.ACTIVE;
+
+/** A model registration's status that is still changing. Not found is left out: a deleted model stays so. */
+const unsettledRegistrations: ReadonlySet<string> = new Set([PhaseStatus.PENDING, PhaseStatus.UNKNOWN, 'Saved to Git']);
+
+/** Whether the subscription, or the registration of any model it names, is still changing. */
+export const isUnsettledSubscriptionInfo = (info: SubscriptionsGetResponse): boolean =>
+  !!info.object &&
+  (isUnsettledSubscription(info.object) ||
+    modelRefsOf(info.object).some((ref) =>
+      unsettledRegistrations.has(registrationStatusOf(info.modelRegistrations, ref).status),
+    ));

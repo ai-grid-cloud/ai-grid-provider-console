@@ -71,7 +71,7 @@ const SubscriptionActions: React.FC<ActionsProps> = ({ subscription, returnTo })
 export const ViewSubscriptionPage: React.FC = () => {
   const { id = '' } = useParams<{ id: string }>();
   const location = useLocation();
-  const { data: info, loaded, error, refresh } = useSubscription(id);
+  const { data: info, loaded, error, refresh } = useSubscription(id, { poll: true });
   const { data: organizations } = useTenantList();
   const { user } = useConsoleSession();
   const canWrite = !!user?.isProviderAdmin;
