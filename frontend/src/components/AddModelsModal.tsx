@@ -91,7 +91,8 @@ export const AddModelsModal: React.FC<Props> = ({ currentModels, onAdd, onRemove
       <ModalBody>
         <Stack hasGutter>
           <StackItem>
-            Select the models members of this subscription can use. You set their token limits next.
+            Select the models that users in this subscription&apos;s groups can use. You can set token limits after
+            adding them.
           </StackItem>
           <StackItem>
             <SearchInput

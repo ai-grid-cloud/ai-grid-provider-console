@@ -38,16 +38,15 @@ const requestCodes = new Set<Code>([
 ]);
 
 /** The console's words for the other codes, as the BFF's; the rest share genericMessage. */
-const genericMessage = 'the AI Grid backend failed to process the request';
+const genericMessage = 'The AI Grid backend failed to process the request.';
 const consoleMessages: Partial<Record<Code, string>> = {
-  [Code.Unauthenticated]: 'the AI Grid backend rejected the credentials; log in again',
-  [Code.Unimplemented]: 'the AI Grid backend does not support this operation yet',
-  [Code.Unavailable]: 'the AI Grid backend is unavailable; try again',
-  [Code.Canceled]: 'the AI Grid backend is unavailable; try again',
-  [Code.DeadlineExceeded]: 'the AI Grid backend did not answer in time',
+  [Code.Unauthenticated]: 'The AI Grid backend rejected your credentials. Log in again.',
+  [Code.Unimplemented]: 'The AI Grid backend does not support this operation.',
+  [Code.Unavailable]: 'The AI Grid backend is unavailable. Try again.',
+  [Code.Canceled]: 'The AI Grid backend is unavailable. Try again.',
+  [Code.DeadlineExceeded]: 'The AI Grid backend did not respond in time. Try again.',
   // The relay answers an oversized body (over 1 MiB) with this code too, which no retry fixes.
-  [Code.ResourceExhausted]:
-    'the request is too large, or the AI Grid backend is limiting requests; make it smaller or try again shortly',
+  [Code.ResourceExhausted]: 'The request is too large, or the AI Grid backend is limiting requests. Try again later.',
 };
 
 const kinds: Partial<Record<Code, ApiErrorKind>> = {

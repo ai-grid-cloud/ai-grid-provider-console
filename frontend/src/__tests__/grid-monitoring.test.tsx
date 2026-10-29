@@ -30,7 +30,7 @@ it('labels metric simulation independently of real backend inventory in Monitori
     metricsSource: 'demo',
   });
   renderAt('/monitoring', service);
-  expect(await screen.findByText('Simulated monitoring metrics')).toBeVisible();
+  expect(await screen.findByText('Sample metrics')).toBeVisible();
   // Each chart's title carries its unit.
   expect(screen.getByRole('heading', { name: 'GPU utilization (%)' })).toBeVisible();
   expect(screen.getByRole('heading', { name: 'Gateway request rate (req/s)' })).toBeVisible();
@@ -43,7 +43,9 @@ it('updates monitoring chart windows through time controls', async () => {
   renderAt('/monitoring', service);
   const chart = await screen.findByRole('img', { name: 'Gateway request rate over time' });
   expect(Number(chart.getAttribute('data-end')) - Number(chart.getAttribute('data-start'))).toBe(3600);
-  await user.click(within(screen.getByRole('group', { name: 'Time range' })).getByRole('button', { name: 'Last 24h' }));
+  await user.click(
+    within(screen.getByRole('group', { name: 'Time range' })).getByRole('button', { name: 'Last 24 hours' }),
+  );
   await waitFor(() => {
     const c = screen.getByRole('img', { name: 'Gateway request rate over time' });
     expect(Number(c.getAttribute('data-end')) - Number(c.getAttribute('data-start'))).toBe(86400);
@@ -76,9 +78,9 @@ it('provides Clusters, Models and Usage tabs, plain section headings, and a work
   // No raw organization IDs; the names link to the organizations.
   expect(screen.queryByRole('columnheader', { name: 'Organization ID' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('tab', { name: 'Models' }));
-  await user.click(screen.getByRole('combobox', { name: 'Select model deployment' }));
+  await user.click(screen.getByRole('combobox', { name: 'Select model' }));
   await user.click(screen.getByRole('option', { name: titleOf(models[0]) }));
-  expect(within(screen.getByRole('grid', { name: 'Model deployments' })).getAllByRole('row')).toHaveLength(2);
+  expect(within(screen.getByRole('grid', { name: 'Models' })).getAllByRole('row')).toHaveLength(2);
   expect(screen.getByRole('img', { name: 'Request queue length over time' })).toBeVisible();
   expect(screen.getByRole('img', { name: 'P90 Time to first token (TTFT) over time' })).toBeVisible();
   expect(screen.queryByRole('tab', { name: 'Gateway' })).not.toBeInTheDocument();
@@ -91,7 +93,7 @@ it('shows all sites without a selector and recalculates overview totals for the 
   await screen.findByRole('img', { name: 'Gateway request rate over time' });
   const overview = () => screen.getByText('Requests').closest('.pf-v6-c-card')!.textContent;
   const first = overview();
-  await user.click(screen.getByRole('button', { name: 'Last 24h' }));
+  await user.click(screen.getByRole('button', { name: 'Last 24 hours' }));
   await waitFor(() => expect(overview()).not.toBe(first));
   expect(screen.queryByRole('combobox', { name: 'Filter by site' })).not.toBeInTheDocument();
   expect(screen.getByRole('cell', { name: 'San Francisco' })).toBeVisible();
@@ -125,14 +127,14 @@ it('changes simulated model charts with model selection and organization usage w
   const queue = () =>
     screen.getByRole('img', { name: 'Request queue length over time' }).querySelector('path')!.getAttribute('d');
   const all = queue();
-  await user.click(screen.getByRole('combobox', { name: 'Select model deployment' }));
+  await user.click(screen.getByRole('combobox', { name: 'Select model' }));
   await user.click(screen.getByRole('option', { name: titleOf(models[0]) }));
   expect(queue()).not.toBe(all);
   await user.click(screen.getByRole('tab', { name: 'Usage' }));
   const chart = () => screen.getByRole('img', { name: 'Token consumption by organization' });
   const before = screen.getByRole('grid', { name: 'Organization usage' }).textContent;
   const beforeWidth = chart().querySelector('[data-kind="input"]')!.getAttribute('width');
-  await user.click(screen.getByRole('button', { name: 'Last 6h' }));
+  await user.click(screen.getByRole('button', { name: 'Last 6 hours' }));
   await waitFor(() => expect(screen.getByRole('grid', { name: 'Organization usage' }).textContent).not.toBe(before));
   expect(chart()).toBeVisible();
   expect(chart().querySelector('[data-kind="input"]')!.getAttribute('width')).not.toBe(beforeWidth);
@@ -163,9 +165,9 @@ it('never shows a late answer for an earlier range as the current one', async ()
     }
     return overview(range, opts);
   });
-  await user.click(screen.getByRole('button', { name: 'Last 6h' }));
-  await user.click(screen.getByRole('button', { name: 'Last 1h' }));
-  await user.click(screen.getByRole('button', { name: 'Last 24h' }));
+  await user.click(screen.getByRole('button', { name: 'Last 6 hours' }));
+  await user.click(screen.getByRole('button', { name: 'Last hour' }));
+  await user.click(screen.getByRole('button', { name: 'Last 24 hours' }));
   const span = () => {
     const c = screen.getByRole('img', { name: 'Gateway request rate over time' });
     return Number(c.getAttribute('data-end')) - Number(c.getAttribute('data-start'));
@@ -197,7 +199,13 @@ it('lists the models with the sites their placement chose', async () => {
   granite.status!.placement!.locations = ['paris'];
   renderAt('/monitoring', service);
   await user.click(await screen.findByRole('tab', { name: 'Models' }));
-  const table = screen.getByRole('grid', { name: 'Model deployments' });
+  const table = screen.getByRole('grid', { name: 'Models' });
+  // The Models page's words: the name shown, then the model users request.
+  expect(
+    within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent),
+  ).toEqual(['Name', 'Model', 'Target sites', 'Replicas', 'Status']);
   const row = within(table).getByText('Granite 8B Instruct').closest('tr')!;
   expect(row).toHaveTextContent('Paris DC1');
 });
@@ -206,9 +214,9 @@ it('explains the target sites in a help popover', async () => {
   const user = userEvent.setup();
   renderAt('/monitoring', withOrganizations());
   await user.click(await screen.findByRole('tab', { name: 'Models' }));
-  await user.click(screen.getByRole('button', { name: 'More about model deployments' }));
+  await user.click(screen.getByRole('button', { name: 'More about models' }));
   expect(
-    await screen.findByText(/^Target sites are the sites of the clusters each model's placement chose/),
+    await screen.findByText(/^Target sites are the sites of the clusters selected for each model\./),
   ).toBeVisible();
 });
 
@@ -231,14 +239,16 @@ it('drops the dashboard for the not-available page when a later answer is 501', 
   const serve = service.getGridOverview.bind(service);
   vi.spyOn(service, 'getGridOverview')
     .mockImplementationOnce(serve)
-    .mockRejectedValue(new ServiceError(501, 'the AI Grid backend does not support this operation yet'));
+    .mockRejectedValue(new ServiceError(501, 'The AI Grid backend does not support this operation.'));
   const user = userEvent.setup();
   renderAt('/monitoring', service);
   expect(await screen.findByRole('grid', { name: 'Clusters' })).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Last 6h' }));
-  expect(await screen.findByRole('heading', { name: 'Monitoring is not available on this backend yet' })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Last 6 hours' }));
+  expect(
+    await screen.findByRole('heading', { name: 'Monitoring is not available on this AI Grid backend' }),
+  ).toBeVisible();
   expect(screen.queryByRole('grid', { name: 'Clusters' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Last 24h' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Last 24 hours' })).not.toBeInTheDocument();
 });
 
 it('names a failed overview for what it is, hides its controls and offers Retry', async () => {
@@ -252,7 +262,7 @@ it('names a failed overview for what it is, hides its controls and offers Retry'
   renderAt('/monitoring', service);
   expect(await screen.findByRole('heading', { name: 'Unable to load metrics' })).toBeVisible();
   expect(screen.queryByText(/AI Grid clusters/)).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Last 6h' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Last 6 hours' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Retry' }));
   expect(await screen.findByRole('grid', { name: 'Clusters' })).toBeVisible();
   expect(overview).toHaveBeenCalledTimes(2);
@@ -270,14 +280,16 @@ it('shows the not-available page, like Models, when the backend has no overview'
   const service = withOrganizations();
   const overview = vi
     .spyOn(service, 'getGridOverview')
-    .mockRejectedValue(new ServiceError(501, 'the AI Grid backend does not support this operation yet'));
+    .mockRejectedValue(new ServiceError(501, 'The AI Grid backend does not support this operation.'));
   const clusters = vi.spyOn(service, 'listClusters');
   renderAt('/monitoring', service);
-  expect(await screen.findByRole('heading', { name: 'Monitoring is not available on this backend yet' })).toBeVisible();
+  expect(
+    await screen.findByRole('heading', { name: 'Monitoring is not available on this AI Grid backend' }),
+  ).toBeVisible();
   expect(screen.getByRole('heading', { level: 1, name: 'Monitoring' })).toBeVisible();
   // No tabs, no time range and nothing to refresh.
   expect(screen.queryByRole('grid', { name: 'Clusters' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Last 6h' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Last 6 hours' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   // One request: the not-available answer isn't asked again for a range, and the Clusters list isn't
   // asked at all. A refetch would start in the effects of the render above; flush them.

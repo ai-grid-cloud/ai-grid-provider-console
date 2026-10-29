@@ -44,8 +44,8 @@ const PersesMonitoring: React.FC<{ service: ConsoleService; project: string }> =
     if (!selected) {
       return (
         <EmptyListState title="No dashboards" icon={CubesIcon}>
-          Monitoring shows the Perses dashboards in project {project} whose names start with <code>dashboard-</code>.
-          The hub has none yet.
+          To show a dashboard here, add a Perses dashboard whose name starts with <code>dashboard-</code> to the{' '}
+          {project} project.
         </EmptyListState>
       );
     }
@@ -70,10 +70,11 @@ const PersesMonitoring: React.FC<{ service: ConsoleService; project: string }> =
           <Alert
             isInline
             variant="info"
-            title="This link opens a page the console doesn't have"
+            title="Link not available in this console"
             actionClose={<AlertActionCloseButton onClose={() => setUnreachableLink(undefined)} />}
           >
-            The dashboard links to <code>{unreachableLink}</code>. Monitoring opens only its own dashboards.
+            The dashboard links to <code>{unreachableLink}</code>, which this console does not provide. Only links to
+            other monitoring dashboards open here.
           </Alert>
         )}
         {/* Links in a dashboard are the dashboard author's: one to a page of this console's (another tab)
@@ -112,7 +113,7 @@ const PersesMonitoring: React.FC<{ service: ConsoleService; project: string }> =
   return (
     <PageStateSection
       title="Monitoring"
-      description="Dashboards from the hub's Perses, across the AI Grid clusters."
+      description="View monitoring dashboards for the AI Grid clusters."
       loaded={loaded}
       error={error}
       onRetry={() => void refresh()}
@@ -141,7 +142,7 @@ export const MonitoringPage: React.FC<Props> = ({ service }) => {
         error={error}
         onRetry={() => void refresh()}
         subject="Monitoring"
-        object="the console settings"
+        object="console settings"
         loadingLabel="Loading monitoring"
       />
     );

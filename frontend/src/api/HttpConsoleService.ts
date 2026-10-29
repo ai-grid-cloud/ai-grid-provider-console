@@ -49,7 +49,7 @@ export class HttpConsoleService implements ConsoleService {
         credentials: 'same-origin',
       });
     } catch {
-      throw new ServiceError(0, 'The console backend could not be reached.');
+      throw new ServiceError(0, 'Unable to reach the console server.');
     }
     if (!response.ok) {
       let message = `Request failed with status ${response.status}.`;
@@ -133,7 +133,7 @@ export class HttpConsoleService implements ConsoleService {
         credentials: 'same-origin',
       });
     } catch {
-      throw new ServiceError(0, 'The console backend could not be reached.');
+      throw new ServiceError(0, 'Unable to reach the console server.');
     }
     if (!response.ok) {
       let message = `Request failed with status ${response.status}.`;

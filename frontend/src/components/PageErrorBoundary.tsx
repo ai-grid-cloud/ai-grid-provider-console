@@ -43,7 +43,7 @@ export class PageErrorBoundary extends Component<Props, State> {
     return (
       <PageSection isFilled>
         <ErrorState
-          title={outdated ? 'Unable to load this page' : 'Something went wrong on this page'}
+          title={outdated ? 'Unable to load this page' : 'Unable to display this page'}
           headingLevel="h1"
           retryLabel="Reload"
           onRetry={() => window.location.reload()}
@@ -62,8 +62,8 @@ export class PageErrorBoundary extends Component<Props, State> {
           }
         >
           {outdated
-            ? 'The console may have been updated since this tab opened. Reload to get the current version.'
-            : 'The console ran into a problem showing this page. Reload to try again, or go to another page.'}
+            ? 'The console was probably updated after this page opened. Reload the page to get the latest version.'
+            : 'Reload the page, or go to another page.'}
         </ErrorState>
       </PageSection>
     );

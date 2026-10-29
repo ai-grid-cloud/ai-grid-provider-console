@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   FormGroup,
+  FormGroupLabelHelp,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -11,6 +12,7 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  Popover,
   Stack,
   TextInput,
 } from '@patternfly/react-core';
@@ -19,6 +21,7 @@ import { ServiceError } from '../../api/ConsoleService';
 import { DeleteModal } from '../../components/DeleteModal';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { ClusterChangedError } from './ClusterChangedError';
+import { ClusterRolesList } from './ClusterRolesHelp';
 import type { ClusterView } from './clusterView';
 import { clusterRoles, roleOf } from './roles';
 
@@ -36,7 +39,7 @@ const labelValue = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
 const locationError = (location: string) => {
   if (!location) return 'Required.';
   if (!labelValue.test(location)) {
-    return 'Use up to 63 letters, digits, hyphens, underscores or dots, starting and ending with a letter or digit.';
+    return 'Must start and end with a letter or number. Valid characters include letters, numbers, hyphens (-), underscores (_), and periods (.). Up to 63 characters.';
   }
   return undefined;
 };
@@ -48,15 +51,15 @@ const defaultRole = (cluster: ClusterView): ClusterRole | '' => {
 
 const errorMessage = (err: unknown, join: boolean) => {
   if (err instanceof ServiceError && err.isNotImplemented) {
-    return `${join ? 'Adding clusters to' : 'Removing clusters from'} AI Grid is not available on this backend yet.`;
+    return `${join ? 'Adding clusters to' : 'Removing clusters from'} AI Grid is not available on this AI Grid backend.`;
   }
   if (err instanceof ClusterChangedError) {
     // With `current`, the page has given the dialog that version, so a second try sends it.
     return err.current
-      ? 'This cluster changed since you opened this dialog. Check it and try again.'
-      : "This cluster changed since you opened this dialog, and the console couldn't load it again. Cancel, refresh the list, and try again.";
+      ? 'This cluster was changed after this dialog opened. The latest version is now shown. Review it and try again.'
+      : 'This cluster was changed after this dialog opened, and the latest version could not be loaded. Cancel, refresh the page, and try again.';
   }
-  return err instanceof Error ? err.message : 'The cluster could not be changed.';
+  return err instanceof Error ? err.message : 'Unable to update the cluster.';
 };
 
 /** Confirms adding a cluster to AI Grid, with its location and role, or removing it, and keeps a failure in view. */
@@ -93,7 +96,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         setRole(defaultRole(current));
         setTouched({ location: false, role: false });
         setError(
-          'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+          "Another user changed this cluster's location or role after this dialog opened. Their values are now shown. Review them and try again.",
         );
       } else {
         setError(errorMessage(err, join));
@@ -115,7 +118,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
           if (!busy) onClose();
         }}
         error={error === undefined ? undefined : new Error(error)}
-        errorTitle="Unable to remove the cluster"
+        errorTitle="Unable to remove cluster from AI Grid"
         testId="cluster-membership-modal"
       >
         <Stack hasGutter>
@@ -125,8 +128,8 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               cluster's ManifestWork; models delivered by env-setup's GitOps apps stay. */}
           <p>
             {cluster.name === 'local-cluster'
-              ? 'AI Grid stops managing this cluster, and models are no longer placed on it.'
-              : 'AI Grid stops managing this cluster, and models are no longer placed on it. It is also disconnected from the other AI Grid clusters.'}
+              ? 'AI Grid stops managing this cluster, and models are no longer deployed to it.'
+              : 'AI Grid stops managing this cluster, and models are no longer deployed to it. The cluster is also disconnected from the other AI Grid clusters.'}
           </p>
           <p>Models deployed to it from the Models page are removed from it. OpenShift AI is not uninstalled.</p>
         </Stack>
@@ -140,7 +143,8 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
       <ModalBody>
         <Stack hasGutter>
           <p>
-            The hub installs AI Grid on the cluster for its role, and model placements can then choose its location.
+            The hub installs the AI Grid components for the selected role. Models can then be deployed to this cluster's
+            location.
           </p>
           <Form id="cluster-membership-form" onSubmit={(e) => e.preventDefault()}>
             <FormGroup label="Location" fieldId="cluster-location" isRequired>
@@ -157,13 +161,21 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               <FormHelperText>
                 <HelperText id="cluster-location-help">
                   <HelperTextItem variant={shownLocationError ? 'error' : 'default'}>
-                    {shownLocationError ??
-                      'The location label that model placements choose clusters by, such as us-east.'}
+                    {shownLocationError ?? 'Models are deployed to clusters by location. For example, us-east.'}
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
-            <FormGroup label="Role" fieldId="cluster-role" isRequired>
+            <FormGroup
+              label="Role"
+              fieldId="cluster-role"
+              isRequired
+              labelHelp={
+                <Popover headerContent="Cluster roles" bodyContent={<ClusterRolesList />}>
+                  <FormGroupLabelHelp aria-label="More info for the role field" />
+                </Popover>
+              }
+            >
               <TypeaheadSelect
                 id="cluster-role"
                 aria-label="Role"
@@ -181,14 +193,14 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               <FormHelperText>
                 <HelperText id="cluster-role-help">
                   <HelperTextItem variant={shownRoleError ? 'error' : 'default'}>
-                    {shownRoleError ?? 'Which AI Grid pieces the hub installs on the cluster.'}
+                    {shownRoleError ?? 'Determines which AI Grid components the hub installs on the cluster.'}
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>
           </Form>
           {error && (
-            <Alert isInline variant="danger" title="Unable to add the cluster">
+            <Alert isInline variant="danger" title="Unable to add cluster to AI Grid">
               {error}
             </Alert>
           )}

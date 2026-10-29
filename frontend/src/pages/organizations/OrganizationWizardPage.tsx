@@ -27,7 +27,7 @@ export const OrganizationWizardPage: React.FC<Props> = ({ service }) => {
       title={title}
       description={
         id
-          ? 'Change the organization’s domains and its OIDC identity provider.'
+          ? "Edit the organization's domains and OIDC identity provider."
           : 'Configure organization details and an OIDC identity provider.'
       }
       breadcrumb={

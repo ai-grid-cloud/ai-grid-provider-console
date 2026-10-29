@@ -53,7 +53,7 @@ export const EditRateLimitsModal: React.FC<Props> = ({ modelName, rateLimits, on
         title={title}
         description={
           <>
-            Limit how many tokens each member of this subscription can use with <b>{modelName}</b>.
+            Limit how many tokens each user in this subscription&apos;s groups can use with <b>{modelName}</b>.
           </>
         }
       />

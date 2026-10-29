@@ -361,14 +361,14 @@ export function ObservabilityPanel({
     if (!organizations.length) {
       return (
         <SectionEmptyState title="No organizations">
-          Create organizations to see their simulated consumption.
+          To see token usage by organization, create an organization.
         </SectionEmptyState>
       );
     }
     if (!simulated || requestTotal === undefined) {
       return (
         <SectionEmptyState title="No organization usage">
-          Organization token telemetry is not configured for this source or selection.
+          Token usage by organization is not available for this selection.
         </SectionEmptyState>
       );
     }
@@ -437,7 +437,7 @@ export function ObservabilityPanel({
           <Alert
             isInline
             variant="warning"
-            title="Unable to load metrics for this range"
+            title="Unable to load metrics for this time range"
             actionLinks={onRetry && <AlertActionLink onClick={onRetry}>Retry</AlertActionLink>}
           >
             {error}
@@ -447,7 +447,7 @@ export function ObservabilityPanel({
           <>
             <Section
               title="Overview"
-              help={`Requests, GPU use and success rate cover the last ${range}. Ready clusters is the current state.`}
+              help={`Requests, GPU utilization, and success rate cover the last ${range}. Ready clusters shows the current count.`}
             >
               <Grid hasGutter md={6} xl={3}>
                 <StatCard
@@ -517,12 +517,12 @@ export function ObservabilityPanel({
             <Toolbar inset={{ default: 'insetNone' }}>
               <ToolbarContent alignItems="center">
                 <ToolbarItem variant="label">
-                  <label htmlFor="observability-model">Model deployment</label>
+                  <label htmlFor="observability-model">Model</label>
                 </ToolbarItem>
                 <ToolbarItem className="console-toolbar-field">
                   <TypeaheadSelect
                     id="observability-model"
-                    aria-label="Select model deployment"
+                    aria-label="Select model"
                     value={model}
                     options={modelOptions}
                     onChange={setModel}
@@ -531,13 +531,13 @@ export function ObservabilityPanel({
               </ToolbarContent>
             </Toolbar>
             <Section
-              title="Model deployments"
-              help="Target sites are the sites of the clusters each model's placement chose; they don't confirm the model is serving there."
+              title="Models"
+              help="Target sites are the sites of the clusters selected for each model. They do not confirm that the model is serving there."
             >
-              <Table aria-label="Model deployments" variant="compact">
+              <Table aria-label="Models" variant="compact">
                 <Thead>
                   <Tr>
-                    <Th>Model deployment</Th>
+                    <Th>Name</Th>
                     <Th>Model</Th>
                     <Th>Target sites</Th>
                     <Th className="console-number">Replicas</Th>
@@ -549,7 +549,7 @@ export function ObservabilityPanel({
                     (model === 'all' ? (
                       <Tr>
                         <Td colSpan={5}>
-                          <SectionEmptyState title="No model deployments">
+                          <SectionEmptyState title="No models">
                             Deploy a model from the Models page to see it here.
                           </SectionEmptyState>
                         </Td>
@@ -557,13 +557,13 @@ export function ObservabilityPanel({
                     ) : (
                       <TableEmptyRow
                         colSpan={5}
-                        body="Change the filter to see more model deployments."
+                        body="Adjust your filters and try again."
                         onClear={() => setModel('all')}
                       />
                     ))}
                   {visibleModels.map((m) => (
                     <Tr key={m.id}>
-                      <Td dataLabel="Model deployment">
+                      <Td dataLabel="Name">
                         <Link to={modelPath(m)}>{titleOf(m)}</Link>
                       </Td>
                       <Td dataLabel="Model" modifier="breakWord">

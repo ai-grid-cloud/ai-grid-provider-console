@@ -45,14 +45,17 @@ export type MapInventory = {
 const noMap: MapInventory = { loaded: true, refresh: async () => undefined };
 
 const modelsErrorOf = (err: Error) =>
-  err instanceof ServiceError && err.isNotImplemented ? 'Models are not available on this backend yet.' : err.message;
+  err instanceof ServiceError && err.isNotImplemented
+    ? 'Models are not available on this AI Grid backend.'
+    : err.message;
 
 const organizationsErrorOf = (err: Error) =>
   err instanceof ServiceError && err.isNotImplemented
-    ? 'Organizations are not available on this backend yet.'
-    : 'Unable to load organization identities.';
+    ? 'Organizations are not available on this AI Grid backend.'
+    : 'Unable to load organizations.';
 
 const ranges: GridRange[] = ['1h', '6h', '24h'];
+const rangeLabels: Record<GridRange, string> = { '1h': 'Last hour', '6h': 'Last 6 hours', '24h': 'Last 24 hours' };
 
 export const GridPage: React.FC<Props> = ({ service, monitoring = false, map = noMap }) => {
   const { data: models, error: modelsLoadError, refresh: refreshModels } = useModelList();
@@ -121,7 +124,7 @@ export const GridPage: React.FC<Props> = ({ service, monitoring = false, map = n
           {ranges.map((r) => (
             <ToggleGroupItem
               key={r}
-              text={`Last ${r}`}
+              text={rangeLabels[r]}
               buttonId={`obs-range-${r}`}
               isSelected={range === r}
               onChange={() => setRange(r)}
@@ -144,8 +147,8 @@ export const GridPage: React.FC<Props> = ({ service, monitoring = false, map = n
       title={monitoring ? 'Monitoring' : 'AI Grid'}
       description={
         monitoring
-          ? 'Cluster availability, gateway performance and resource use across AI Grid.'
-          : 'Where the AI Grid clusters are, and which models they serve.'
+          ? 'Cluster availability, gateway performance, and resource use across AI Grid.'
+          : 'View the locations of AI Grid clusters and the models they serve.'
       }
       headerAction={toolbar}
       loaded={loaded}
@@ -153,20 +156,20 @@ export const GridPage: React.FC<Props> = ({ service, monitoring = false, map = n
       onRetry={() => void refresh()}
       subject={monitoring ? 'Monitoring' : 'AI Grid'}
       object={monitoring ? 'metrics' : 'AI Grid clusters'}
-      notAvailableTitle={`${monitoring ? 'Monitoring' : 'AI Grid'} is not available on this backend yet`}
+      notAvailableTitle={`${monitoring ? 'Monitoring' : 'The AI Grid map'} is not available on this AI Grid backend`}
       loadingLabel={monitoring ? 'Loading monitoring' : 'Loading AI Grid'}
     >
       <Stack hasGutter>
         {data && (
           <>
             {demo && (
-              <Alert isInline variant="info" title="Demo data">
-                Inventory and metrics on this page are simulated.
+              <Alert isInline variant="info" title="Sample data">
+                The clusters and metrics on this page are sample data.
               </Alert>
             )}
             {monitoring && !demo && metricsSource === 'demo' && (
-              <Alert isInline variant="info" title="Simulated monitoring metrics">
-                Thanos is not configured. Charts show generated demo data; cluster inventory comes from the configured
+              <Alert isInline variant="info" title="Sample metrics">
+                Metrics are not configured, so the charts show sample data. The cluster list comes from the AI Grid
                 backend.
               </Alert>
             )}

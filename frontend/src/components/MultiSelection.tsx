@@ -140,7 +140,7 @@ export const MultiSelection: React.FC<MultiSelectionProps> = ({
   toggleTestId,
   listTestId,
   selectionRequired,
-  noSelectedOptionsMessage = 'One or more options must be selected',
+  noSelectedOptionsMessage = 'Select at least one option.',
   errorMessage,
   isCreatable = false,
   isCreateOptionOnTop = false,

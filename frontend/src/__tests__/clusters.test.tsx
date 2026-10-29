@@ -97,7 +97,7 @@ it('removes a member from AI Grid after a confirmation', async () => {
   const modal = await screen.findByTestId('cluster-membership-modal');
   expect(modal).toHaveTextContent('Remove cluster-a from AI Grid?');
   // A remote cluster also leaves the cross-cluster network.
-  expect(modal).toHaveTextContent('It is also disconnected from the other AI Grid clusters.');
+  expect(modal).toHaveTextContent('The cluster is also disconnected from the other AI Grid clusters.');
   expect(modal).toHaveTextContent(
     'Models deployed to it from the Models page are removed from it. OpenShift AI is not uninstalled.',
   );
@@ -122,7 +122,7 @@ it('does not say the hub is disconnected when removing local-cluster', async () 
   const modal = await screen.findByTestId('cluster-membership-modal');
   // The network Placement always selects local-cluster.
   expect(modal).not.toHaveTextContent('disconnected');
-  expect(modal).toHaveTextContent('AI Grid stops managing this cluster, and models are no longer placed on it.');
+  expect(modal).toHaveTextContent('AI Grid stops managing this cluster, and models are no longer deployed to it.');
   expect(modal).toHaveTextContent(
     'Models deployed to it from the Models page are removed from it. OpenShift AI is not uninstalled.',
   );
@@ -149,8 +149,19 @@ it('warns about a member without a location, and asks for a location and role be
   expect(role).toHaveAccessibleDescription(/^Required\./);
   await user.click(location);
   await user.paste('us east');
-  expect(location).toHaveAccessibleDescription(/Use up to 63 letters/);
+  expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
   expect(service.clusters[1].labels).toEqual({});
+  // The Role field's help explains each role.
+  await user.click(within(modal).getByRole('button', { name: 'More info for the role field' }));
+  const help = await screen.findByRole('dialog', { name: 'Cluster roles' });
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((t) => t.textContent),
+  ).toEqual(['Ingress', 'Inference', 'Combined']);
+  expect(help).toHaveTextContent(
+    "Receives requests from organizations' users through MaaS and routes them to inference clusters.",
+  );
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   // The hub itself defaults to the combined role.
   await pick(user, 'local-cluster', 'Add to AI Grid');
@@ -182,12 +193,12 @@ it('reports Hub unavailability and retries instead of showing a false empty list
   const service = serviceWith(hubClusters());
   const list = service.listClusters;
   service.listClusters = async () => {
-    throw new ServiceError(503, 'the AI Grid backend is unavailable; try again');
+    throw new ServiceError(503, 'The AI Grid backend is unavailable. Try again.');
   };
   const user = userEvent.setup();
   renderAt('/clusters', service);
   expect(await screen.findByRole('heading', { name: 'Unable to load clusters' })).toBeVisible();
-  expect(screen.getByText('the AI Grid backend is unavailable; try again')).toBeVisible();
+  expect(screen.getByText('The AI Grid backend is unavailable. Try again.')).toBeVisible();
   expect(screen.queryByRole('heading', { name: 'No clusters' })).not.toBeInTheDocument();
   service.listClusters = list;
   await user.click(screen.getByRole('button', { name: 'Retry' }));
@@ -238,7 +249,7 @@ it('shows the role and location Add wrote while the list reloads', async () => {
   answer();
   await waitFor(() =>
     expect(within(screen.getByTestId('clusters-table')).getByRole('row', { name: /^cluster-b / })).toHaveTextContent(
-      'MaaS (ingress)',
+      'Ingress',
     ),
   );
 });
@@ -285,7 +296,7 @@ it('keeps the cluster Add returned when a poll replaced the list during the PATC
       labels: { ...service.clusters[0].labels, 'ai-grid/role': 'ingress' },
     };
     await act(async () => latestCalls.forEach((go) => go()));
-    await waitFor(() => expect(row()).toHaveTextContent('MaaS (ingress)'));
+    await waitFor(() => expect(row()).toHaveTextContent('Ingress'));
   } finally {
     vi.useRealTimers();
   }
@@ -297,14 +308,14 @@ it('rejects a response that does not confirm membership', async () => {
   const user = userEvent.setup();
   renderAt('/clusters', service);
   const modal = await add(user, 'cluster-b');
-  expect(await within(modal).findByText('Unable to add the cluster')).toBeVisible();
-  expect(within(modal).getByText('The Hub did not confirm the change. Refresh and try again.')).toBeVisible();
+  expect(await within(modal).findByText('Unable to add cluster to AI Grid')).toBeVisible();
+  expect(within(modal).getByText('The hub did not confirm the change. Refresh the page and try again.')).toBeVisible();
 });
 
 it('says when the hub has no clusters', async () => {
   renderAt('/clusters', serviceWith([]));
   expect(await screen.findByRole('heading', { name: 'No clusters' })).toBeVisible();
-  expect(screen.getByText(/The hub has no managed clusters yet/)).toBeVisible();
+  expect(screen.getByText(/first import it into the hub/)).toBeVisible();
 });
 
 it('keeps the list under a warning when a reload fails, and clears it on the next', async () => {
@@ -317,7 +328,7 @@ it('keeps the list under a warning when a reload fails, and clears it on the nex
   const alert = await screen.findByTestId('stale-data-alert');
   expect(alert).toHaveTextContent('Showing the last loaded clusters');
   // The fake Connect transport answers a 503 with its own Unavailable message.
-  expect(alert).toHaveTextContent('the AI Grid backend is unavailable; try again');
+  expect(alert).toHaveTextContent('The AI Grid backend is unavailable. Try again.');
   expect(screen.getByRole('link', { name: 'cluster-a' })).toBeVisible();
   failed.mockRestore();
   await user.click(within(alert).getByRole('button', { name: 'Retry' }));
@@ -357,7 +368,7 @@ it('shows the role of each member, and warns about a member without one', async 
     ]),
   );
   const table = await screen.findByTestId('clusters-table');
-  expect(within(table).getByRole('row', { name: /^edge-1 / })).toHaveTextContent('MaaS (ingress)');
+  expect(within(table).getByRole('row', { name: /^edge-1 / })).toHaveTextContent('Ingress');
   expect(within(table).getByRole('row', { name: /^gpu-1 / })).toHaveTextContent('Inference');
   const former = within(table).getByRole('row', { name: /^former / });
   expect(former).toHaveTextContent('Not added');
@@ -365,7 +376,7 @@ it('shows the role of each member, and warns about a member without one', async 
   const missing = screen.getByTestId('missing-role-no-role');
   expect(missing).toHaveTextContent('No role');
   await user.hover(missing);
-  expect(await screen.findByText(/doesn't install OpenShift AI or MaaS on it/)).toBeInTheDocument();
+  expect(await screen.findByText(/cannot install OpenShift AI or MaaS on it/)).toBeInTheDocument();
   expect(screen.getByTestId('missing-role-odd-role')).toHaveTextContent('No role');
   // The header explains the three roles, without sorting the table.
   const names = () =>
@@ -375,7 +386,9 @@ it('shows the role of each member, and warns about a member without one', async 
       .map((r) => r.querySelector('td')?.textContent);
   const before = names();
   await user.click(within(table).getByRole('button', { name: 'About cluster roles' }));
-  expect(await screen.findByText('Serves models behind a MaaS (ingress) cluster.')).toBeVisible();
+  expect(
+    await screen.findByText('Serves models with KServe. Requests reach it through an ingress cluster.'),
+  ).toBeVisible();
   expect(names()).toEqual(before);
 });
 
@@ -417,7 +430,7 @@ const unknownUser = () => {
 it('hides write actions until it knows the user is a provider admin', async () => {
   const service = unknownUser();
   renderAt('/clusters', service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   // site4 is both the name and the location, so find its row rather than the text.
   expect(await screen.findByRole('row', { name: /^site4 / })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument();
@@ -427,13 +440,13 @@ it('shows the not-available state on a backend without the RPC', async () => {
   const user = userEvent.setup();
   const service = new MockConsoleService();
   service.enrollCluster = async () => {
-    throw new ServiceError(501, 'the AI Grid backend does not support this operation yet');
+    throw new ServiceError(501, 'The AI Grid backend does not support this operation.');
   };
   renderAt('/clusters', service);
   const modal = await add(user, 'site4');
-  expect(await within(modal).findByText('Unable to add the cluster')).toBeInTheDocument();
+  expect(await within(modal).findByText('Unable to add cluster to AI Grid')).toBeInTheDocument();
   expect(
-    within(modal).getByText('Adding clusters to AI Grid is not available on this backend yet.'),
+    within(modal).getByText('Adding clusters to AI Grid is not available on this AI Grid backend.'),
   ).toBeInTheDocument();
 });
 
@@ -526,14 +539,14 @@ it('offers Add to AI Grid only for ready, offline or unknown clusters', async ()
     const item = await addItem(name);
     expect(item).toHaveAttribute('aria-disabled', 'true');
     await user.hover(item);
-    expect(await screen.findByText(/once it has imported it/)).toBeInTheDocument();
+    expect(await screen.findByText(/after the hub imports it/)).toBeInTheDocument();
     await user.keyboard('{Escape}');
   }
   const notAccepted = await addItem('is-notaccepted');
   expect(notAccepted).toHaveAttribute('aria-disabled', 'true');
   await user.hover(notAccepted);
   expect(
-    await screen.findByText("The hub hasn't accepted this cluster yet. Accept it in ACM, then add it to AI Grid."),
+    await screen.findByText('The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.'),
   ).toBeInTheDocument();
 });
 
@@ -632,7 +645,7 @@ it('says when the search matches no cluster, and clears it from the table', asyn
   await user.click(screen.getByRole('textbox', { name: 'Filter clusters' }));
   await user.paste('no-such-cluster');
   expect(screen.getByRole('heading', { name: 'No results found' })).toBeVisible();
-  expect(screen.getByText('Change the filter to see more clusters.')).toBeVisible();
+  expect(screen.getByText('Adjust your filters and try again.')).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
   expect(await screen.findByRole('row', { name: /^site1 / })).toBeVisible();
   expect(screen.getByRole('textbox', { name: 'Filter clusters' })).toHaveValue('');
@@ -661,7 +674,9 @@ it('reloads the cluster in the open dialog after a conflict, keeping the choices
 
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
-    await within(modal).findByText('This cluster changed since you opened this dialog. Check it and try again.'),
+    await within(modal).findByText(
+      'This cluster was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+    ),
   ).toBeVisible();
   expect(within(modal).queryByText(/resource version/)).not.toBeInTheDocument();
   expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('us-east');
@@ -704,11 +719,11 @@ it('shows the location and role someone else set meanwhile instead of sending th
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
     await within(modal).findByText(
-      'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+      "Another user changed this cluster's location or role after this dialog opened. Their values are now shown. Review them and try again.",
     ),
   ).toBeVisible();
   expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('eu-west');
-  expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('MaaS (ingress)');
+  expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress');
 
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(await screen.findByText('site4 added to AI Grid')).toBeVisible();
@@ -735,7 +750,7 @@ it('says so when the cluster changed and could not be loaded again', async () =>
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
     await within(modal).findByText(
-      "This cluster changed since you opened this dialog, and the console couldn't load it again. Cancel, refresh the list, and try again.",
+      'This cluster was changed after this dialog opened, and the latest version could not be loaded. Cancel, refresh the page, and try again.',
     ),
   ).toBeVisible();
 });
@@ -803,10 +818,10 @@ it("shows each cluster's site: its name, the cloud region marked as such, or wha
   // What "(cloud region)" means, from the keyboard too.
   inRegion.focus();
   expect(await screen.findByRole('tooltip')).toHaveTextContent(
-    'No site is set on this cluster; the map places it by its cloud region.',
+    'No site is set for this cluster. The map shows it at its cloud region.',
   );
   const wrong = screen.getByTestId('cluster-site-wrong');
-  expect(wrong).toHaveTextContent('Position not readable');
+  expect(wrong).toHaveTextContent('Invalid position');
   await user.hover(wrong);
   expect(await screen.findByText('ai-grid/latitude "40,7" is not a decimal number of degrees')).toBeInTheDocument();
   expect(within(screen.getByRole('row', { name: /^nowhere / })).getAllByText('—').length).toBeGreaterThan(0);

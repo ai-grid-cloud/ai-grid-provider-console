@@ -91,7 +91,7 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
           isDisabled={isDisabled}
           onChange={(_event, title) => onChange({ ...value, title })}
         />
-        <Help>The name members see on the sign-in page.</Help>
+        <Help>The name users see on the login page.</Help>
       </FormGroup>
       <FormGroup label="Description" fieldId="idp-description">
         <TextArea
@@ -130,7 +130,7 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
         <Checkbox
           id="idp-validate-signature"
           label="Validate signature"
-          description="Check the provider's signature on tokens with its JWKS keys."
+          description="Verify token signatures with the provider's JWKS keys."
           isChecked={value.config.validateSignature}
           isDisabled={isDisabled}
           onChange={(_event, validateSignature) => setConfig({ validateSignature })}
@@ -139,7 +139,7 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
       <FormSection title="OIDC endpoints" titleElement="h2">
         <HelperText>
           <HelperTextItem>
-            The provider lists these in its OpenID configuration, at the issuer URL followed by
+            Find these in the provider&apos;s OpenID configuration, at the issuer URL followed by
             /.well-known/openid-configuration.
           </HelperTextItem>
         </HelperText>

@@ -47,7 +47,7 @@ documentation, from the POC, or from the backend's own conventions. The sources 
    `hasDeployment`) do not exist here.
 3. **"Not implemented yet" is a normal state.** RPCs that are not agreed yet answer
    `Unimplemented`, exactly as the real server does for a stub. The BFF maps it to 501 and
-   the UI shows "not available on this backend yet", so a page can ship before its RPC.
+   the UI shows "not available on this AI Grid backend", so a page can ship before its RPC.
 4. **Errors use the same codes the backend will use.** `NotFound`, `AlreadyExists`,
    `InvalidArgument` with the CRD's own validation message, `FailedPrecondition` when the
    hub lacks a feature gate or Keycloak lacks the realm, `Unavailable` when Keycloak is down,

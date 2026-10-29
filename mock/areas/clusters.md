@@ -63,9 +63,9 @@ Connect and write `Clusters/Update` (`docs/connect.md`, "The Clusters area"), wi
 membership, the lifecycle state and the location the backend derives. So they run on the backend's own fakes (`make dev-fake-infra`), not on this fake, whose
 draft the relay can't reach. The Clusters page (`frontend/src/pages/clusters/ClustersPage.tsx`) lists every
 ManagedCluster under nested column headers that match the details page's cards: **Cluster** (name,
-the hub's connection status), **AI Grid** (status, with "Not added" outside it, location, role: Combined, MaaS (ingress), the
-cluster tenants send requests to, or Inference; the `ai-grid/role` values stay `combined`,
-`ingress` and `inference`) and
+the hub's connection status), **AI Grid** (status, with "Not added" outside it, location, role: Ingress, the
+cluster organizations' users send requests to, Inference or Combined, each with a help icon that describes it; the
+`ai-grid/role` values stay `ingress`, `inference` and `combined`) and
 **GPUs** (capacity, "4 nodes, 32 GPUs", or "8 GPUs" from `capacity["nvidia.com/gpu"]` read as a
 plain integer, as the BFF's `gpuCapacity` reads it, when the backend has no inventory; configuration, "NVIDIA H200, 8 GPUs/node", with ", Time-sliced ×4",
 ", MPS ×2" or ", MIG 3g.20gb" when shared, and "+N more" for more configurations), as provider-admin

@@ -53,7 +53,7 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await page.getByRole('button', { name: 'Next' }).click();
 
   // Deployment: the name starts from the model URI's last segment.
-  await expect(page.getByRole('textbox', { name: /^Deployment name/ })).toHaveValue(unique);
+  await expect(page.getByRole('textbox', { name: /^Model name/ })).toHaveValue(unique);
   await page.getByRole('textbox', { name: /^Runtime image/ }).fill('quay.io/example/runtime:latest');
   // The model server has no default.
   await page.getByRole('combobox', { name: 'Model server' }).selectOption({ label: 'vLLM on CPU' });
@@ -65,9 +65,9 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Next' }).click();
 
-  // Review: tenants call the model by its resource name.
+  // Review: users call the model by its resource name.
   await expect(page.getByText(CLUSTER).first()).toBeVisible();
-  await expect(page.getByTestId('model-review')).toContainText(`Name tenants call${unique}`);
+  await expect(page.getByTestId('model-review')).toContainText(`Model name in requests${unique}`);
   await page.getByRole('button', { name: 'Deploy', exact: true }).click();
   await expect(page.getByText('Model deployed')).toBeVisible();
 
@@ -93,7 +93,7 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await page.getByRole('spinbutton', { name: 'Replicas' }).fill('2');
   await page.getByRole('button', { name: 'Review', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Model deployment updated')).toBeVisible();
+  await expect(page.getByText('Model updated')).toBeVisible();
   await expect(page.getByRole('heading', { name: unique })).toBeVisible();
   await expect(page.getByLabel('Deployment', { exact: true })).toContainText(/Replicas\s*2/);
 
@@ -102,11 +102,11 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await page.getByLabel(/^Type .* to confirm/).fill(unique);
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(page.getByText('Model deployment deleted')).toBeVisible();
+  await expect(page.getByText('Model deleted')).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: unique })).toHaveCount(0);
 });
 
 test('says when a model page has no model', async ({ page }) => {
   await page.goto('/models/no-such-model');
-  await expect(page.getByText('Model deployment not found')).toBeVisible();
+  await expect(page.getByText('Model not found')).toBeVisible();
 });

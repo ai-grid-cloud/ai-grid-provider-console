@@ -29,7 +29,7 @@ import { StatusLabel } from '../../components/StatusLabel';
 import { useConsoleSession } from '../../context/useConsoleSession';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { formatCores, formatGiB } from '../../utilities/quantity';
-import { gpuCount, membershipAction, statusReason } from './clusterInfo';
+import { gpuCount, membershipAction } from './clusterInfo';
 import {
   capacityText,
   configurationText,
@@ -43,6 +43,7 @@ import type { MembershipChange } from './MembershipModal';
 import { MembershipModal } from './MembershipModal';
 import { changeMembership } from './changeMembership';
 import { MissingLabel } from './MissingLabel';
+import { ClusterRoleName } from './ClusterRolesHelp';
 import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
@@ -68,7 +69,7 @@ const aiGridItems = (c: ClusterView) => {
         (c.aiGridEnabled ? (
           <MissingLabel
             testId="missing-location"
-            reason="This member has no location label, so models can't be deployed to it."
+            reason="This cluster has no location, so models cannot be deployed to it."
           >
             No location
           </MissingLabel>
@@ -77,17 +78,23 @@ const aiGridItems = (c: ClusterView) => {
     {
       term: 'Role',
       value: !c.aiGridEnabled ? undefined : role ? (
-        `${role.label}: ${role.description}`
+        <ClusterRoleName role={role} />
       ) : (
         <MissingLabel
           testId="missing-role"
-          reason="This member has no role, so the hub doesn't install OpenShift AI or MaaS on it, and it never finishes provisioning. Remove it from AI Grid and add it again to choose a role."
+          reason="This cluster has no role, so the hub cannot install OpenShift AI or MaaS on it, and provisioning cannot finish. To set a role, remove the cluster from AI Grid and add it again."
         >
           No role
         </MissingLabel>
       ),
     },
   ];
+};
+
+/** The status tooltip: "Hub connection: Importing. <the hub's message>", either part when it is all there is. */
+const hubConnection = (c: ClusterView) => {
+  const detail = [c.state && `${c.state}.`, c.statusMessage].filter(Boolean).join(' ');
+  return detail ? `Hub connection: ${detail}` : undefined;
 };
 
 /**
@@ -98,13 +105,7 @@ const aiGridItems = (c: ClusterView) => {
 const clusterItems = (c: ClusterView) => [
   {
     term: 'Status',
-    value: (
-      <StatusLabel
-        isCompact
-        status={c.status}
-        reason={['Connection to the hub', statusReason(c)].filter(Boolean).join(': ')}
-      />
-    ),
+    value: <StatusLabel isCompact status={c.status} reason={hubConnection(c)} />,
     'data-testid': 'cluster-status',
   },
   { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" /> },
@@ -131,7 +132,7 @@ const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
   if (c.latitude === undefined || c.longitude === undefined) {
     return (
       <Stack>
-        <span>{c.locationProblem ? `Not on the map: ${c.locationProblem}` : 'Not on the map: no position'}</span>
+        <span>{c.locationProblem ? `Not on the map: ${c.locationProblem}` : 'Not on the map: position not set'}</span>
         {how}
       </Stack>
     );
@@ -302,9 +303,9 @@ const GPUNodesTable: React.FC<{ nodes: GPUNode[] }> = ({ nodes }) => (
   </Table>
 );
 
-const NotReported: React.FC<{ what: string }> = ({ what }) => (
+const NotReported: React.FC<{ children: string }> = ({ children }) => (
   <Content component="p" className="pf-v6-u-text-color-subtle">
-    The backend doesn't report {what} yet.
+    {children}
   </Content>
 );
 
@@ -403,7 +404,7 @@ export const ClusterDetailsPage: React.FC = () => {
         <GridItem md={6}>
           <Section
             title="AI Grid"
-            help="A member has the ai-grid/enabled label. The hub then installs what its role needs, and the cluster is provisioned once the hub's ai-grid-ready Policy is compliant on it."
+            help="When a cluster is added to AI Grid, the hub installs the components its role needs. The status is Provisioned when that setup is complete."
           >
             <DetailsList items={aiGridItems(cluster)} aria-label="AI Grid membership" />
           </Section>
@@ -416,28 +417,25 @@ export const ClusterDetailsPage: React.FC = () => {
         <GridItem md={6}>
           <Section
             title="Capacity"
-            help="What the cluster's nodes provide, as the hub reports it. Schedulable GPUs are the GPUs Kubernetes can give to pods: when GPUs are time-sliced or shared with MPS, each one counts once per replica."
+            help="The resources of the cluster's nodes, as reported by the hub. Schedulable GPUs is the number of GPUs that workloads can request. A time-sliced or MPS-shared GPU counts once for each share."
           >
             {cluster.capacity ? (
               <DetailsList items={capacityItems(cluster)} aria-label="Capacity" />
             ) : (
-              <NotReported what="this cluster's capacity" />
+              <NotReported>Capacity is not reported for this cluster.</NotReported>
             )}
           </Section>
         </GridItem>
         <GridItem md={6}>
-          <Section
-            title="GPUs"
-            help="What the cluster's GPU nodes report through their NVIDIA GPU Feature Discovery labels, which the hub's ACM Search indexes."
-          >
+          <Section title="GPUs" help="GPU details reported by the cluster's GPU nodes.">
             {cluster.gpus ? (
               <DetailsList items={gpuItems(cluster.gpus)} aria-label="GPUs" />
             ) : !cluster.capacity ? (
-              <NotReported what="this cluster's GPUs" />
+              <NotReported>GPUs are not reported for this cluster.</NotReported>
             ) : (
               <Content component="p" className="pf-v6-u-text-color-subtle" data-testid="cluster-gpus-not-reported">
                 {gpuCount(cluster)
-                  ? `The hub reports ${gpuCountText(gpuCount(cluster) ?? 0)} in this cluster's capacity, but no details for its GPU nodes: ACM Search hasn't indexed them, or the backend doesn't report them yet.`
+                  ? `The hub reports ${gpuCountText(gpuCount(cluster) ?? 0)} for this cluster, but no GPU node details are available yet.`
                   : 'The hub reports no GPUs on this cluster.'}
               </Content>
             )}

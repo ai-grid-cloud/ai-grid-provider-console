@@ -38,7 +38,7 @@ export const SubscriptionDetailsSection: React.FC<Props> = ({ subscription, auth
               // The backend lists every policy covering one of the models, whichever groups it
               // grants, so the term says that rather than implying these policies are this
               // subscription's own.
-              term: 'Policies for its models',
+              term: 'Authorization policies for its models',
               'data-testid': 'subscription-auth-policies',
               value: authPolicies.length ? (
                 <Stack>

@@ -95,7 +95,7 @@ export const DeleteModal: React.FC<Props> = ({
                 variant="danger"
               >
                 {error.message}
-                {reloadError && <p>The latest version could not be loaded again: {reloadError.message}</p>}
+                {reloadError && <p>Unable to reload the latest version: {reloadError.message}</p>}
               </Alert>
             </StackItem>
           )}

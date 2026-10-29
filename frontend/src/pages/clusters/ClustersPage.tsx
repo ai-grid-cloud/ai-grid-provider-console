@@ -31,7 +31,8 @@ import { ClusterSite } from './ClusterSite';
 import { siteOf } from './site';
 import { gpuCount, membershipAction, statusReason } from './clusterInfo';
 import { capacityText, configurationText, gpuCountText, gpuSharing } from './gpuText';
-import { clusterRoles, roleOf } from './roles';
+import { ClusterRolesList } from './ClusterRolesHelp';
+import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useClusterList, useMembershipWrites } from './useClusters';
 
@@ -91,17 +92,8 @@ const columns: Column[] = [
     sort: (a, b) => memberRole(a).localeCompare(memberRole(b)),
     info: {
       ariaLabel: 'About cluster roles',
-      popover: (
-        <DescriptionList isCompact>
-          {clusterRoles.map((r) => (
-            <DescriptionListGroup key={r.value}>
-              <DescriptionListTerm>{r.label}</DescriptionListTerm>
-              <DescriptionListDescription>{r.description}</DescriptionListDescription>
-            </DescriptionListGroup>
-          ))}
-        </DescriptionList>
-      ),
-      popoverProps: { headerContent: 'What a member runs' },
+      popover: <ClusterRolesList />,
+      popoverProps: { headerContent: 'Cluster roles' },
     },
   },
   { label: 'Capacity', dataLabel: 'GPU capacity', sort: (a, b) => gpuTotal(a) - gpuTotal(b) },
@@ -126,21 +118,19 @@ const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
           <DescriptionListGroup>
             <DescriptionListTerm>Capacity</DescriptionListTerm>
             <DescriptionListDescription>
-              The cluster&apos;s GPU nodes and GPUs, as GPU Feature Discovery counts them: on a node that splits its
-              GPUs with MIG (strategy single), each MIG device counts as one. Without node details, the GPUs in the
-              cluster&apos;s capacity as the hub reports it.
+              The GPU nodes and GPUs reported by the cluster. A GPU split into MIG devices counts once per device. When
+              node details are not available, this is the GPU count from the cluster&apos;s capacity.
             </DescriptionListDescription>
           </DescriptionListGroup>
           <DescriptionListGroup>
             <DescriptionListTerm>Configuration</DescriptionListTerm>
             <DescriptionListDescription>
-              The GPU model and GPUs per node on the cluster&apos;s GPU nodes, and how they are shared, from the
-              nodes&apos; GPU Feature Discovery labels.
+              The GPU model, the GPUs per node, and how the GPUs are shared.
             </DescriptionListDescription>
           </DescriptionListGroup>
         </DescriptionList>
       ),
-      popoverProps: { headerContent: "A cluster's GPUs" },
+      popoverProps: { headerContent: 'GPUs' },
     },
   },
 ];
@@ -239,7 +229,7 @@ export const ClustersPage: React.FC = () => {
             </Button>
           }
         >
-          The hub has no managed clusters yet. Import a cluster into the hub to add it to AI Grid.
+          To add a cluster to AI Grid, first import it into the hub.
         </EmptyListState>
       );
     }
@@ -292,7 +282,7 @@ export const ClustersPage: React.FC = () => {
                   {rows.length === 0 ? (
                     <TableEmptyRow
                       colSpan={columns.length + 1}
-                      body="Change the filter to see more clusters."
+                      body="Adjust your filters and try again."
                       onClear={() => setSearch('')}
                     />
                   ) : (
@@ -315,7 +305,7 @@ export const ClustersPage: React.FC = () => {
                             (c.aiGridEnabled ? (
                               <MissingLabel
                                 testId={`missing-location-${c.name}`}
-                                reason="This member has no location label, so models can't be deployed to it."
+                                reason="This cluster has no location, so models cannot be deployed to it."
                               >
                                 No location
                               </MissingLabel>
@@ -329,7 +319,7 @@ export const ClustersPage: React.FC = () => {
                             : (roleOf(c.labels)?.label ?? (
                                 <MissingLabel
                                   testId={`missing-role-${c.name}`}
-                                  reason="This member has no role, so the hub doesn't install OpenShift AI or MaaS on it, and it never finishes provisioning. Remove it from AI Grid and add it again to choose a role."
+                                  reason="This cluster has no role, so the hub cannot install OpenShift AI or MaaS on it, and provisioning cannot finish. To set a role, remove the cluster from AI Grid and add it again."
                                 >
                                   No role
                                 </MissingLabel>
@@ -366,7 +356,7 @@ export const ClustersPage: React.FC = () => {
     <>
       <PageStateSection
         title="Clusters"
-        description="Manage AI Grid membership and provisioning readiness."
+        description="Add clusters to AI Grid and check their provisioning status."
         loaded={loaded}
         error={error}
         onRetry={reload}

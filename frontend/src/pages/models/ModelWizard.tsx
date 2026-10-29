@@ -20,6 +20,7 @@ import {
   HelperText,
   HelperTextItem,
   PageSection,
+  Spinner,
   TextInput,
   Wizard,
   WizardStep,
@@ -68,8 +69,7 @@ const fixedReason = {
   source: 'The model a deployment serves is fixed. Deploy a new model to serve another one.',
   // Says what the field is without claiming a model deployed earlier serves its resource name: one
   // written before the backend served models as their ids can keep another.
-  served:
-    'Tenants send this name as the model in their requests, and it can’t be changed here. A model deployed from this console is served as its resource name.',
+  served: 'Users send this name as the model in their requests. It cannot be edited.',
   resources: 'Resources are set when the model is deployed. Deploy it again to change them.',
 };
 
@@ -96,7 +96,7 @@ const Help: React.FC<{ children: React.ReactNode; error?: string; id?: string }>
 );
 
 const notAvailable = (err: unknown, what: string) =>
-  err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this backend yet.` : undefined;
+  err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this AI Grid backend.` : undefined;
 
 /** Says which chosen locations are no longer offered; undefined when none are. */
 const goneLocationsError = (names: string[]) =>
@@ -290,7 +290,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     try {
       if (model) {
         await writes.updateModel(model, edited);
-        navigate(detailsPath, { state: { notice: 'Model deployment updated' } });
+        navigate(detailsPath, { state: { notice: 'Model updated' } });
       } else {
         await writes.createModel(input);
         // Replaces the deploy form in history, so Back doesn't land on it, empty.
@@ -300,12 +300,12 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       setError(
         notAvailable(err, editing ? 'Editing models is' : 'Deploying models is') ??
           (editing && err instanceof ServiceError && err.status === 409
-            ? 'This model deployment changed since you opened it. Reload the page to edit the current version.'
+            ? 'This model was changed by another user. Reload the page to edit the latest version.'
             : err instanceof Error
               ? err.message
               : editing
-                ? 'The model deployment could not be updated.'
-                : 'The model could not be deployed.'),
+                ? 'Unable to update the model.'
+                : 'Unable to deploy the model.'),
       );
       setSaving(false);
     }
@@ -313,10 +313,10 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
 
   // A placement the console doesn't edit, or none, as the review and the step show it.
   const placedAt = () => {
-    if (!model?.placed) return 'No placement';
+    if (!model?.placed) return 'Not deployed to a location';
     return model.locations.length > 0
       ? model.locations.map((l) => locationLabel(l, siteNames)).join(', ')
-      : 'No locations chosen yet';
+      : 'No locations selected';
   };
 
   const locationsStep = () => {
@@ -328,8 +328,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
           value={placedAt()}
           reason={
             model?.placed
-              ? 'This placement selects clusters by more than location, so it can’t be edited as locations here.'
-              : 'This model has no placement, so it isn’t placed on any AI Grid location.'
+              ? "This model's placement uses rules other than location, so its locations cannot be edited here."
+              : 'This model is not deployed to any AI Grid location.'
           }
         />
       );
@@ -339,7 +339,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         <Alert
           isInline
           variant="danger"
-          title="Error loading locations"
+          title="Unable to load locations"
           actionLinks={<AlertActionLink onClick={() => void reloadLocations()}>Retry</AlertActionLink>}
         >
           {notAvailable(locationsError, 'Locations are') ?? locationsError.message}
@@ -347,13 +347,13 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       );
     }
     if (!locationsLoaded) {
-      return <p>Loading locations...</p>;
+      return <Spinner size="lg" aria-label="Loading locations" />;
     }
     // With chosen locations to show, the field stays, so the user can see and remove them.
     if (availableLocations.length === 0 && goneLocations.length === 0) {
       return (
         <Alert isInline variant="warning" title="No locations available">
-          Locations become available when an AI Grid member that serves models is Available and provisioned.
+          A location appears here when an AI Grid cluster that serves models at that location is Ready and Provisioned.
         </Alert>
       );
     }
@@ -391,9 +391,9 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
           isDisabled={saving}
         />
         <Help>
-          The model runs on each AI Grid cluster you choose.
+          The model runs on every AI Grid cluster at the selected locations.
           {unavailableMembers > 0 &&
-            ` ${unavailableMembers} AI Grid ${unavailableMembers === 1 ? 'cluster isn’t' : 'clusters aren’t'} listed because ${unavailableMembers === 1 ? 'it isn’t' : 'they aren’t'} Available and provisioned, or ${unavailableMembers === 1 ? 'doesn’t' : 'don’t'} serve models.`}
+            ` ${unavailableMembers} AI Grid ${unavailableMembers === 1 ? 'cluster is' : 'clusters are'} not listed because ${unavailableMembers === 1 ? 'it is' : 'they are'} not Ready and Provisioned, or ${unavailableMembers === 1 ? 'does' : 'do'} not serve models.`}
         </Help>
       </FormGroup>
     );
@@ -424,15 +424,15 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       items: [
         { term: 'Model URI', value: modelUri },
         // A deployed model keeps the name it is served as; a new one is served as its resource name.
-        ...(model ? [{ term: 'Model name', value: model.modelName ?? model.id }] : []),
+        ...(model ? [{ term: 'Model name in requests', value: model.modelName ?? model.id }] : []),
       ],
     },
     {
       title: 'Deployment',
       step: steps.deployment,
       items: [
-        { term: 'Deployment name', value: nameDescData.name },
-        ...(model ? [] : [{ term: 'Name tenants call', value: nameDescData.k8sName.value }]),
+        { term: 'Model name', value: nameDescData.name },
+        ...(model ? [] : [{ term: 'Model name in requests', value: nameDescData.k8sName.value }]),
         { term: 'Description', value: nameDescData.description },
         { term: 'Model server', value: modelServerLabel(input.baseRefs) },
         { term: 'Runtime image', value: runtimeImage },
@@ -459,9 +459,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     <>
       <PageHeader
         title={model ? `Edit ${titleOf(model)}` : 'Deploy model'}
-        description={
-          model ? 'Change the model deployment’s settings and locations.' : 'Deploy a model to AI Grid locations.'
-        }
+        description={model ? "Edit the model's settings and locations." : 'Deploy a model to AI Grid locations.'}
         breadcrumb={
           <Breadcrumb>
             <BreadcrumbItem>
@@ -500,7 +498,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
             <ConsoleWizardFooter
               submitStepId={steps.review}
               submitLabel={editing ? 'Save changes' : 'Deploy'}
-              errorTitle={editing ? 'Unable to update model deployment' : 'Unable to deploy model'}
+              errorTitle={editing ? 'Unable to update model' : 'Unable to deploy model'}
               isStepValid={isStepValid}
               saving={saving}
               error={error}
@@ -516,7 +514,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   {model && <OlderServedNameAlert model={model} />}
                   <ReadOnlyField label="Model URI" fieldId="model-uri" value={modelUri} reason={fixedReason.source} />
                   <ReadOnlyField
-                    label="Model name"
+                    label="Model name in requests"
                     fieldId="model-alias"
                     value={model?.modelName ?? model?.id ?? ''}
                     reason={fixedReason.served}
@@ -535,8 +533,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                       isRequired
                     />
                     <Help id="model-uri-help" error={modelUriError}>
-                      Enter the model location, for example hf://org/model, oci://registry/model:tag, s3://bucket/path
-                      or pvc://claim/path.
+                      For example, hf://org/model, oci://registry/model:tag, s3://bucket/path, or pvc://claim/path.
                     </Help>
                   </FormGroup>
                 </>
@@ -549,11 +546,11 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                 data={nameDescData}
                 onDataChange={onNameDescChange}
                 dataTestId="model-name-desc"
-                nameLabel="Deployment name"
+                nameLabel="Model name"
                 nameHelperText={
                   editing
                     ? undefined
-                    : 'Choose a resource name of at most 63 characters. Tenants send it as the model in their requests.'
+                    : 'Users send the resource name as the model in their requests. Up to 63 characters.'
                 }
               />
               {editing ? (
@@ -580,7 +577,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                     ))}
                   </FormSelect>
                   <Help id="model-server-help" error={serverError}>
-                    {server?.description ?? 'Choose the build that matches the hardware of the clusters you deploy to.'}
+                    {server?.description ??
+                      'Select the model server that matches the hardware at the selected locations.'}
                   </Help>
                 </FormGroup>
               )}
@@ -595,8 +593,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   isRequired
                 />
                 <Help id="runtime-image-help" error={runtimeImageError}>
-                  Container image for the serving runtime. It must match the model server, such as a vLLM CPU image for
-                  vLLM on CPU.
+                  Must match the model server. For example, use a vLLM CPU image for vLLM on CPU.
                 </Help>
               </FormGroup>
               {replicasEditable ? (
@@ -613,7 +610,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                     validated={replicasError ? 'error' : 'default'}
                   />
                   <Help id="deployment-replicas-help" error={replicasError}>
-                    Between 1 and 99.
+                    From 1 to 99.
                   </Help>
                 </FormGroup>
               ) : (
@@ -621,7 +618,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   label="Replicas"
                   fieldId="deployment-replicas"
                   value="Autoscaled"
-                  reason="KEDA scales this model, so it has no fixed replica count."
+                  reason="This model scales automatically, so it has no fixed replica count."
                 />
               )}
               {editing ? (
@@ -659,7 +656,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                       isRequired
                     />
                     <Help id="deployment-cpu-help" error={cpuError}>
-                      Positive cores or millicores, for example 2 or 500m.
+                      In cores or millicores. For example, 2 or 500m.
                     </Help>
                   </FormGroup>
                   <FormGroup label="Memory" fieldId="deployment-memory" isRequired>
@@ -673,7 +670,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                       isRequired
                     />
                     <Help id="deployment-memory-help" error={memoryError}>
-                      For example 4Gi or 512Mi.
+                      For example, 4Gi or 512Mi.
                     </Help>
                   </FormGroup>
                   {usesGpus && (
@@ -690,7 +687,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                         validated={gpuCountError ? 'error' : 'default'}
                       />
                       <Help id="deployment-gpus-help" error={gpuCountError}>
-                        Between 1 and 64.
+                        From 1 to 64.
                       </Help>
                     </FormGroup>
                   )}

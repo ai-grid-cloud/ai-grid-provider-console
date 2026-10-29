@@ -134,8 +134,8 @@ export const SubscriptionsList: React.FC = () => {
               actionLinks={<AlertActionLink onClick={refresh}>Retry</AlertActionLink>}
               data-testid="subscriptions-models-unavailable"
             >
-              The models' locations aren't shown, and the model filter matches only the names and descriptions the
-              subscriptions give their models.
+              Model locations are not shown, and the model filter matches only the model names and descriptions saved in
+              each subscription.
             </Alert>
           </StackItem>
         )}
@@ -167,7 +167,7 @@ export const SubscriptionsList: React.FC = () => {
     <>
       <PageStateSection
         title="Subscriptions"
-        description="Manage subscriptions to models available through Models as a Service."
+        description="Manage which organizations' groups can use which models, and their token limits."
         loaded={loaded}
         error={error}
         onRetry={refresh}

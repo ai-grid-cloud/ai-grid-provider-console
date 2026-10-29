@@ -167,7 +167,7 @@ export const clustersBackend = (service: ClusterSource & Writes) =>
           });
         }
         if (service.removeClusterFromGrid) return service.removeClusterFromGrid(cluster);
-        throw new ServiceError(501, 'the AI Grid backend does not support this operation yet');
+        throw new ServiceError(501, 'The AI Grid backend does not support this operation.');
       });
       return { object: toManagedCluster(updated) };
     },

@@ -73,7 +73,7 @@ export const OrganizationListPage: React.FC<Props> = ({ service }) => {
     if (organizations.length === 0) {
       return (
         <EmptyListState title="No organizations" action={createButton}>
-          Create an organization to give its users access to models.
+          To give an organization's users access to models, create an organization.
         </EmptyListState>
       );
     }
@@ -112,7 +112,7 @@ export const OrganizationListPage: React.FC<Props> = ({ service }) => {
                 {rows.length === 0 ? (
                   <TableEmptyRow
                     colSpan={columns.length + 1}
-                    body="Change the filter to see more organizations."
+                    body="Adjust your filters and try again."
                     onClear={() => setSearch('')}
                   />
                 ) : (
@@ -128,7 +128,7 @@ export const OrganizationListPage: React.FC<Props> = ({ service }) => {
                         {o.domains[0] ?? EMPTY_VALUE}
                       </Td>
                       <Td dataLabel="Identity provider" modifier="breakWord">
-                        {o.identityProvider ? o.identityProvider.title || 'OIDC' : EMPTY_VALUE}
+                        {o.identityProvider ? o.identityProvider.title || 'OIDC (no title)' : EMPTY_VALUE}
                       </Td>
                       {canWrite && (
                         <Td isActionCell>

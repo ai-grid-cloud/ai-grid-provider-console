@@ -42,12 +42,15 @@ it('opens from the Clusters list', async () => {
 });
 
 it('shows a member: AI Grid, the cluster, its capacity and GPUs', async () => {
+  const user = userEvent.setup();
   renderAt('/clusters/site1', new MockConsoleService());
   expect(await screen.findByRole('heading', { level: 1, name: 'site1' })).toBeVisible();
 
   expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioned');
   const aiGrid = details('AI Grid membership');
-  expect(aiGrid).toHaveTextContent('Combined: A MaaS (ingress) cluster that also serves models.');
+  expect(aiGrid).toHaveTextContent('RoleCombined');
+  await user.click(within(aiGrid).getByRole('button', { name: 'More about the combined role' }));
+  expect(await screen.findByText('Does both: receives requests through MaaS and serves models.')).toBeVisible();
   expect(aiGrid).toHaveTextContent('site1');
   // The same order as the list's AI Grid columns: status, location, role (UX review).
   expect(
@@ -117,9 +120,9 @@ it("says what the backend doesn't report yet instead of showing zeros", async ()
   // Versions the labels carry show; claims the backend doesn't send read as empty.
   expect(details('Cluster')).toHaveTextContent('4.21.36');
   expect(details('Cluster')).toHaveTextContent('Platform—');
-  expect(screen.getByText("The backend doesn't report this cluster's capacity yet.")).toBeVisible();
+  expect(screen.getByText('Capacity is not reported for this cluster.')).toBeVisible();
   expect(screen.queryByTestId('cluster-gpus')).not.toBeInTheDocument();
-  expect(screen.getByText("The backend doesn't report this cluster's GPUs yet.")).toBeVisible();
+  expect(screen.getByText('GPUs are not reported for this cluster.')).toBeVisible();
   expect(screen.queryByRole('link', { name: 'OpenShift console' })).not.toBeInTheDocument();
 });
 
@@ -281,7 +284,7 @@ it('says when the hub counts GPUs but has no details for them', async () => {
   delete clusters[0].gpus;
   renderAt('/clusters/site1', new MockConsoleService(undefined, clusters));
   expect(await screen.findByTestId('cluster-gpus-not-reported')).toHaveTextContent(
-    "The hub reports 16 GPUs in this cluster's capacity, but no details for its GPU nodes",
+    'The hub reports 16 GPUs for this cluster, but no GPU node details are available yet.',
   );
   expect(screen.queryByRole('grid', { name: 'GPU nodes' })).not.toBeInTheDocument();
 });
@@ -441,7 +444,9 @@ it('loads the cluster again into the open dialog after a conflict, so the next A
 
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
-    await within(modal).findByText('This cluster changed since you opened this dialog. Check it and try again.'),
+    await within(modal).findByText(
+      'This cluster was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+    ),
   ).toBeVisible();
   // The user's choices stand when the other change didn't touch them.
   expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('us-east');
@@ -474,11 +479,11 @@ it('shows the location and role someone else set meanwhile instead of sending th
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
     await within(modal).findByText(
-      'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+      "Another user changed this cluster's location or role after this dialog opened. Their values are now shown. Review them and try again.",
     ),
   ).toBeVisible();
   expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('eu-west');
-  expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('MaaS (ingress)');
+  expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress');
 });
 
 it('offers Retry when the cluster could not be loaded', async () => {
@@ -550,4 +555,29 @@ it('says what to fix when the coordinate annotations are wrong', async () => {
   expect(await screen.findByTestId('cluster-map-position')).toHaveTextContent(
     'Not on the map: ai-grid/latitude "39,96" is not a decimal number of degrees',
   );
+});
+
+it("says in the status tooltip what the hub reports about the cluster's connection", async () => {
+  const user = userEvent.setup();
+  const importing: GridCluster = {
+    ...bare(),
+    name: 'importing-1',
+    status: 'Unknown',
+    state: 'Importing',
+    statusMessage: 'The klusterlet is starting.',
+  };
+  const offline: GridCluster = { ...bare(), name: 'offline-1', status: 'Offline', statusMessage: 'Lease not updated.' };
+  renderAt('/clusters/importing-1', new MockConsoleService(undefined, [importing, offline]));
+  await user.hover(await within(await screen.findByTestId('cluster-status')).findByText('Unknown'));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(
+    /^Hub connection: Importing\. The klusterlet is starting\.$/,
+  );
+});
+
+it('says in the status tooltip what the hub reports, without a state', async () => {
+  const user = userEvent.setup();
+  const offline: GridCluster = { ...bare(), name: 'offline-1', status: 'Offline', statusMessage: 'Lease not updated.' };
+  renderAt('/clusters/offline-1', new MockConsoleService(undefined, [offline]));
+  await user.hover(await within(await screen.findByTestId('cluster-status')).findByText('Offline'));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Hub connection: Lease not updated\.$/);
 });

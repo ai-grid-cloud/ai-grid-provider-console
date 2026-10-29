@@ -89,7 +89,7 @@ const ClusterStatusModal: React.FC<{
     {onEdit && (
       <ModalFooter>
         <Button variant="link" onClick={onEdit}>
-          Edit deployment
+          Edit model
         </Button>
       </ModalFooter>
     )}
@@ -131,7 +131,7 @@ export const ModelLocationsTable: React.FC<Props> = ({ model, clusters, siteName
     return (
       <Stack hasGutter data-testid={`model-selected-clusters-${model.id}`}>
         <Content component="p">
-          <SubtleText>No cluster has reported this model yet.</SubtleText>
+          <SubtleText>No cluster has reported a status for this model.</SubtleText>
         </Content>
         <Table aria-label={`Locations of ${title}`} variant="compact" isNested={isNested}>
           <Thead>

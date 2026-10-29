@@ -112,8 +112,9 @@ it('walks the deployment wizard, selects locations and creates the model', async
   expect(review).toHaveTextContent(`${site1}, ${site2}`);
   // Empty optional fields are left out of the review, and the served name is the resource name.
   expect(review).not.toHaveTextContent('Additional runtime arguments');
-  expect(review).toHaveTextContent('Name tenants callwidget');
-  expect(review).not.toHaveTextContent('Model name');
+  expect(review).toHaveTextContent('Model nameWidget');
+  expect(review).toHaveTextContent('Model name in requestswidget');
+  expect(within(review).getAllByText('Model name in requests')).toHaveLength(1);
   await user.click(screen.getByRole('button', { name: 'Deploy' }));
 
   expect(await screen.findByText('Model deployed')).toBeVisible();
@@ -145,12 +146,12 @@ it('removes a model after its name is typed', async () => {
   await user.click(await screen.findByTestId('model-actions-widget'));
   await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
   const dialog = await screen.findByTestId('delete-deployment-modal');
-  expect(dialog).toHaveTextContent('Delete model deployment?');
+  expect(dialog).toHaveTextContent('Delete model?');
   expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeDisabled();
   await user.click(within(dialog).getByTestId('delete-modal-input'));
   await user.paste('Widget');
   await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-  expect(await screen.findByText('Model deployment deleted')).toBeVisible();
+  expect(await screen.findByText('Model deleted')).toBeVisible();
   await waitFor(() => expect(screen.queryByTestId('model-actions-widget')).not.toBeInTheDocument());
   expect(models.models.some((m) => m.id === 'widget')).toBe(false);
 });
@@ -205,7 +206,7 @@ it('names the subscriptions that use the model and disables Delete, joined by mo
   expect(button).toHaveAttribute('aria-disabled', 'true');
   await user.click(button);
   await user.hover(button);
-  expect(await screen.findByText('Remove this model from its subscriptions first')).toBeInTheDocument();
+  expect(await screen.findByText('Remove this model from its subscriptions first.')).toBeInTheDocument();
   expect(remove).not.toHaveBeenCalled();
 });
 
@@ -324,7 +325,7 @@ it('keeps chosen locations visible when the reload offers none', async () => {
 });
 
 it('counts the AI Grid members the Locations step leaves out', async () => {
-  const hint = /AI Grid clusters? (isn’t|aren’t) listed/;
+  const hint = /AI Grid clusters? (is|are) not listed/;
   const service = new MockConsoleService();
   const models = modelsOf(service);
   models.placementClusters = async () => ['site1', 'site2'];
@@ -332,7 +333,7 @@ it('counts the AI Grid members the Locations step leaves out', async () => {
   renderAt('/models/deploy', service);
   await fillModel(user);
   await screen.findByRole('combobox', { name: 'Locations' });
-  expect(await screen.findByText(hint)).toHaveTextContent('1 AI Grid cluster isn’t listed');
+  expect(await screen.findByText(hint)).toHaveTextContent('1 AI Grid cluster is not listed');
   models.placementClusters = async () => ['site1', 'site2', 'site3'];
   await user.click(screen.getByRole('button', { name: 'Back' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -356,7 +357,7 @@ it("keeps input when saving fails, with the backend's message", async () => {
 it('hides write actions until it knows the user is a provider admin', async () => {
   const service = unknownUser();
   renderAt('/models', service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   const table = await screen.findByTestId('model-deployments-table');
   expect(table).toHaveTextContent('Granite 3.3 8B Instruct');
   expect(screen.queryByRole('link', { name: 'Deploy model' })).not.toBeInTheDocument();
@@ -369,7 +370,7 @@ it('shows the not-available state when the backend has no Models/List', async ()
     throw new ConnectError('no such method', Code.Unimplemented);
   });
   renderAt('/models', service);
-  expect(await screen.findByText('Models are not available on this backend yet')).toBeVisible();
+  expect(await screen.findByText('Models are not available on this AI Grid backend')).toBeVisible();
   expect(screen.queryByTestId('model-deployments-table')).not.toBeInTheDocument();
 });
 
@@ -472,7 +473,7 @@ it('says a required field is required once the user leaves it empty, and asks fo
   const user = userEvent.setup();
   renderAt('/models/deploy', new MockConsoleService());
   const uri = await screen.findByRole('textbox', { name: /Model URI/ });
-  // A model is served as its id, the name tenants send: there is no name to choose for it.
+  // A model is served as its id, the name users send: there is no name to choose for it.
   expect(screen.queryByRole('textbox', { name: /^Model name/ })).not.toBeInTheDocument();
   await user.click(uri);
   await user.paste('hf://org/widget');
@@ -664,7 +665,7 @@ it('keeps the delete dialog busy until the reloaded model is in, and says when t
   models.find('granite-research').metadata!.version = 3;
   reloadSpy.mockImplementationOnce(unavailable);
   await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-  expect(await within(dialog).findByText(/could not be loaded again/)).toBeVisible();
+  expect(await within(dialog).findByText(/Unable to reload the latest version/)).toBeVisible();
   expect(within(dialog).getByRole('button', { name: 'Delete' })).toBeEnabled();
 });
 
@@ -739,7 +740,7 @@ it("opens a model page with its configuration, its endpoint and each cluster's s
   expect(screen.getByText('vLLM on CPU')).toBeVisible();
   const locations = screen.getByTestId('model-locations');
   expect(within(locations).getByTestId('model-clusters-granite-3-8b')).toBeVisible();
-  expect(within(locations).getByRole('link', { name: 'Show on the AI Grid map' })).toHaveAttribute(
+  expect(within(locations).getByRole('link', { name: 'View on the AI Grid map' })).toHaveAttribute(
     'href',
     '/ai-grid?model=granite-3-8b',
   );
@@ -751,7 +752,7 @@ it("opens a model page with its configuration, its endpoint and each cluster's s
 
 it('says a model without locations has none', async () => {
   renderAt('/models/llama-3-70b', new MockConsoleService());
-  expect(await screen.findByText('The placement hasn’t chosen any locations yet.')).toBeVisible();
+  expect(await screen.findByText("No AI Grid cluster matches this model's placement.")).toBeVisible();
 });
 
 it('deletes a model from its page and returns to the list', async () => {
@@ -763,13 +764,13 @@ it('deletes a model from its page and returns to the list', async () => {
   await user.click(within(dialog).getByTestId('delete-modal-input'));
   await user.paste('Granite research endpoint');
   await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
-  expect(await screen.findByText('Model deployment deleted')).toBeVisible();
+  expect(await screen.findByText('Model deleted')).toBeVisible();
   expect(await screen.findByTestId('model-deployments-table')).not.toHaveTextContent('Granite research endpoint');
 });
 
 it('says when a model page has no model', async () => {
   renderAt('/models/nope', new MockConsoleService());
-  expect(await screen.findByText('Model deployment not found')).toBeVisible();
+  expect(await screen.findByText('Model not found')).toBeVisible();
 });
 
 it('loads only the one model on its page and its edit page', async () => {
@@ -954,7 +955,7 @@ describe('editing a model deployment', () => {
     await user.keyboard('{Escape}');
     await openStep(user, 'Review');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByText('Model deployment updated')).toBeVisible();
+    expect(await screen.findByText('Model updated')).toBeVisible();
     const [request] = update.mock.calls[0];
     expect(request.updateMask?.paths).toEqual(['spec.replicas', 'spec.placement']);
     expect(request.lock).toBe(true);
@@ -1016,24 +1017,25 @@ describe('editing a model deployment', () => {
     expect(annotations).toHaveProperty('openshift.io/description', 'new');
   });
 
-  it('shows the name tenants send read-only, as the model has it', async () => {
+  it('shows the name users send read-only, as the model has it', async () => {
     const service = new MockConsoleService();
     // A model written before the backend served models as their ids can keep another name.
     modelsOf(service).find('granite-3-8b').spec!.model!.name = 'example-org/granite-3-8b';
     const user = userEvent.setup();
     renderAt('/models/granite-3-8b/edit', service);
-    const served = await screen.findByRole('textbox', { name: 'Model name' });
+    const served = await screen.findByRole('textbox', { name: 'Model name in requests' });
     expect(served).toHaveValue('example-org/granite-3-8b');
     expect(served).toHaveAttribute('readonly');
     expect(
-      screen.getByText(/Tenants send this name as the model in their requests, and it can.t be changed here\./),
+      screen.getByText(/Users send this name as the model in their requests\. It cannot be edited\./),
     ).toBeInTheDocument();
     await openStep(user, 'Review');
-    expect(await screen.findByTestId('model-review')).toHaveTextContent('Model nameexample-org/granite-3-8b');
-    expect(screen.getByTestId('model-review')).not.toHaveTextContent('Name tenants call');
+    const review = await screen.findByTestId('model-review');
+    expect(review).toHaveTextContent('Model name in requestsexample-org/granite-3-8b');
+    expect(within(review).getAllByText('Model name in requests')).toHaveLength(1);
   });
 
-  it('says a model that still serves an older name fails tenant requests until any change is saved', async () => {
+  it("says a model that still serves an older name fails users' requests until any change is saved", async () => {
     const service = new MockConsoleService();
     const models = modelsOf(service);
     // Saved before the backend served models as their ids: it still serves its own name.
@@ -1045,7 +1047,7 @@ describe('editing a model deployment', () => {
     expect(alert).toHaveClass('pf-m-info');
     expect(within(alert).getByRole('heading', { name: /This model uses an older name/ })).toBeVisible();
     expect(alert).toHaveTextContent(
-      'Tenants request models by their ID, granite-3-8b, but this model still answers only to example-org/granite-3-8b, so tenant requests to it fail. Saving any change updates it to use its ID. The model is unavailable for a moment while it restarts.',
+      'Users request models by their ID, granite-3-8b, but this model still answers only to example-org/granite-3-8b, so their requests to it fail. Saving any change updates it to use its ID. The model is unavailable for a moment while it restarts.',
     );
     expect([...alert.querySelectorAll('code')].map((c) => c.textContent)).toEqual([
       'granite-3-8b',
@@ -1059,7 +1061,7 @@ describe('editing a model deployment', () => {
     await openStep(user, 'Review');
     expect(within(screen.getByTestId('model-review')).getByTestId('model-older-name')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
-    expect(await screen.findByText('Model deployment updated')).toBeVisible();
+    expect(await screen.findByText('Model updated')).toBeVisible();
     // The edit sends no served name: the backend switches the model to its id on any update.
     const [request] = update.mock.calls[0];
     expect(request.updateMask?.paths).toEqual(['metadata.annotations']);
@@ -1071,7 +1073,7 @@ describe('editing a model deployment', () => {
     const service = new MockConsoleService();
     const user = userEvent.setup();
     renderAt('/models/granite-3-8b/edit', service);
-    expect(await screen.findByRole('textbox', { name: 'Model name' })).toHaveValue('granite-3-8b');
+    expect(await screen.findByRole('textbox', { name: 'Model name in requests' })).toHaveValue('granite-3-8b');
     expect(screen.queryByTestId('model-older-name')).not.toBeInTheDocument();
     await openStep(user, 'Review');
     expect(await screen.findByTestId('model-review')).toBeVisible();
@@ -1116,7 +1118,7 @@ describe('editing a model deployment', () => {
     renderAt('/models/granite-3-8b/edit', service);
     await openStep(user, 'Locations');
     expect(await screen.findByRole('textbox', { name: 'Locations' })).toHaveAttribute('readonly');
-    expect(screen.getByText(/selects clusters by more than location/)).toBeVisible();
+    expect(screen.getByText(/uses rules other than location/)).toBeVisible();
     await openStep(user, 'Deployment');
     const replicas = screen.getByRole('spinbutton', { name: 'Replicas' });
     await user.clear(replicas);
@@ -1152,9 +1154,7 @@ describe('editing a model deployment', () => {
     // The edit's version, not the refetched one: the backend refuses it, and the page says so.
     expect(update.mock.calls[0][0].object?.metadata?.version).toBe(1);
     expect(
-      await screen.findByText(
-        'This model deployment changed since you opened it. Reload the page to edit the current version.',
-      ),
+      await screen.findByText('This model was changed by another user. Reload the page to edit the latest version.'),
     ).toBeVisible();
     act(() => focusManager.setFocused(undefined));
   });
@@ -1173,9 +1173,7 @@ describe('editing a model deployment', () => {
     await openStep(user, 'Review');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(
-      await screen.findByText(
-        'This model deployment changed since you opened it. Reload the page to edit the current version.',
-      ),
+      await screen.findByText('This model was changed by another user. Reload the page to edit the latest version.'),
     ).toBeVisible();
   });
 
@@ -1278,9 +1276,9 @@ it('shows the loading spinner until the models arrive, then the list in its plac
   renderAt('/models', service);
   const spinner = await screen.findByRole('progressbar', { name: 'Loading models' });
   expect(spinner.closest('.pf-v6-c-page__main-section')).toHaveClass('pf-m-fill');
-  expect(screen.queryByRole('grid', { name: 'Model deployments' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('grid', { name: 'Models' })).not.toBeInTheDocument();
   await act(async () => release.resolve());
-  expect(await screen.findByRole('grid', { name: 'Model deployments' })).toBeVisible();
+  expect(await screen.findByRole('grid', { name: 'Models' })).toBeVisible();
   expect(screen.queryByRole('progressbar', { name: 'Loading models' })).not.toBeInTheDocument();
 });
 
@@ -1352,7 +1350,7 @@ describe('each cluster of a placed model (status.clusters, proposal P13)', () =>
     for (const r of rows) expect(within(r).getByRole('button')).toBeInTheDocument();
   });
 
-  it('opens what a cluster reported, and offers Edit deployment', async () => {
+  it('opens what a cluster reported, and offers Edit model', async () => {
     const user = userEvent.setup();
     renderAt('/models', partial());
     await user.click(within(await rowOf('mistral-7b-instruct')).getByRole('button', { name: 'Details' }));
@@ -1363,7 +1361,7 @@ describe('each cluster of a placed model (status.clusters, proposal P13)', () =>
     expect(modal).toHaveTextContent('on cluster site2');
     expect(modal).toHaveTextContent('NotReady');
     expect(modal).toHaveTextContent('LLMInferenceService not ready');
-    await user.click(within(modal).getByRole('button', { name: 'Edit deployment' }));
+    await user.click(within(modal).getByRole('button', { name: 'Edit model' }));
     expect(await screen.findByRole('heading', { name: /^Edit / })).toBeVisible();
   });
 
@@ -1395,7 +1393,7 @@ describe('the Models list expands every row', () => {
     renderAt('/models', new MockConsoleService());
     await user.click(within(await rowOf('llama-3-70b')).getByRole('button', { name: 'Details' }));
     const empty = await screen.findByTestId('model-not-placed-llama-3-70b');
-    expect(within(empty).getByRole('heading', { name: 'Not placed on any cluster yet' })).toBeVisible();
+    expect(within(empty).getByRole('heading', { name: 'No locations' })).toBeVisible();
     await user.click(within(empty).getByRole('button', { name: 'Edit locations' }));
     expect(await screen.findByRole('heading', { name: /^Edit / })).toBeVisible();
   });
@@ -1407,7 +1405,7 @@ describe('the Models list expands every row', () => {
     renderAt('/models', service);
     await user.click(within(await rowOf('widget')).getByRole('button', { name: 'Details' }));
     const selected = await screen.findByTestId('model-selected-clusters-widget');
-    expect(selected).toHaveTextContent('No cluster has reported this model yet.');
+    expect(selected).toHaveTextContent('No cluster has reported a status for this model.');
     expect(
       within(selected)
         .getAllByTestId('model-selected-cluster-row')

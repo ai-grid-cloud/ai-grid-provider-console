@@ -126,7 +126,7 @@ it('onboards organization details then IdP, saves only after review and orders n
   const table = await screen.findByTestId('organizations-table');
   expect(table).toHaveTextContent('Enabled');
   expect(table).toHaveTextContent('tenant1.example.com');
-  expect(await screen.findByText('Organization and identity provider saved')).toBeVisible();
+  expect(await screen.findByText('Organization created')).toBeVisible();
   expect(service.organizations[0].identityProvider?.config.clientSecretSecret.name).toBe('tenant1-secret');
 });
 
@@ -146,7 +146,7 @@ it('opens an organization from the list and edits its identity provider', async 
   // Edit is the create wizard with every step open; the name can't change, so it's read-only.
   expect(await screen.findByRole('heading', { name: 'Edit tenant1' })).toBeVisible();
   expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAttribute('readonly');
-  expect(screen.getByText("The name can't be changed once the organization exists.")).toBeVisible();
+  expect(screen.getByText('The name cannot be edited after the organization is created.')).toBeVisible();
   // Nothing changed yet, so Review can't save.
   await openStep(user, 'Review');
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
@@ -155,7 +155,7 @@ it('opens an organization from the list and edits its identity provider', async 
   await user.clear(title);
   await user.paste('Updated SSO');
   await saveEdit(user);
-  expect(await screen.findByText('Organization configuration saved')).toBeVisible();
+  expect(await screen.findByText('Organization updated')).toBeVisible();
   expect(await screen.findByTestId('organization-configuration-details')).toHaveTextContent('Updated SSO');
 });
 
@@ -170,7 +170,7 @@ it('deletes an organization from its page after its name is typed', async () => 
   await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
   const modal = await screen.findByTestId('delete-organization-modal');
   expect(modal).toHaveTextContent('Delete organization?');
-  expect(modal).toHaveTextContent('Delete this organization and its saved identity provider configuration?');
+  expect(modal).toHaveTextContent('The organization and its identity provider configuration will be deleted.');
   await user.click(within(modal).getByTestId('delete-modal-input'));
   await user.paste('tenant1');
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
@@ -304,7 +304,9 @@ it('keeps input on conflict', async () => {
   await service.updateOrganization(existing.id, input, existing.resourceVersion);
   await saveEdit(user);
   // The PoC's message, not the backend's text.
-  expect(await screen.findByText('This organization changed. Reload it before saving or deleting.')).toBeVisible();
+  expect(
+    await screen.findByText('This organization was changed by another user. Reload the page, then try again.'),
+  ).toBeVisible();
   expect(screen.getByText('Unable to save organization')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
   await openStep(user, 'Identity provider');
@@ -316,7 +318,7 @@ it('keeps input on conflict', async () => {
 it('hides write actions until it knows the user is a provider admin', async () => {
   const service = unknownUser();
   const list = renderAt('/organizations', service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   const table = await screen.findByTestId('organizations-table');
   expect(within(table).getByRole('link', { name: 'acme-robotics' })).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Create organization' })).not.toBeInTheDocument();
@@ -325,7 +327,7 @@ it('hides write actions until it knows the user is a provider admin', async () =
   list.unmount();
 
   renderAt(`/organizations/${service.organizations[0].id}`, service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   expect(await screen.findByRole('heading', { name: 'acme-robotics' })).toBeInTheDocument();
   expect(screen.queryByTestId('organization-actions')).not.toBeInTheDocument();
 });
@@ -405,7 +407,7 @@ it('keeps the list under a warning when a reload fails', async () => {
 it('shows the not-available state when the backend cannot delete organizations yet', async () => {
   const service = new MockConsoleService();
   service.deleteOrganization = async () => {
-    throw new ServiceError(501, 'the AI Grid backend does not support this operation yet');
+    throw new ServiceError(501, 'The AI Grid backend does not support this operation.');
   };
   const user = userEvent.setup();
   renderAt('/organizations', service);
@@ -415,8 +417,10 @@ it('shows the not-available state when the backend cannot delete organizations y
   await user.click(within(modal).getByTestId('delete-modal-input'));
   await user.paste('initech-labs');
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
-  expect(await within(modal).findByText('Deleting organizations is not available on this backend yet.')).toBeVisible();
-  expect(within(modal).queryByText('the AI Grid backend does not support this operation yet')).not.toBeInTheDocument();
+  expect(
+    await within(modal).findByText('Deleting organizations is not available on this AI Grid backend.'),
+  ).toBeVisible();
+  expect(within(modal).queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
 });
 
 it('shows one pagination, in the toolbar, for a single page', async () => {
@@ -465,7 +469,7 @@ it('edit sends PATCH with domains, identity provider, and If-Match', async () =>
   await user.clear(domain);
   await user.paste('acme.example.net');
   await saveEdit(user);
-  expect(await screen.findByText('Organization configuration saved')).toBeVisible();
+  expect(await screen.findByText('Organization updated')).toBeVisible();
 
   const patch = fetchFn.mock.calls.find(([, init]) => init?.method === 'PATCH');
   expect(patch?.[0]).toBe(`/api/v1/tenants/${tenantJson.id}`);
@@ -507,7 +511,7 @@ it('leaves the create form out of history once the organization is created, so B
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
-  expect(await screen.findByText('Organization saved')).toBeVisible();
+  expect(await screen.findByText('Organization created')).toBeVisible();
   await act(async () => navigate(-1));
   expect(await screen.findByRole('heading', { level: 1, name: 'Clusters' })).toBeVisible();
 });
@@ -528,7 +532,7 @@ it('create without an identity provider sends none, and Review says so', async (
     'No identity provider is configured.',
   );
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
-  expect(await screen.findByText('Organization saved')).toBeVisible();
+  expect(await screen.findByText('Organization created')).toBeVisible();
   const post = fetchFn.mock.calls.find(([, init]) => init?.method === 'POST');
   expect(JSON.parse(String(post?.[1]?.body))).toEqual({ name: 'tenant1', domains: [] });
 });
@@ -620,7 +624,7 @@ it('locks the edit wizard while it saves', async () => {
   expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
   finish();
-  expect(await screen.findByText('Organization configuration saved')).toBeVisible();
+  expect(await screen.findByText('Organization updated')).toBeVisible();
 });
 
 it('moves an edit refused for a field to that field, once, and lets the user return to Review', async () => {
@@ -660,7 +664,9 @@ it('reloads an organization after a stale delete from its page, keeping the type
   service.organizations[0] = { ...organization, resourceVersion: String(Number(organization.resourceVersion) + 1) };
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
   expect(
-    await within(modal).findByText('This organization changed since you opened this dialog. Check it and try again.'),
+    await within(modal).findByText(
+      'This organization was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+    ),
   ).toBeVisible();
   expect(within(modal).getByTestId('delete-modal-input')).toHaveValue(organization.name);
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
@@ -700,7 +706,7 @@ it('keeps the delete dialog busy until the reloaded organization is in, and says
   };
   reloadSpy.mockRejectedValueOnce(new ServiceError(503, 'Service unavailable.'));
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
-  expect(await within(modal).findByText(/could not be loaded again: Service unavailable\./)).toBeVisible();
+  expect(await within(modal).findByText(/Unable to reload the latest version: Service unavailable\./)).toBeVisible();
   expect(within(modal).getByRole('button', { name: 'Delete' })).toBeEnabled();
 });
 

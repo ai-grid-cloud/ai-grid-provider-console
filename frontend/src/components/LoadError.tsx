@@ -7,7 +7,7 @@ import { NotFoundState, type NotFound } from './states/NotFoundState';
 export type { NotFound };
 
 type Props = {
-  /** The feature, plural, e.g. "Models": "Models are not available on this backend yet". */
+  /** The feature, plural, e.g. "Models": "Models are not available on this AI Grid backend". */
   subject: string;
   /** What failed to load, as the titles name it: "model" on a model's page; the subject in lower case without it. */
   object?: string;
@@ -43,12 +43,13 @@ export const LoadError: React.FC<Props> = ({ subject, object, error, onRetry, no
     return <NotFoundState {...notFound} />;
   }
   if (error instanceof ServiceError && error.isNotImplemented) {
-    return <NotAvailableState title={notAvailableTitle ?? `${subject} are not available on this backend yet`} />;
+    return <NotAvailableState title={notAvailableTitle ?? `${subject} are not available on this AI Grid backend`} />;
   }
   if (error instanceof ServiceError && error.status === 403) {
     return (
-      <FullPageState inPage title={`You don't have access to ${what}`}>
-        {error.message}
+      <FullPageState inPage title="Access permissions needed">
+        <p>{error.message}</p>
+        <p>To view {what}, ask your hub administrator for access.</p>
       </FullPageState>
     );
   }

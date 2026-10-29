@@ -90,7 +90,7 @@ const fillNewSubscription = async (user: User) => {
   const name = await screen.findByTestId('subscription-name-desc-name');
   await user.click(name);
   await user.paste('Test team');
-  await user.click(screen.getByRole('combobox', { name: 'Enter groups' }));
+  await user.click(screen.getByRole('combobox', { name: 'Groups' }));
   await user.paste('engineering');
   const option = await screen.findByRole('option', { name: 'Add group "engineering"' });
   await user.click(option.querySelector('button') ?? option);
@@ -131,7 +131,7 @@ describe('administrator subscription flows', () => {
     expect(policies).toHaveTextContent('Engineering policy');
     expect(policies).toHaveTextContent('Active');
     expect(policies).not.toHaveTextContent('Ready');
-    expect(within(details).getByText('Policies for its models')).toBeVisible();
+    expect(within(details).getByText('Authorization policies for its models')).toBeVisible();
     // The ref's limits, and its model's registration (model_registrations).
     expect(screen.getByTestId('subscription-models-table')).toHaveTextContent('100,000 / 1 hour');
     expect(screen.getByTestId('subscription-models-table')).toHaveTextContent('Ready');
@@ -313,7 +313,9 @@ describe('administrator subscription flows', () => {
 
     act(() => fail(new ConnectError('backend down', Code.Unavailable)));
     expect(await screen.findByTestId('subscriptions-models-unavailable')).toHaveTextContent('Unable to load models');
-    expect(screen.getByTestId('expanded-subscription-model-locations')).toHaveTextContent('Unavailable');
+    expect(screen.getByTestId('expanded-subscription-model-locations')).toHaveTextContent(/^—$/);
+    await user.hover(within(screen.getByTestId('expanded-subscription-model-locations')).getByText('—'));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Unable to load models.');
     // The ref's own name still filters.
     await user.click(screen.getByTestId('subscriptions-filter-attribute'));
     await user.click(await screen.findByRole('option', { name: 'Model' }));
@@ -332,7 +334,7 @@ describe('administrator subscription flows', () => {
     await pickOrganization(user, 'acme-robotics');
     await user.click(screen.getByTestId('subscription-name-desc-name'));
     await user.paste('Test team');
-    await user.click(screen.getByRole('combobox', { name: 'Enter groups' }));
+    await user.click(screen.getByRole('combobox', { name: 'Groups' }));
     await user.paste('engineering');
     const option = await screen.findByRole('option', { name: 'Add group "engineering"' });
     await user.click(option.querySelector('button') ?? option);
@@ -469,7 +471,7 @@ describe('administrator subscription flows', () => {
     };
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByTestId('stale-data-alert')).toHaveTextContent(
-      'Showing the last loaded subscriptionsthe AI Grid backend is unavailable; try again',
+      'Showing the last loaded subscriptionsThe AI Grid backend is unavailable. Try again.',
     );
     expect(screen.getByRole('link', { name: 'Engineering' })).toBeVisible();
   });
@@ -481,7 +483,7 @@ describe('administrator subscription flows', () => {
     renderAt('/subscriptions', service);
     expect(await screen.findByRole('heading', { name: 'Unable to load subscriptions' })).toBeVisible();
     // A server-side failure shows the console's words, not the backend's (describeError).
-    expect(screen.getByTestId('error-state')).toHaveTextContent('the AI Grid backend failed to process the request');
+    expect(screen.getByTestId('error-state')).toHaveTextContent('The AI Grid backend failed to process the request.');
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByTestId('subscriptions-table')).toBeVisible();
   });
@@ -577,7 +579,7 @@ it('requires an organization and shows it in the table', async () => {
 it('hides write actions until it knows the user is a provider admin', async () => {
   const service = unknownUser();
   const { unmount } = renderAt('/subscriptions', service);
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   const table = await screen.findByTestId('subscriptions-table');
   expect(within(table).getByRole('link', { name: 'Engineering' })).toBeVisible();
   expect(screen.queryByRole('link', { name: 'Create subscription' })).not.toBeInTheDocument();
@@ -588,7 +590,7 @@ it('hides write actions until it knows the user is a provider admin', async () =
 
   renderAt('/subscriptions/view/engineering', service);
   await screen.findByTestId('subscription-details-section');
-  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('User could not be loaded'));
+  await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('Unable to load user'));
   expect(screen.queryByTestId('subscription-actions-toggle')).not.toBeInTheDocument();
 });
 
@@ -596,7 +598,7 @@ it('shows the not-available state when the backend has no subscriptions yet', as
   const service = seeded();
   failNext(service, 'list', new ConnectError('unimplemented', Code.Unimplemented));
   renderAt('/subscriptions', service);
-  expect(await screen.findByText('Subscriptions are not available on this backend yet')).toBeVisible();
+  expect(await screen.findByText('Subscriptions are not available on this AI Grid backend')).toBeVisible();
   expect(screen.queryByTestId('subscriptions-table')).not.toBeInTheDocument();
 });
 
@@ -608,7 +610,7 @@ it('says creating is not available on a backend without subscriptions', async ()
   await fillNewSubscription(user);
   await pickOrganization(user, 'acme-robotics');
   await user.click(screen.getByTestId('create-subscription-button'));
-  expect(await screen.findByText('Creating subscriptions is not available on this backend yet.')).toBeVisible();
+  expect(await screen.findByText('Creating subscriptions is not available on this AI Grid backend.')).toBeVisible();
   expect(screen.getByText('Unable to create subscription')).toBeVisible();
 });
 
@@ -876,7 +878,7 @@ it('hints that a new model needs a token limit, and labels the limit fields', as
   expect(hint).not.toHaveClass('pf-m-error');
   await user.click(screen.getByTestId('add-token-limit-0'));
   expect(screen.getByRole('dialog', { name: 'Edit token limits' })).toHaveTextContent(
-    /^Edit token limitsLimit how many tokens each member of this subscription can use with/,
+    /^Edit token limitsLimit how many tokens each user in this subscription's groups can use with/,
   );
   expect(screen.getByRole('spinbutton', { name: 'Tokens' })).toHaveValue(1000);
   expect(screen.getByRole('spinbutton', { name: 'Per' })).toHaveValue(1);
@@ -924,7 +926,9 @@ it('reloads a subscription after a stale delete, keeping the typed name, so a re
   stored(service, 'engineering').metadata!.version += 1;
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
   expect(
-    await within(modal).findByText('This subscription changed since you opened this dialog. Check it and try again.'),
+    await within(modal).findByText(
+      'This subscription was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+    ),
   ).toBeVisible();
   expect(within(modal).getByTestId('delete-modal-input')).toHaveValue('Engineering');
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
@@ -964,7 +968,9 @@ it('keeps the delete dialog busy until the reloaded version is in, and says when
   };
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
   expect(
-    await within(modal).findByText(/could not be loaded again: the AI Grid backend is unavailable; try again/),
+    await within(modal).findByText(
+      /Unable to reload the latest version: The AI Grid backend is unavailable. Try again./,
+    ),
   ).toBeVisible();
   expect(within(modal).getByRole('button', { name: 'Delete' })).toBeEnabled();
 });
@@ -1002,7 +1008,7 @@ it('shows a window the form cannot read as it is, and saves it only once a new t
   const dialog = screen.getByRole('dialog', { name: 'Edit token limits' });
   const readable = within(dialog).getByTestId('edit-token-limit-0');
   const unreadable = within(dialog).getByTestId('edit-token-limit-1');
-  const message = 'Saved as "2d", which MaaS doesn\'t accept. Enter a time from 1 to 9999.';
+  const message = 'The saved value "2d" is not valid. Enter a time from 1 to 9,999.';
   // From the moment the dialog opens, the row with "2d" warns, with its time empty; the other row says nothing.
   expect(within(readable).getByRole('spinbutton', { name: 'Per' })).toHaveValue(1);
   expect(within(readable).getByTestId('edit-token-limit-0-helper-text')).toHaveTextContent(/^$/);
@@ -1050,7 +1056,7 @@ it('refuses a token limit window over 8784 hours as it is typed, and takes 8784'
   await user.type(time, '8785');
   expect(time).toBeInvalid();
   expect(within(row).getByTestId('edit-token-limit-0-helper-text')).toHaveTextContent(
-    'At most 8784 hours (366 days): error status;',
+    'Enter at most 8,784 hours (366 days).: error status;',
     { normalizeWhitespace: false },
   );
   expect(within(dialog).getByTestId('save-rate-limits')).toBeDisabled();

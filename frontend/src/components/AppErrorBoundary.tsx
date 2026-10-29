@@ -31,9 +31,9 @@ export class AppErrorBoundary extends Component<Props, State> {
       <main className="pf-v6-l-bullseye pf-v6-u-h-100vh">
         <div className="pf-v6-c-empty-state">
           <div className="pf-v6-c-empty-state__content">
-            <h1 className="pf-v6-c-empty-state__title-text">The console ran into a problem</h1>
+            <h1 className="pf-v6-c-empty-state__title-text">Unable to display the console</h1>
             <div className="pf-v6-c-empty-state__body">
-              Something in the console failed, so it can&apos;t show anything. Reload to start it again.
+              Reload the page. If the problem continues, contact your hub administrator.
             </div>
             <div className="pf-v6-c-empty-state__footer">
               <div className="pf-v6-c-empty-state__actions">

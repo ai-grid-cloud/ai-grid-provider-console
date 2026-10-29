@@ -6,7 +6,7 @@ import type { ClusterView } from './clusterView';
  */
 export class ClusterChangedError extends Error {
   constructor(readonly current?: ClusterView) {
-    super('The cluster changed since the dialog loaded it.');
+    super('The cluster was changed after this dialog opened.');
     this.name = 'ClusterChangedError';
   }
 }

@@ -14,12 +14,12 @@ import { ORGANIZATION_CHANGED, currentServerErrors, emptyOrganizationInput, erro
 
 const saveErrorMessage = (err: unknown, editing: boolean) => {
   if (err instanceof ServiceError && err.isNotImplemented) {
-    return 'Saving organizations is not available on this backend yet.';
+    return 'Saving organizations is not available on this AI Grid backend.';
   }
   if (editing && err instanceof ServiceError && err.status === 409) {
     return ORGANIZATION_CHANGED;
   }
-  return err instanceof Error ? err.message : 'The organization could not be saved.';
+  return err instanceof Error ? err.message : 'Unable to save the organization.';
 };
 
 /** The form always holds an identity provider; a blank one is left out on save. */
@@ -77,11 +77,7 @@ export const useOrganizationForm = (service: OrganizationsService, initial?: Org
       navigate(initial ? `/organizations/${encodeURIComponent(initial.id)}` : '/organizations', {
         replace: !initial,
         state: {
-          notice: initial
-            ? 'Organization configuration saved'
-            : idpBlank
-              ? 'Organization saved'
-              : 'Organization and identity provider saved',
+          notice: initial ? 'Organization updated' : 'Organization created',
         },
       });
     } catch (err) {

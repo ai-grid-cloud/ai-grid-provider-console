@@ -8,10 +8,10 @@ import { useModelWrites } from './useModels';
 
 const deleteErrorOf = (err: unknown) =>
   err instanceof ServiceError && err.isNotImplemented
-    ? new Error('Deleting models is not available on this backend yet.')
+    ? new Error('Deleting models is not available on this AI Grid backend.')
     : err instanceof Error
       ? err
-      : new Error('The deployment could not be deleted.');
+      : new Error('Unable to delete the model.');
 
 /**
  * Deleting a model deployment, the same from its list row and its page: returns `confirmDelete`
@@ -66,7 +66,7 @@ export const useDeleteModel = ({
 
   const modal = selected && (
     <DeleteModal
-      title="Delete model deployment?"
+      title="Delete model?"
       deleteName={titleOf(selected)}
       onClose={() => {
         if (!deleting) {
@@ -81,12 +81,12 @@ export const useDeleteModel = ({
       testId="delete-deployment-modal"
       // Only a guide: while the subscriptions load, or if they fail to, Delete stays enabled. The
       // backend refuses to delete a model a subscription uses, and stays the authority.
-      disabledReason={inUse ? 'Remove this model from its subscriptions first' : undefined}
+      disabledReason={inUse ? 'Remove this model from its subscriptions first.' : undefined}
     >
       <Stack hasGutter>
         <p>
-          Delete this model, its saved deployment, and its location placement resources? Remove references from
-          subscriptions and authorization policies first.
+          The model is removed from every location it is deployed to. Remove it from any subscriptions and authorization
+          policies first.
         </p>
         <ReferencingSubscriptions modelId={selected.id} onInUse={setInUse} />
       </Stack>

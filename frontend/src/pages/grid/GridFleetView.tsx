@@ -200,7 +200,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
       </Flex>
     ) : (
       <SubtleText>
-        {model.selectedClusters.length ? 'None of its clusters is in AI Grid.' : 'No clusters yet.'}
+        {model.selectedClusters.length ? 'No AI Grid clusters selected.' : 'No clusters selected.'}
       </SubtleText>
     );
   };
@@ -221,7 +221,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
         ))}
       </Flex>
     ) : (
-      <SubtleText>{modelsError ? 'Model assignments unavailable.' : 'No models on this cluster.'}</SubtleText>
+      <SubtleText>{modelsError ? 'Unable to load models.' : 'No models on this cluster.'}</SubtleText>
     );
   };
 
@@ -250,14 +250,14 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
       <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
         <FlexItem grow={{ default: 'grow' }}>
           <SearchInput
-            aria-label={`Filter grid ${objects}`}
+            aria-label={`Filter ${objects}`}
             placeholder="Filter by name"
             value={search}
             onChange={(_, value) => setSearch(value)}
             onClear={() => setSearch('')}
           />
         </FlexItem>
-        <ToggleGroup aria-label="Grid object type" isCompact>
+        <ToggleGroup aria-label="Show" isCompact>
           {(['cluster', 'model'] as const).map((value) => (
             <ToggleGroupItem
               key={value}
@@ -282,7 +282,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
           aria-label="Site and cluster"
           items={[
             { term: 'Site', value: cluster.siteName ?? cluster.site },
-            { term: 'Site identifier', value: cluster.site },
+            { term: 'Site ID', value: cluster.site },
             { term: 'Region', value: cluster.region },
             { term: 'Location', value: cluster.location },
             {
@@ -299,7 +299,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
                 </>
               ) : undefined,
             },
-            { term: 'Position problem', value: cluster.locationProblem },
+            { term: 'Position error', value: cluster.locationProblem },
             { term: 'Provisioning', value: <StatusLabel isCompact status={cluster.provisioningStatus} /> },
           ]}
         />
@@ -308,11 +308,11 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
         title="Models on this cluster"
         headingLevel="h3"
         count={modelsAt(cluster).length}
-        help="The models whose placement chose this cluster. A model listed here may still be starting."
+        help="Models deployed to this cluster. A model listed here might still be starting."
       >
         {modelLinks(cluster)}
       </DetailsSection>
-      <Link to="/clusters">View in Clusters</Link>
+      <Link to="/clusters">View cluster details</Link>
     </Stack>
   );
 
@@ -334,15 +334,15 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
         title="Sites and clusters"
         headingLevel="h3"
         count={clustersOf(model).length}
-        help="The AI Grid clusters this model's placement chose. They are where it should run, not proof that it is serving there."
+        help="The AI Grid clusters selected for this model. Being listed here does not confirm that the model is serving on the cluster."
       >
         {clusterLinks(model)}
       </DetailsSection>
-      <Link to={modelPath(model)}>View model</Link>
+      <Link to={modelPath(model)}>View model details</Link>
     </Stack>
   );
 
-  const noResults = <NoResultsState body={`Change the filter to see more ${objects}.`} onClear={clearFilters} />;
+  const noResults = <NoResultsState body="Adjust your filters and try again." onClear={clearFilters} />;
 
   // Not on the map: no position (no annotations, no known cloud region), or annotations to fix.
   const notOnMap = clusters.filter((c) => !hasCoordinates(c));
@@ -411,13 +411,13 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
       </Stack>
       {mode === 'cluster' && notOnMap.length > 0 && (
         <SubtleText>
-          {notOnMap.length} {notOnMap.length === 1 ? "cluster isn't" : "clusters aren't"} on the map:{' '}
+          {notOnMap.length} {notOnMap.length === 1 ? 'cluster is not' : 'clusters are not'} on the map:{' '}
           {[
             withoutPosition && `${withoutPosition} without a position`,
-            withProblem && `${withProblem} with coordinate annotations to fix`,
+            withProblem && `${withProblem} with an invalid position`,
           ]
             .filter(Boolean)
-            .join(', ')}
+            .join(' and ')}
           .{' '}
           <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
             How to set a cluster&apos;s position
@@ -463,7 +463,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
 
   return (
     <Stack hasGutter>
-      <Grid hasGutter md={4} role="region" aria-label="Fleet summary">
+      <Grid hasGutter md={4} role="region" aria-label="AI Grid summary">
         {summary.map(([label, value, detail]) => (
           <StatCard key={label} label={label} value={value} detail={detail} />
         ))}

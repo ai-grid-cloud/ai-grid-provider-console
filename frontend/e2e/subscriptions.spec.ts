@@ -20,7 +20,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     await page.getByRole('textbox', { name: 'Name', exact: true }).fill(unique);
     await page.getByRole('combobox', { name: 'Organization' }).click();
     await page.getByRole('option', { name: ORGANIZATION }).click();
-    await page.getByRole('combobox', { name: 'Enter groups' }).fill(group);
+    await page.getByRole('combobox', { name: 'Groups' }).fill(group);
     await page.getByRole('option', { name: `Add group "${group}"` }).click();
     await page.keyboard.press('Escape');
 

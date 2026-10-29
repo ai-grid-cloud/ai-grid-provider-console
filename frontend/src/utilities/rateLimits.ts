@@ -79,7 +79,7 @@ export const toRateLimit = (trl: TokenLimit): RateLimit => {
 /** Names a limit's saved window that the form could not read, while its time is not valid yet. */
 export const getSavedWindowMessage = (limit: RateLimit): string | undefined =>
   limit.savedWindow !== undefined && getTimeError(limit) !== undefined
-    ? `Saved as "${limit.savedWindow}", which MaaS doesn't accept. Enter a time from 1 to 9999.`
+    ? `The saved value "${limit.savedWindow}" is not valid. Enter a time from 1 to 9,999.`
     : undefined;
 
 /** Converts the UI's RateLimit form back to a TokenLimit. */
@@ -117,21 +117,21 @@ export const rateLimitSchema = z.object({
   count: z
     .number()
     .int()
-    .min(1, 'Token count must be greater than 0')
-    .max(MAX_VALUE, 'Token count exceeds maximum allowed value'),
+    .min(1, 'Enter a number of at least 1.')
+    .max(MAX_VALUE, `Enter at most ${MAX_VALUE.toLocaleString('en-US')} tokens.`),
   time: z
     .number()
     .int()
-    .min(1, 'Time value must be greater than 0')
-    .max(MAX_WINDOW_VALUE, 'Time value exceeds maximum allowed value'),
+    .min(1, 'Enter a time of at least 1.')
+    .max(MAX_WINDOW_VALUE, `Enter a time of at most ${MAX_WINDOW_VALUE.toLocaleString('en-US')}.`),
   unit: z.enum(['hour', 'minute', 'second']),
 });
 
-export const rateLimitsSchema = z.array(rateLimitSchema).min(1, 'At least one token rate limit is required');
+export const rateLimitsSchema = z.array(rateLimitSchema).min(1, 'Add at least one token limit.');
 
 export const getCountError = (limit: RateLimit): string | undefined => {
   if (Number.isNaN(limit.count)) {
-    return 'Token count is required';
+    return 'Required.';
   }
   const result = rateLimitSchema.shape.count.safeParse(limit.count);
   return result.success ? undefined : result.error.issues[0].message;
@@ -139,17 +139,20 @@ export const getCountError = (limit: RateLimit): string | undefined => {
 
 export const getTimeError = (limit: RateLimit): string | undefined => {
   if (Number.isNaN(limit.time)) {
-    return 'Time value is required';
+    return 'Required.';
   }
   const result = rateLimitSchema.shape.time.safeParse(limit.time);
   return result.success ? undefined : result.error.issues[0].message;
 };
 
 export const getCountDigitError = (limit: RateLimit): string | undefined =>
-  exceedsTokenLimit(limit.count) ? 'Token count exceeds maximum allowed value' : undefined;
+  exceedsTokenLimit(limit.count) ? `Enter at most ${MAX_VALUE.toLocaleString('en-US')} tokens.` : undefined;
 
 /** The time's too-large error, shown as soon as it is typed: over 8784 hours, or over 4 digits. */
 export const getTimeDigitError = (limit: RateLimit): string | undefined => {
-  if (exceedsMaxWindowHours(limit)) return `At most ${MAX_WINDOW_HOURS} hours (366 days)`;
-  return exceedsWindowLimit(limit.time) ? 'Time value exceeds maximum allowed value' : undefined;
+  if (exceedsMaxWindowHours(limit))
+    return `Enter at most ${MAX_WINDOW_HOURS.toLocaleString('en-US')} hours (366 days).`;
+  return exceedsWindowLimit(limit.time)
+    ? `Enter a time of at most ${MAX_WINDOW_VALUE.toLocaleString('en-US')}.`
+    : undefined;
 };

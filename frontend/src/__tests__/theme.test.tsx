@@ -143,7 +143,7 @@ it('shows each choice’s tooltip on keyboard focus', async () => {
   renderAt('/clusters', new MockConsoleService());
   await screen.findByRole('row', { name: /^site1 / });
   act(() => within(toggle()).getByRole('button', { name: 'System theme' }).focus());
-  expect(await screen.findByText("System: the operating system's setting")).toBeInTheDocument();
+  expect(await screen.findByText('System default')).toBeInTheDocument();
   await user.keyboard('{Escape}');
 });
 

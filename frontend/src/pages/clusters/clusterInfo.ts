@@ -7,9 +7,11 @@ export const statusReason = (c: ClusterView) => [c.state, c.statusMessage].filte
 /** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */
 export const cannotAddReason = (c: ClusterView) => {
   if (c.state === 'Not accepted') {
-    return "The hub hasn't accepted this cluster yet. Accept it in ACM, then add it to AI Grid.";
+    return 'The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.';
   }
-  return c.state ? `The hub can add this cluster to AI Grid once it has imported it (now: ${c.state}).` : undefined;
+  return c.state
+    ? `This cluster can be added to AI Grid after the hub imports it. Current state: ${c.state}.`
+    : undefined;
 };
 
 /**

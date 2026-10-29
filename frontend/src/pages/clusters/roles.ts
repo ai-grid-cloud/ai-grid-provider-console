@@ -1,18 +1,23 @@
 import type { ClusterRole } from '../../api/clusters';
 
 /**
- * The roles a member can have, as Add to AI Grid offers them and the Clusters table shows them. The
- * clusters tenants send their requests to are MaaS clusters in AI Grid's setup docs; the label
- * value stays `ingress`, which the hub's Placements select on.
+ * The AI Grid roles a cluster can have, as Add to AI Grid offers them and the Clusters pages show
+ * them (GLOSSARY.md, "Ingress", "Inference" and "Combined"). A role says what the cluster does in
+ * AI Grid; MaaS and KServe are the tools it does it with. The value is the cluster's
+ * `ai-grid/role` label, which the hub's Placements select on.
  */
 export const clusterRoles: { value: ClusterRole; label: string; description: string }[] = [
-  { value: 'combined', label: 'Combined', description: 'A MaaS (ingress) cluster that also serves models.' },
   {
     value: 'ingress',
-    label: 'MaaS (ingress)',
-    description: 'Where tenants send their requests: runs MaaS and routes them to inference clusters.',
+    label: 'Ingress',
+    description: "Receives requests from organizations' users through MaaS and routes them to inference clusters.",
   },
-  { value: 'inference', label: 'Inference', description: 'Serves models behind a MaaS (ingress) cluster.' },
+  {
+    value: 'inference',
+    label: 'Inference',
+    description: 'Serves models with KServe. Requests reach it through an ingress cluster.',
+  },
+  { value: 'combined', label: 'Combined', description: 'Does both: receives requests through MaaS and serves models.' },
 ];
 
 /** The cluster's `ai-grid/role` label when it's one of the roles above. */

@@ -91,7 +91,7 @@ export const SubscriptionsTable: React.FC<Props> = ({
               <Tbody>
                 <TableEmptyRow
                   colSpan={columns.length + (canWrite ? 1 : 0)}
-                  body="Change the filter to see more subscriptions."
+                  body="Adjust your filters and try again."
                   onClear={onClearFilters}
                 />
               </Tbody>

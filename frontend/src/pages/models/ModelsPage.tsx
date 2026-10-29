@@ -65,7 +65,7 @@ export const ModelsPage: React.FC = () => {
     refresh: () => void refresh(),
     onDeleted: () => {
       // Replace, so the notice doesn't add a second Models entry to the browser's history.
-      void navigate('.', { replace: true, state: { notice: 'Model deployment deleted' } });
+      void navigate('.', { replace: true, state: { notice: 'Model deleted' } });
     },
   });
 
@@ -116,7 +116,7 @@ export const ModelsPage: React.FC = () => {
         }
       >
         {(pageRows) => (
-          <Table aria-label="Model deployments" isExpandable data-testid="model-deployments-table">
+          <Table aria-label="Models" isExpandable data-testid="model-deployments-table">
             <Thead>
               <Tr>
                 <Th screenReaderText="Show locations" />
@@ -240,7 +240,7 @@ export const ModelsPage: React.FC = () => {
     <>
       <PageStateSection
         title="Models"
-        description="Add and remove model deployments."
+        description="Deploy models to AI Grid locations and check their status."
         loaded={loaded}
         error={error}
         onRetry={() => void refresh()}

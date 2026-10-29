@@ -6,12 +6,14 @@ import { DeleteModal } from '../../components/DeleteModal';
 
 const deleteError = (err: unknown) =>
   err instanceof ServiceError && err.isNotImplemented
-    ? new Error('Deleting organizations is not available on this backend yet.')
+    ? new Error('Deleting organizations is not available on this AI Grid backend.')
     : err instanceof ServiceError && err.isConflict
-      ? new Error('This organization changed since you opened this dialog. Check it and try again.')
+      ? new Error(
+          'This organization was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+        )
       : err instanceof Error
         ? err
-        : new Error('The organization could not be deleted.');
+        : new Error('Unable to delete the organization.');
 
 /**
  * Deleting an organization, the same from its list row and its page: returns `confirmDelete`,
@@ -74,7 +76,7 @@ export const useDeleteOrganization = (
       onDelete={() => void remove()}
       testId="delete-organization-modal"
     >
-      <p>Delete this organization and its saved identity provider configuration?</p>
+      <p>The organization and its identity provider configuration will be deleted.</p>
     </DeleteModal>
   );
 

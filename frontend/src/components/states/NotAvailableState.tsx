@@ -2,7 +2,7 @@ import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { WrenchIcon } from '@patternfly/react-icons';
 
 type Props = {
-  /** e.g. "Models are not available on this backend yet". */
+  /** e.g. "Models are not available on this AI Grid backend". */
   title: string;
 };
 
@@ -14,8 +14,7 @@ type Props = {
 export const NotAvailableState: React.FC<Props> = ({ title }) => (
   <EmptyState variant="lg" titleText={title} headingLevel="h2" icon={WrenchIcon} data-testid="not-available-state">
     <EmptyStateBody>
-      The AI Grid backend this console talks to doesn&apos;t implement this yet. The page works without changes once it
-      does.
+      This AI Grid backend does not support this feature. The page becomes available when the backend supports it.
     </EmptyStateBody>
   </EmptyState>
 );

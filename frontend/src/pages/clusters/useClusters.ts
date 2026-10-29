@@ -102,7 +102,7 @@ const writeLabels = async (
     throw toServiceError(err);
   }
   if (!object) {
-    throw new Error('The Hub did not confirm the change. Refresh and try again.');
+    throw new Error('The hub did not confirm the change. Refresh the page and try again.');
   }
   return toClusterView(object);
 };

@@ -20,12 +20,12 @@ type Props = {
 
 /** Shown instead of the pages, and their navigation, once a call has answered 401: no page is left to show. */
 export const SessionEnded: React.FC<Props> = ({ state, onTryAgain, onReload }) => {
-  useDocumentTitle(state === 'redirecting' || state === 'checking' ? 'Signing you in again' : 'Session ended');
+  useDocumentTitle(state === 'redirecting' || state === 'checking' ? 'Logging you in' : 'Session ended');
   if (state === 'checking') {
-    return <PageLoading label="Signing you in again" />;
+    return <PageLoading label="Logging you in" />;
   }
   if (state === 'redirecting') {
-    return <FullPageState title="Signing you in again…" icon={Spinner} />;
+    return <FullPageState title="Logging you in" icon={Spinner} />;
   }
   return (
     <FullPageState
@@ -34,7 +34,7 @@ export const SessionEnded: React.FC<Props> = ({ state, onTryAgain, onReload }) =
         <>
           {state !== 'fake' && (
             <Button variant="primary" onClick={onTryAgain}>
-              Try again
+              Log in
             </Button>
           )}
           {(state === 'fake' || state === 'unknown') && (
@@ -48,8 +48,8 @@ export const SessionEnded: React.FC<Props> = ({ state, onTryAgain, onReload }) =
       {state === 'fake'
         ? "The fake backend has no login, so the console can't sign you in again. Reload to try again with the token the dev server sends."
         : state === 'unknown'
-          ? "The console can't load or save anything with your current session, and couldn't load its settings to know how to sign you in again. Try again to log in again, or reload the console; if you end up back here, ask a hub administrator to check your access."
-          : "The console can't load or save anything with your current session. Try again to log in again; if you end up back here, ask a hub administrator to check your access."}
+          ? 'Your session is no longer valid, and the login settings could not be loaded. Log in again, or reload the page. If this page appears again, ask your hub administrator to check your access.'
+          : 'Your session is no longer valid. To continue, log in again. If this page appears again, ask your hub administrator to check your access.'}
     </FullPageState>
   );
 };

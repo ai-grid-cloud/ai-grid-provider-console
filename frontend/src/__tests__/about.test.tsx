@@ -61,12 +61,12 @@ describe('the config rows', () => {
 
   it('say Loading while the config loads', () => {
     renderAbout({ user: admin });
-    for (const label of rows) expect(row(label)).toHaveTextContent(/^Loading…$/);
+    for (const label of rows) expect(row(label)).toHaveTextContent(/^Loading$/);
   });
 
-  it("say Couldn't load when the config failed", () => {
+  it('say Unable to load when the config failed', () => {
     renderAbout({ configError: new ServiceError(502, 'bad gateway'), user: admin });
-    for (const label of rows) expect(row(label)).toHaveTextContent(/^Couldn't load$/);
+    for (const label of rows) expect(row(label)).toHaveTextContent(/^Unable to load$/);
   });
 
   it('say what the console talks to', async () => {
@@ -89,25 +89,25 @@ describe('the config rows', () => {
 describe('the user rows', () => {
   it('show the username and email, and a provider admin', () => {
     renderAbout({ user: admin });
-    expect(row('Signed in as')).toHaveTextContent(/^dev-user \(dev@example.com\)$/);
-    expect(row('Access')).toHaveTextContent(/^Provider admin \(may change managed clusters on this hub\)$/);
+    expect(row('Logged in as')).toHaveTextContent(/^dev-user \(dev@example.com\)$/);
+    expect(row('Access')).toHaveTextContent(/^Provider admin$/);
   });
 
   it('show a user without an email, who is not a provider admin', () => {
     renderAbout({ user: { username: 'viewer', groups: [], isProviderAdmin: false } });
-    expect(row('Signed in as')).toHaveTextContent(/^viewer$/);
+    expect(row('Logged in as')).toHaveTextContent(/^viewer$/);
     expect(row('Access')).toHaveTextContent(/^Not a provider admin$/);
   });
 
   it('say Loading while the user loads', () => {
     renderAbout({});
-    expect(row('Signed in as')).toHaveTextContent(/^Loading…$/);
-    expect(row('Access')).toHaveTextContent(/^Loading…$/);
+    expect(row('Logged in as')).toHaveTextContent(/^Loading$/);
+    expect(row('Access')).toHaveTextContent(/^Loading$/);
   });
 
-  it("say Couldn't load when the user failed", () => {
+  it('say Unable to load when the user failed', () => {
     renderAbout({ userError: new ServiceError(500, 'unavailable') });
-    expect(row('Signed in as')).toHaveTextContent(/^Couldn't load$/);
-    expect(row('Access')).toHaveTextContent(/^Couldn't load$/);
+    expect(row('Logged in as')).toHaveTextContent(/^Unable to load$/);
+    expect(row('Access')).toHaveTextContent(/^Unable to load$/);
   });
 });

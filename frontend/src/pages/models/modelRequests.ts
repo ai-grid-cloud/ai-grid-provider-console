@@ -62,7 +62,7 @@ export const createRequestOf = (input: ModelInput): MessageInitShape<typeof Mode
         },
       },
       spec: {
-        // No served name: the backend serves a model as its id, the name tenants send
+        // No served name: the backend serves a model as its id, the name users send
         // (ModelSource.name defaults to the id).
         model: { uri: input.modelUri },
         replicas: input.replicas,

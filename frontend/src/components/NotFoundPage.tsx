@@ -10,7 +10,7 @@ export const NotFoundPage: React.FC = () => {
       <NotFoundState
         what="Page"
         headingLevel="h1"
-        body="There's no page at this address. Check it, or go to AI Grid, the console's home."
+        body="Check the address, or go to the AI Grid page."
         listPath="/ai-grid"
         listLabel="AI Grid"
       />

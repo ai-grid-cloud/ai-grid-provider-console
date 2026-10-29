@@ -228,7 +228,7 @@ export const GridFleetMap: React.FC<Props> = ({ clusters, selected, onSelect, ti
       <div ref={container} className="fleet-map__leaflet" role="region" aria-label="AI Grid map of clusters" />
       {(tileError || (outlineError && tileUrl === '')) && (
         <p className="fleet-map__overlay fleet-map__overlay--notice">
-          {tileError ? 'Basemap tiles unavailable' : 'No basemap configured'}. Cluster pins and the cluster list remain
+          {tileError ? 'Unable to load the map' : 'No map is configured'}. Cluster pins and the cluster list are still
           available.
         </p>
       )}
@@ -239,7 +239,7 @@ export const GridFleetMap: React.FC<Props> = ({ clusters, selected, onSelect, ti
       )}
       <Flex
         component="ul"
-        aria-label="Pin colours"
+        aria-label="Pin colors"
         className="fleet-map__overlay fleet-map__overlay--legend"
         spaceItems={{ default: 'spaceItemsMd' }}
       >

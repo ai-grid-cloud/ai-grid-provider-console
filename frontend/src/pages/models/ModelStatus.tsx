@@ -15,7 +15,7 @@ export const ModelStatusDetails: React.FC<{ model: ModelView }> = ({ model }) =>
   }
   return (
     <Stack hasGutter>
-      <p>{known?.summary ?? 'The controller couldn’t deploy this model.'}</p>
+      <p>{known?.summary ?? 'Unable to deploy this model.'}</p>
       {known && <p>{known.next}</p>}
       <ExpandableSection toggleText="Details">
         <code className="pf-v6-u-font-size-sm pf-v6-u-text-break-word">

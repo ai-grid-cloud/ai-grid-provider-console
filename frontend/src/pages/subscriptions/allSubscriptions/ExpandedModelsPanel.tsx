@@ -4,7 +4,7 @@
 // The console adds the Locations column (where the model's placement put it), as the org admin's
 // view shows regions, named and styled as the Models page names them, and moves the model's
 // description into a popover by its name.
-import { Button, Flex, Label, LabelGroup, Popover, Skeleton } from '@patternfly/react-core';
+import { Button, Flex, Label, LabelGroup, Popover, Skeleton, Tooltip } from '@patternfly/react-core';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { TableRowTitleDescription } from '../../../components/TableRowTitleDescription';
@@ -40,7 +40,11 @@ const locationsCell = (
     return <Skeleton width="6rem" screenreaderText="Loading locations" />;
   }
   if (modelsState === 'failed') {
-    return 'Unavailable';
+    return (
+      <Tooltip content="Unable to load models.">
+        <span tabIndex={0}>{EMPTY_VALUE}</span>
+      </Tooltip>
+    );
   }
   const locations = model?.locations ?? [];
   return locations.length ? (

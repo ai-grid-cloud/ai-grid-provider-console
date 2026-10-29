@@ -21,7 +21,7 @@ export const ReferencingSubscriptions: React.FC<{ modelId: string; onInUse?: (in
   }
   return (
     <Alert isInline isPlain variant="warning" title="Subscriptions still use this model" data-testid="model-references">
-      <p>Remove the model from these subscriptions first, or their members lose access to it:</p>
+      <p>Remove the model from these subscriptions first, or their users lose access to it:</p>
       <List>
         {using.map((subscription) => (
           <ListItem key={subscription.id}>

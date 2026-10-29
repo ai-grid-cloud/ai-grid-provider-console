@@ -9,7 +9,7 @@ import { isFromCloudRegion, siteOf } from './site';
 type Located = Pick<ClusterView, 'name' | 'siteName' | 'region' | 'locationSource' | 'locationProblem'>;
 
 /** Why a cluster's site is its cloud region, in the tooltip on "(cloud region)". */
-export const CLOUD_REGION_REASON = 'No site is set on this cluster; the map places it by its cloud region.';
+export const CLOUD_REGION_REASON = 'No site is set for this cluster. The map shows it at its cloud region.';
 
 /**
  * A site's text: the site's name, or the cloud region followed by "(cloud region)" when no site is
@@ -39,7 +39,7 @@ export const ClusterSite: React.FC<{ cluster: Located; testId: string }> = ({ cl
   if (cluster.locationProblem) {
     return (
       <MissingLabel testId={testId} reason={cluster.locationProblem}>
-        {text ?? 'Position not readable'}
+        {text ?? 'Invalid position'}
       </MissingLabel>
     );
   }

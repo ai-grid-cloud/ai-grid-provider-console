@@ -59,6 +59,6 @@ Subscriptions pages call the backend's own API over Connect (`docs/connect.md`).
 behind Add to AI Grid and Remove) and tenants, the console's organizations (list, get, create,
 update, delete). A tenant create or update that sets a field the backend's tenant doesn't have
 answers 501 instead of dropping it. Against it, the grid overview is 501, and so is a list request with `filter`, `offset` or `limit`, which it
-doesn't apply; the pages show these as not available on this backend yet. `/user` and
+doesn't apply; the pages show these as not available on this AI Grid backend. `/user` and
 `/config` work on any backend (neither calls it). See the "Waiting on backend RPCs" table in
 `docs/plan/bff-api.md`.

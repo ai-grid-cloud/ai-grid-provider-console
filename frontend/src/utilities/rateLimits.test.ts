@@ -67,7 +67,7 @@ describe('the token limit form', () => {
 
   it('names a saved window it cannot read until a valid time replaces it', () => {
     const limit = toRateLimit({ limit: 1000, window: '1h30m' });
-    const message = 'Saved as "1h30m", which MaaS doesn\'t accept. Enter a time from 1 to 9999.';
+    const message = 'The saved value "1h30m" is not valid. Enter a time from 1 to 9,999.';
     expect(getSavedWindowMessage(limit)).toBe(message);
     expect(getSavedWindowMessage({ ...limit, time: 0 })).toBe(message);
     expect(getSavedWindowMessage({ ...limit, time: 10000 })).toBe(message);
@@ -82,7 +82,7 @@ describe('the token limit form', () => {
 });
 
 describe('the longest window, 366 days', () => {
-  const hoursMessage = 'At most 8784 hours (366 days)';
+  const hoursMessage = 'Enter at most 8,784 hours (366 days).';
 
   it.each([
     [8784, 'hour', undefined],
@@ -91,7 +91,7 @@ describe('the longest window, 366 days', () => {
     [10000, 'hour', hoursMessage],
     [9999, 'minute', undefined],
     [9999, 'second', undefined],
-    [10000, 'minute', 'Time value exceeds maximum allowed value'],
+    [10000, 'minute', 'Enter a time of at most 9,999.'],
     [NaN, 'hour', undefined],
   ] as const)('%d %s: %s', (time, unit, want) => {
     const limit = { count: 1000, time, unit };

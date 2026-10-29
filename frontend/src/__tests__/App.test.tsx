@@ -76,10 +76,10 @@ describe('App', () => {
       </MemoryRouter>,
     );
     // Not a 401: somebody is signed in, the console just can't say who.
-    await user.click(await screen.findByRole('button', { name: 'User menu: User could not be loaded' }));
+    await user.click(await screen.findByRole('button', { name: 'User menu: Unable to load user' }));
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveAttribute('href', '/oauth2/sign_out');
     await user.click(screen.getByRole('menuitem', { name: 'About' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent("Signed in asCouldn't load");
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Logged in asUnable to load');
     expect(screen.queryByText('Your session has ended')).not.toBeInTheDocument();
   });
 
@@ -92,7 +92,7 @@ describe('App', () => {
         <TestApp service={service} />
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole('button', { name: 'User menu: Signing in...' }));
+    await user.click(await screen.findByRole('button', { name: 'User menu: Logging in' }));
     expect(screen.getByRole('menuitem', { name: 'About' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toBeVisible();
   });
@@ -118,11 +118,9 @@ describe('App', () => {
         <TestApp service={service} />
       </MemoryRouter>,
     );
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'This console is for provider admins' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/You are signed in as viewer/)).toHaveTextContent(
-      'log out from the user menu and sign in as someone else',
+    expect(await screen.findByRole('heading', { level: 1, name: 'Access permissions needed' })).toBeInTheDocument();
+    expect(screen.getByText(/You are logged in as viewer/)).toHaveTextContent(
+      'To use another account, log out from the user menu.',
     );
     expect(screen.queryByTestId('clusters-table')).not.toBeInTheDocument();
     // Every page would only answer 403, so there is no nav to them, nor a toggle for it.
@@ -145,7 +143,7 @@ describe('App', () => {
       </MemoryRouter>,
     );
     await screen.findByText(/^Fake backend:/);
-    const body = await screen.findByText(/You are signed in as viewer/);
+    const body = await screen.findByText(/You are logged in as viewer/);
     expect(body).not.toHaveTextContent('log out');
     expect(body).toHaveTextContent('The fake backend has no login');
   });
@@ -161,11 +159,11 @@ describe('App', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole('row', { name: /^site1 / })).toBeInTheDocument();
-    expect(screen.queryByText('This console is for provider admins')).not.toBeInTheDocument();
+    expect(screen.queryByText('Access permissions needed')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument();
     // Not silently read-only: the console says it couldn't tell, and tries again.
     const alert = screen.getByTestId('user-load-error');
-    expect(alert).toHaveTextContent('Unable to load your access');
+    expect(alert).toHaveTextContent('Unable to confirm your access');
     expect(alert).toHaveTextContent('unavailable');
     service.getUser = getUser;
     await user.click(within(alert).getByRole('button', { name: 'Retry' }));
@@ -189,7 +187,7 @@ describe('App', () => {
   it('shows a not-available state, not an error, when the backend lacks the RPC', async () => {
     const service = new MockConsoleService();
     service.listOrganizations = async () => {
-      throw new ServiceError(501, 'the AI Grid backend does not support this operation yet');
+      throw new ServiceError(501, 'The AI Grid backend does not support this operation.');
     };
     render(
       <MemoryRouter>
@@ -198,14 +196,14 @@ describe('App', () => {
     );
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
-    expect(await screen.findByText('Organizations are not available on this backend yet')).toBeInTheDocument();
+    expect(await screen.findByText('Organizations are not available on this AI Grid backend')).toBeInTheDocument();
     expect(screen.queryByText('Unable to load organizations')).not.toBeInTheDocument();
   });
 
   it('shows the backend error when organizations cannot be loaded', async () => {
     const service = new MockConsoleService();
     service.listOrganizations = async () => {
-      throw new ServiceError(502, 'the AI Grid backend failed to process the request');
+      throw new ServiceError(502, 'The AI Grid backend failed to process the request.');
     };
     render(
       <MemoryRouter>
@@ -215,7 +213,7 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
     expect(await screen.findByText('Unable to load organizations')).toBeInTheDocument();
-    expect(screen.getByText('the AI Grid backend failed to process the request')).toBeInTheDocument();
+    expect(screen.getByText('The AI Grid backend failed to process the request.')).toBeInTheDocument();
   });
 });
 
@@ -265,8 +263,8 @@ describe('user menu', () => {
     expect(about).toHaveTextContent('DataFake backend: fixture data; nothing you change reaches a cluster');
     // The backend has no version RPC yet, so About has no row for it.
     expect(about).not.toHaveTextContent('Backend version');
-    expect(about).toHaveTextContent('Signed in asdev-user');
-    expect(about).toHaveTextContent('AccessProvider admin (may change managed clusters on this hub)');
+    expect(about).toHaveTextContent('Logged in asdev-user');
+    expect(about).toHaveTextContent('AccessProvider admin');
     await user.click(within(about).getByRole('button', { name: /close/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -322,12 +320,12 @@ describe('an ended session', () => {
     // A reload would keep the login proxy's session cookie, with the token the hub rejected; signing
     // out clears it and comes back here, through a new login.
     await waitFor(() => expect(navigation.assign).toHaveBeenCalledWith(signOut));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Signing you in again…' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Logging you in' })).toBeInTheDocument();
     expectFullPage();
     expect(window.sessionStorage.getItem(SIGN_IN_AGAIN_KEY)).toMatch(/^\d+$/);
 
     // The masthead stays, with its user menu and Log out.
-    await user.click(screen.getByRole('button', { name: 'User menu: Not signed in' }));
+    await user.click(screen.getByRole('button', { name: 'User menu: Not logged in' }));
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveAttribute('href', '/oauth2/sign_out');
     expect(navigation.assign).toHaveBeenCalledTimes(1);
     expect(navigation.reload).not.toHaveBeenCalled();
@@ -341,7 +339,7 @@ describe('an ended session', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(navigation.assign).toHaveBeenCalledWith(signOut);
     expect(navigation.assign).toHaveBeenCalledTimes(1);
   });
@@ -410,7 +408,7 @@ describe('an ended session', () => {
       throw new DOMException('The operation is insecure.', 'SecurityError');
     });
     expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeVisible();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
   });
@@ -436,7 +434,7 @@ describe('an ended session', () => {
     service.getConfig = () => config.promise;
     const navigation = fakeNavigation();
     renderEnded(service, navigation);
-    expect(await screen.findByRole('progressbar', { name: 'Signing you in again' })).toBeInTheDocument();
+    expect(await screen.findByRole('progressbar', { name: 'Logging you in' })).toBeInTheDocument();
     expectFullPage(0);
     expect(navigation.assign).not.toHaveBeenCalled();
     await act(async () => config.resolve(await new MockConsoleService().getConfig()));
@@ -457,7 +455,7 @@ describe('an ended session', () => {
     expect(navigation.assign).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Reload' }));
     expect(navigation.reload).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(navigation.assign).toHaveBeenCalledWith(signOut);
     expect(navigation.assign).toHaveBeenCalledTimes(1);
   });
@@ -480,7 +478,7 @@ describe('an ended session', () => {
       await act(async () => {
         vi.advanceTimersByTime(30000);
       });
-      expect(await screen.findByRole('heading', { level: 1, name: 'Signing you in again…' })).toBeVisible();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Logging you in' })).toBeVisible();
       expect(poll).toHaveBeenCalledTimes(1);
       // Each further poll would only be another 401.
       await act(async () => {

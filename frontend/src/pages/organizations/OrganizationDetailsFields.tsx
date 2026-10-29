@@ -95,7 +95,7 @@ export const OrganizationDetailsFields: React.FC<Props> = ({
           label="Name"
           fieldId="organization-name"
           value={value.name}
-          reason="The name can't be changed once the organization exists."
+          reason="The name cannot be edited after the organization is created."
         />
       )}
       <FormSection title="Domains" titleElement="h2">

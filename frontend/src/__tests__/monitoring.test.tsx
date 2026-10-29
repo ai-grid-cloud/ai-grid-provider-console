@@ -86,7 +86,7 @@ it('opens the tab ?dashboard= names, and another one on click', async () => {
 it('says when the hub has no such dashboards yet', async () => {
   renderAt('/monitoring', withMonitoring('ai-grid', [dashboard('ai-grid', 'acm-clusters-overview')]));
   expect(await screen.findByRole('heading', { name: 'No dashboards' })).toBeVisible();
-  expect(screen.getByText(/in project ai-grid whose names start with/)).toBeVisible();
+  expect(screen.getByText(/whose name starts with/)).toBeVisible();
   expect(screen.queryByTestId('perses-dashboard')).not.toBeInTheDocument();
 });
 
@@ -94,8 +94,9 @@ it("says when the caller can't read the dashboards", async () => {
   const service = withMonitoring('ai-grid', []);
   service.listMonitoringDashboards = () => Promise.reject(new ServiceError(403, 'forbidden: project ai-grid'));
   renderAt('/monitoring', service);
-  expect(await screen.findByRole('heading', { name: "You don't have access to dashboards" })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Access permissions needed' })).toBeVisible();
   expect(screen.getByText('forbidden: project ai-grid')).toBeVisible();
+  expect(screen.getByText('To view dashboards, ask your hub administrator for access.')).toBeVisible();
 });
 
 it("says when the dashboards can't be loaded, and retries", async () => {
@@ -114,9 +115,9 @@ it("says when the console's configuration can't be read, instead of falling back
   const user = userEvent.setup();
   const service = withMonitoring('ai-grid', hub);
   const getConfig = service.getConfig;
-  service.getConfig = () => Promise.reject(new ServiceError(0, 'The console backend could not be reached.'));
+  service.getConfig = () => Promise.reject(new ServiceError(0, 'Unable to reach the console server.'));
   renderAt('/monitoring', service);
-  expect(await screen.findByRole('heading', { name: 'Unable to load the console settings' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Unable to load console settings' })).toBeVisible();
   expect(screen.queryByText(/Cluster availability, gateway performance/)).not.toBeInTheDocument();
   service.getConfig = getConfig;
   await user.click(screen.getByRole('button', { name: 'Retry' }));
@@ -126,7 +127,7 @@ it("says when the console's configuration can't be read, instead of falling back
 it("keeps the AI Grid overview's metrics when the console relays to no Perses", async () => {
   renderAt('/monitoring', new MockConsoleService());
   expect(
-    await screen.findByText('Cluster availability, gateway performance and resource use across AI Grid.'),
+    await screen.findByText('Cluster availability, gateway performance, and resource use across AI Grid.'),
   ).toBeVisible();
   expect(screen.queryByTestId('monitoring-tabs')).not.toBeInTheDocument();
 });
@@ -136,12 +137,12 @@ it("opens a dashboard's link to another tab here, and says when a link goes else
   renderAt('/monitoring', withMonitoring('ai-grid', hub));
   expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
   await user.click(screen.getByRole('link', { name: 'optimization' }));
-  expect(await screen.findByText("This link opens a page the console doesn't have")).toBeVisible();
+  expect(await screen.findByText('Link not available in this console')).toBeVisible();
   expect(screen.getByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
   await user.click(screen.getByRole('link', { name: 'usage of site-a' }));
   expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-2-usage');
   expect(screen.getByRole('tab', { name: 'Token usage' })).toHaveAttribute('aria-selected', 'true');
-  expect(screen.queryByText("This link opens a page the console doesn't have")).not.toBeInTheDocument();
+  expect(screen.queryByText('Link not available in this console')).not.toBeInTheDocument();
 });
 
 describe('monitoringLinkFor', () => {
@@ -223,7 +224,7 @@ describe('a 401 from the relay', () => {
     await user.click(screen.getByRole('button', { name: 'panels answered 401' }));
     await waitFor(() => expect(getUser).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('perses-dashboard')).toBeVisible();
-    expect(screen.queryByText(/Your session has ended|Signing you in again/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your session has ended|Logging you in/)).not.toBeInTheDocument();
   });
 
   it('checks the session, and keeps it, when Perses answers the dashboards list with 401', async () => {
@@ -234,7 +235,7 @@ describe('a 401 from the relay', () => {
     expect(await screen.findByText('Perses refused the token')).toBeVisible();
     // Once on load, once for the check.
     await waitFor(() => expect(getUser).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText(/Your session has ended|Signing you in again/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your session has ended|Logging you in/)).not.toBeInTheDocument();
   });
 
   it('ends the session when the user answers 401 too', async () => {
@@ -250,7 +251,7 @@ describe('a 401 from the relay', () => {
     await screen.findByTestId('perses-dashboard');
     service.getUser = () => Promise.reject(new ServiceError(401, 'missing x-forwarded-access-token'));
     await user.click(screen.getByRole('button', { name: 'panels answered 401' }));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Signing you in again…' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Logging you in' })).toBeInTheDocument();
     expect(navigation.assign).toHaveBeenCalledWith('/oauth2/sign_out?rd=%2Fmonitoring');
     expect(screen.queryByTestId('perses-dashboard')).not.toBeInTheDocument();
   });

@@ -36,10 +36,10 @@ export const UserMenu: React.FC<Props> = ({ user, loaded, error, canSignOut, onA
   // Only a 401 means nobody is signed in; any other failure is the console failing to say who is.
   const who = error
     ? error instanceof ServiceError && error.isUnauthenticated
-      ? 'Not signed in'
-      : 'User could not be loaded'
+      ? 'Not logged in'
+      : 'Unable to load user'
     : !loaded
-      ? 'Signing in...'
+      ? 'Logging in'
       : user?.username;
   const name = `${who}${user?.isProviderAdmin ? ' (provider admin)' : ''}`;
   // A menu even while signing in or when /user fails: About, with the versions a bug report

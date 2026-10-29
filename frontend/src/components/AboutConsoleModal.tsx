@@ -11,8 +11,8 @@ type Props = {
   userError?: Error;
 };
 
-const LOADING = 'Loading…';
-const FAILED = "Couldn't load";
+const LOADING = 'Loading';
+const FAILED = 'Unable to load';
 
 /**
  * The build as the BFF reports it: the full commit SHA in CI images, `git describe` output in a
@@ -64,13 +64,8 @@ export const AboutConsoleModal: React.FC<Props> = ({ isOpen, onClose, config, co
             : 'On',
       ),
     ],
-    ['Signed in as', fromUser((u) => (u.email ? `${u.username} (${u.email})` : u.username))],
-    [
-      'Access',
-      fromUser((u) =>
-        u.isProviderAdmin ? 'Provider admin (may change managed clusters on this hub)' : 'Not a provider admin',
-      ),
-    ],
+    ['Logged in as', fromUser((u) => (u.email ? `${u.username} (${u.email})` : u.username))],
+    ['Access', fromUser((u) => (u.isProviderAdmin ? 'Provider admin' : 'Not a provider admin'))],
   ];
   return (
     <AboutModal

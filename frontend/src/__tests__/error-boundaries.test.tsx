@@ -52,8 +52,8 @@ describe('PageErrorBoundary', () => {
       </PageErrorBoundary>,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Unable to load this page' })).toBeVisible();
-    expect(screen.getByText(/The console may have been updated since this tab opened/)).toBeVisible();
-    expect(screen.queryByText('Something went wrong on this page')).not.toBeInTheDocument();
+    expect(screen.getByText(/The console was probably updated after this page opened/)).toBeVisible();
+    expect(screen.queryByText('Unable to display this page')).not.toBeInTheDocument();
   });
 
   it('says something went wrong, with the error, for any other error, and offers Reload', async () => {
@@ -63,7 +63,7 @@ describe('PageErrorBoundary', () => {
         <Throws error={new TypeError("Cannot read properties of undefined (reading 'map')")} />
       </PageErrorBoundary>,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Something went wrong on this page' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1, name: 'Unable to display this page' })).toBeVisible();
     expect(screen.queryByText(/may have been updated/)).not.toBeInTheDocument();
     // The message is there for a bug report, folded away until asked for.
     expect(screen.queryByText(/reading 'map'/)).not.toBeVisible();
@@ -95,7 +95,7 @@ describe('PageErrorBoundary', () => {
         <Page broken />
       </PageErrorBoundary>,
     );
-    expect(screen.getByRole('heading', { level: 1, name: 'Something went wrong on this page' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1, name: 'Unable to display this page' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Error details' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText('page broke')).not.toBeVisible();
 
@@ -106,7 +106,7 @@ describe('PageErrorBoundary', () => {
       </PageErrorBoundary>,
     );
     expect(screen.getByText('Clusters')).toBeVisible();
-    expect(screen.queryByText('Something went wrong on this page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unable to display this page')).not.toBeInTheDocument();
   });
 
   it('logs the error and where it happened', () => {
@@ -144,9 +144,7 @@ describe('AppErrorBoundary', () => {
         </MemoryRouter>
       </AppErrorBoundary>,
     );
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'The console ran into a problem' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Unable to display the console' })).toBeInTheDocument();
     const details = screen.getByText('Error details').closest('details')!;
     expect(within(details).getByText(/the masthead broke/)).toBeInTheDocument();
     expect(details).not.toHaveAttribute('open');

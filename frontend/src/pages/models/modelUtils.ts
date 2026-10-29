@@ -42,7 +42,7 @@ export const deploymentNameFromUri = (uri: string): string => {
 
 /** What a model page says when there is no such deployment. */
 export const modelNotFound = (id: string): NotFound => ({
-  what: 'Model deployment',
+  what: 'Model',
   name: id,
   listPath: '/models',
   listLabel: 'Models',

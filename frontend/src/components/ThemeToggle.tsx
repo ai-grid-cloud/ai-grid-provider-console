@@ -7,7 +7,7 @@ import type { ThemeChoice } from '../utilities/theme';
 const choices: { choice: ThemeChoice; label: string; tooltip: string; icon: React.ReactNode }[] = [
   { choice: 'light', label: 'Light theme', tooltip: 'Light', icon: <SunIcon /> },
   { choice: 'dark', label: 'Dark theme', tooltip: 'Dark', icon: <MoonIcon /> },
-  { choice: 'system', label: 'System theme', tooltip: "System: the operating system's setting", icon: <DesktopIcon /> },
+  { choice: 'system', label: 'System theme', tooltip: 'System default', icon: <DesktopIcon /> },
 ];
 
 /**

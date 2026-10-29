@@ -258,11 +258,11 @@ export const App: React.FC<Props> = ({
           <Alert
             isInline
             variant="warning"
-            title="Unable to load your access"
+            title="Unable to confirm your access"
             actionLinks={<AlertActionLink onClick={() => void reloadUser()}>Retry</AlertActionLink>}
             data-testid="user-load-error"
           >
-            Actions that change data are hidden until the console knows you are a provider admin. {userError.message}
+            Actions that change data are hidden until your provider admin access is confirmed. {userError.message}
           </Alert>
         </PageSection>
       )}

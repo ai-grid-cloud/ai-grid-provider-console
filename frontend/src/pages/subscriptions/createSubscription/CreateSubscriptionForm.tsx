@@ -79,12 +79,12 @@ const MAX_ID_LENGTH = 56;
 
 const subscriptionFormSchema = z.object({
   priority: z
-    .number({ message: 'Priority is required' })
-    .int('Priority must be a whole number')
-    .min(MIN_PRIORITY, `Priority must be at least ${MIN_PRIORITY}`)
-    .max(MAX_PRIORITY, `Priority must be at most ${MAX_PRIORITY}`),
-  groups: z.array(z.string()).min(1, 'One or more groups must be selected'),
-  models: z.array(z.unknown()).min(1, 'One or more models must be added'),
+    .number({ message: 'Required.' })
+    .int('Enter a whole number.')
+    .min(MIN_PRIORITY, `Enter a number from ${MIN_PRIORITY} to ${MAX_PRIORITY}.`)
+    .max(MAX_PRIORITY, `Enter a number from ${MIN_PRIORITY} to ${MAX_PRIORITY}.`),
+  groups: z.array(z.string()).min(1, 'Add at least one group.'),
+  models: z.array(z.unknown()).min(1, 'Add at least one model.'),
 });
 
 const buildInitialModels = (info: SubscriptionsGetResponse, models: ModelView[]): SubscriptionModelEntry[] =>
@@ -296,7 +296,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
       const error = describeError(e);
       setSubmitError(
         error.kind === 'notAvailable'
-          ? `${isEditing ? 'Saving' : 'Creating'} subscriptions is not available on this backend yet.`
+          ? `${isEditing ? 'Saving' : 'Creating'} subscriptions is not available on this AI Grid backend.`
           : error.message,
       );
       setIsSubmitting(false);
@@ -413,7 +413,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
 
         <FormGroup label="Groups" fieldId="subscription-groups" isRequired>
           <MultiSelection
-            ariaLabel="Enter groups"
+            ariaLabel="Groups"
             toggleAriaLabel="Groups options"
             value={selectedGroups}
             setValue={(newValue) => {
@@ -423,7 +423,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
             toggleTestId="subscription-groups"
             isCreatable
             createOptionMessage={(value) => `Add group "${value}"`}
-            placeholder="Type a group name"
+            placeholder="Enter a group name"
           />
           {groupsTouched && fieldErrors.groups ? (
             errorText(fieldErrors.groups)
@@ -431,7 +431,8 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Type each group name and choose Add group. Members of these groups can use the models.
+                  Enter a group name, then select Add group. Users in these groups can use the subscription&apos;s
+                  models.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -441,8 +442,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
 
         {showNoModelsWarning ? (
           <Alert variant="warning" isInline title="No models available" data-testid="no-models-warning">
-            There are no model endpoints available on the cluster. To create a subscription, first ask your MaaS
-            administrator to make a model endpoint available.
+            To create a subscription, first deploy a model from the Models page.
           </Alert>
         ) : (
           <MaasModelsSection
@@ -486,11 +486,11 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
           <Alert
             variant="warning"
             isInline
-            title="Only a policy created with this subscription is updated"
+            title="Other authorization policies are not updated"
             data-testid="policy-change-warning"
           >
-            The authorization policy created with this subscription follows these changes. Update any other policy for
-            it from the <b>authorization policy administration tool</b> after saving.
+            The authorization policy created with this subscription is updated with these changes. After saving, update
+            any other authorization policy for these models separately.
           </Alert>
         )}
 
@@ -508,7 +508,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
             isLoading={isSubmitting}
             data-testid={isEditing ? 'update-subscription-button' : 'create-subscription-button'}
           >
-            {isEditing ? (isSubmitting ? 'Saving...' : 'Save') : isSubmitting ? 'Creating...' : 'Create subscription'}
+            {isEditing ? 'Save changes' : 'Create subscription'}
           </Button>
           <Button
             variant="link"

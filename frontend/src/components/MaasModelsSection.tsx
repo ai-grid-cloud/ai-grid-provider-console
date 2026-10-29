@@ -6,9 +6,7 @@
 // words each row (its title, status and limits) from the backend's messages.
 import { Fragment } from 'react';
 import {
-  Bullseye,
   Button,
-  Content,
   FormGroup,
   FormHelperText,
   HelperText,
@@ -20,6 +18,7 @@ import { MinusCircleIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { formatTokenRateLimitLine, type TokenLimit } from '../utilities/rateLimits';
 import { DetailsSection } from './DetailsSection';
+import { SectionEmptyState } from './states/SectionEmptyState';
 import { StatusLabel } from './StatusLabel';
 import { TableRowTitleDescription } from './TableRowTitleDescription';
 
@@ -163,7 +162,7 @@ export const MaasModelsSection: React.FC<Props> = ({
               <HelperText>
                 <HelperTextItem variant={validationError ? 'error' : 'default'}>
                   {validationError ??
-                    'Add the models members of this subscription can use, then set token limits for each one.'}
+                    "Add the models that users in this subscription's groups can use, then set token limits for each model."}
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -176,13 +175,7 @@ export const MaasModelsSection: React.FC<Props> = ({
   return (
     <div data-testid="subscription-models-section">
       <DetailsSection title="Models">
-        {rows.length === 0 ? (
-          <Bullseye>
-            <Content component="p">No models assigned to this subscription.</Content>
-          </Bullseye>
-        ) : (
-          table
-        )}
+        {rows.length === 0 ? <SectionEmptyState title="No models" /> : table}
       </DetailsSection>
     </div>
   );

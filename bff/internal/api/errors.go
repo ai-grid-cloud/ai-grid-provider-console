@@ -88,7 +88,7 @@ func classify(err error) (int, string) {
 		return http.StatusBadGateway, "the hub could not confirm the caller's permissions; try again"
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return http.StatusGatewayTimeout, "the AI Grid backend did not answer in time"
+		return http.StatusGatewayTimeout, "The AI Grid backend did not respond in time. Try again."
 	}
 	if st, ok := status.FromError(err); ok {
 		msg := st.Message()
@@ -96,7 +96,7 @@ func classify(err error) (int, string) {
 		case codes.InvalidArgument, codes.OutOfRange:
 			return http.StatusUnprocessableEntity, msg
 		case codes.Unauthenticated:
-			return http.StatusUnauthorized, "the AI Grid backend rejected the credentials; log in again"
+			return http.StatusUnauthorized, "The AI Grid backend rejected your credentials. Log in again."
 		case codes.PermissionDenied:
 			return http.StatusForbidden, msg
 		case codes.NotFound:
@@ -106,17 +106,17 @@ func classify(err error) (int, string) {
 		case codes.FailedPrecondition:
 			return http.StatusPreconditionFailed, msg
 		case codes.ResourceExhausted:
-			return http.StatusTooManyRequests, "the AI Grid backend is rate limiting requests; try again shortly"
+			return http.StatusTooManyRequests, "The AI Grid backend is limiting requests. Try again later."
 		case codes.Unimplemented:
-			return http.StatusNotImplemented, "the AI Grid backend does not support this operation yet"
+			return http.StatusNotImplemented, "The AI Grid backend does not support this operation."
 		case codes.DeadlineExceeded:
-			return http.StatusGatewayTimeout, "the AI Grid backend did not answer in time"
+			return http.StatusGatewayTimeout, "The AI Grid backend did not respond in time. Try again."
 		case codes.Unavailable, codes.Canceled:
-			return http.StatusServiceUnavailable, "the AI Grid backend is unavailable; try again"
+			return http.StatusServiceUnavailable, "The AI Grid backend is unavailable. Try again."
 		case codes.OK:
 			return http.StatusInternalServerError, "internal server error"
 		}
-		return http.StatusBadGateway, "the AI Grid backend failed to process the request"
+		return http.StatusBadGateway, "The AI Grid backend failed to process the request."
 	}
 	return http.StatusInternalServerError, "internal server error"
 }

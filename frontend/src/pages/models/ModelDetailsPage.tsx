@@ -30,7 +30,7 @@ export const ModelDetailsPage: React.FC = () => {
   const model = error instanceof ServiceError && error.status === 404 ? undefined : loadedModel;
   const [confirmDelete, deleteModal] = useDeleteModel({
     refresh: () => void refresh(),
-    onDeleted: () => navigate('/models', { state: { notice: 'Model deployment deleted' } }),
+    onDeleted: () => navigate('/models', { state: { notice: 'Model deleted' } }),
   });
   const title = model ? titleOf(model) : id;
   const siteNames = siteNamesOf(clusters);
@@ -84,11 +84,11 @@ export const ModelDetailsPage: React.FC = () => {
                   ))}
                 </List>
               )}
-              <Link to={`/ai-grid?model=${encodeURIComponent(model.id)}`}>Show on the AI Grid map</Link>
+              <Link to={`/ai-grid?model=${encodeURIComponent(model.id)}`}>View on the AI Grid map</Link>
             </Stack>
           ) : (
-            <SectionEmptyState title="No locations yet">
-              The placement hasn’t chosen any locations yet.
+            <SectionEmptyState title="No locations selected">
+              No AI Grid cluster matches this model&apos;s placement.
             </SectionEmptyState>
           )}
         </DetailsSection>

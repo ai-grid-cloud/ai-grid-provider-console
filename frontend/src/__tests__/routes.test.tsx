@@ -84,8 +84,8 @@ describe('routes', () => {
 
   // Review focus 1 (A33/C10): on the real backend, which has only Ping, ListManagedClusters and
   // ListTenants, every page that needs a missing RPC says so instead of showing an error.
-  const orgs = 'Organizations are not available on this backend yet';
-  const subs = 'Subscriptions are not available on this backend yet';
+  const orgs = 'Organizations are not available on this AI Grid backend';
+  const subs = 'Subscriptions are not available on this AI Grid backend';
   /** The deploy wizard loads locations up front but shows them on its third step. */
   const toLocationsStep = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
@@ -103,15 +103,15 @@ describe('routes', () => {
     ['/organizations', 'listOrganizations', orgs],
     ['/organizations/org-1', 'getOrganization', orgs],
     ['/organizations/org-1/edit', 'getOrganization', orgs],
-    ['/models', 'models.list', 'Models are not available on this backend yet'],
+    ['/models', 'models.list', 'Models are not available on this AI Grid backend'],
     [
       '/models/deploy',
       'models.listPlacementClusters',
-      'Locations are not available on this backend yet.',
+      'Locations are not available on this AI Grid backend.',
       toLocationsStep,
     ],
-    ['/ai-grid', 'listClusters', 'AI Grid is not available on this backend yet'],
-    ['/monitoring', 'getGridOverview', 'Monitoring is not available on this backend yet'],
+    ['/ai-grid', 'listClusters', 'The AI Grid map is not available on this AI Grid backend'],
+    ['/monitoring', 'getGridOverview', 'Monitoring is not available on this AI Grid backend'],
   ])('renders not-available pages: %s without %s', async (path, methods, text, open) => {
     const service = new MockConsoleService();
     // `methods` lists the service calls that answer 501, joined with +.
@@ -124,7 +124,7 @@ describe('routes', () => {
         continue;
       }
       vi.spyOn(service, name as 'listOrganizations').mockRejectedValue(
-        new ServiceError(501, 'the AI Grid backend does not support this operation yet'),
+        new ServiceError(501, 'The AI Grid backend does not support this operation.'),
       );
     }
     const user = userEvent.setup();
@@ -134,7 +134,7 @@ describe('routes', () => {
     await open?.(user);
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
-    expect(screen.queryByText('the AI Grid backend does not support this operation yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
   });
 
   // The subscription pages call the backend over Connect: one without the Subscriptions and
@@ -156,12 +156,12 @@ describe('routes', () => {
     );
     await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user'));
     expect(await screen.findByText(subs)).toBeInTheDocument();
-    expect(screen.queryByText('the AI Grid backend does not support this operation yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
   });
 
   it.each([
-    ['/models/nope', 'Models', 'Model deployment not found', 'Go to Models', '/models'],
-    ['/models/nope/edit', 'Models', 'Model deployment not found', 'Go to Models', '/models'],
+    ['/models/nope', 'Models', 'Model not found', 'Go to Models', '/models'],
+    ['/models/nope/edit', 'Models', 'Model not found', 'Go to Models', '/models'],
     [
       '/organizations/does-not-exist',
       'Organizations',
@@ -266,17 +266,17 @@ describe('routes', () => {
   });
 
   it('shows a success toast for a notice passed through navigation state', async () => {
-    at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
-    expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+    at({ pathname: '/clusters', state: { notice: 'Organization created' } });
+    expect(await screen.findByText('Organization created')).toBeInTheDocument();
   });
 
   it('clears a success toast when the user moves on to another page', async () => {
     const user = userEvent.setup();
-    at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
-    expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+    at({ pathname: '/clusters', state: { notice: 'Organization created' } });
+    expect(await screen.findByText('Organization created')).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Models' }));
     await screen.findByRole('heading', { level: 1, name: 'Models' });
-    expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Organization created')).not.toBeInTheDocument();
   });
 
   it('does not show a notice again when Back returns to its page', async () => {
@@ -287,37 +287,37 @@ describe('routes', () => {
     };
     const user = userEvent.setup();
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/clusters', state: { notice: 'Organization saved' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/clusters', state: { notice: 'Organization created' } }]}>
         <CaptureNavigate />
         <TestApp service={new MockConsoleService()} />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Organization saved')).toBeInTheDocument();
+    expect(await screen.findByText('Organization created')).toBeInTheDocument();
     // Taking the notice out of the history entry doesn't close the toast.
     await act(async () => {});
-    expect(screen.getByText('Organization saved')).toBeInTheDocument();
+    expect(screen.getByText('Organization created')).toBeInTheDocument();
     await user.click(screen.getByRole('link', { name: 'Models' }));
     await screen.findByRole('heading', { level: 1, name: 'Models' });
     await act(async () => {
       await navigate(-1);
     });
     await screen.findByRole('heading', { level: 1, name: 'Clusters' });
-    expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Organization created')).not.toBeInTheDocument();
   });
 
   it('times a success toast out', async () => {
     vi.useFakeTimers();
     try {
-      at({ pathname: '/clusters', state: { notice: 'Organization saved' } });
+      at({ pathname: '/clusters', state: { notice: 'Organization created' } });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0);
       });
-      expect(screen.getByText('Organization saved')).toBeInTheDocument();
+      expect(screen.getByText('Organization created')).toBeInTheDocument();
       // PatternFly's 8 seconds, then its 3-second fade.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(11500);
       });
-      expect(screen.queryByText('Organization saved')).not.toBeInTheDocument();
+      expect(screen.queryByText('Organization created')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

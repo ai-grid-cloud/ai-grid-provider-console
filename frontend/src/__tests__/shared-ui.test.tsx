@@ -184,7 +184,7 @@ describe('page states', () => {
     renderLoadError(new ServiceError(404, 'object with identifier w1 not found'));
     const state = screen.getByTestId('not-found-state');
     expect(within(state).getByRole('heading', { name: 'Widget not found' })).toBeVisible();
-    expect(state).toHaveTextContent("There's no widget named w1. It may have been deleted, or the link may be wrong.");
+    expect(state).toHaveTextContent('No widget named w1 exists. It might have been deleted.');
     expect(within(state).getByText('w1').tagName).toBe('CODE');
     expect(within(state).getByRole('link', { name: 'Go to Widgets' })).toHaveAttribute('href', '/widgets');
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
@@ -193,14 +193,15 @@ describe('page states', () => {
 
   it('says a 501 is not available yet, without Retry', () => {
     renderLoadError(new ServiceError(501, 'not implemented'));
-    expect(screen.getByRole('heading', { name: 'Widgets are not available on this backend yet' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Widgets are not available on this AI Grid backend' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('says a 403 is no access, with the reason', () => {
     renderLoadError(new ServiceError(403, 'widgets are for admins'));
-    expect(screen.getByRole('heading', { level: 2, name: "You don't have access to widget" })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 2, name: 'Access permissions needed' })).toBeVisible();
     expect(screen.getByText('widgets are for admins')).toBeVisible();
+    expect(screen.getByText('To view widget, ask your hub administrator for access.')).toBeVisible();
   });
 
   it('shows nothing for an ended session', () => {

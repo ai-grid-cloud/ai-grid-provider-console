@@ -21,14 +21,14 @@ export const modelServers: readonly ModelServer[] = [
   {
     id: 'vllm-cpu',
     label: 'vLLM on CPU',
-    description: 'For x86_64 clusters without GPUs. Uses the v3-6-0-kserve-config-llm-template-cpu preset.',
+    description: 'For x86_64 clusters without GPUs.',
     baseRefs: ['v3-6-0-kserve-config-llm-template-cpu'],
     usesGpus: false,
   },
   {
     id: 'vllm-gpu',
     label: 'vLLM on NVIDIA GPU',
-    description: 'For clusters with NVIDIA GPUs. Uses the KServe default preset.',
+    description: 'For clusters with NVIDIA GPUs.',
     baseRefs: [],
     usesGpus: true,
   },

@@ -44,8 +44,7 @@ export const NotFoundState: React.FC<Props> = ({ what, name, body, listPath, lis
         body
       ) : (
         <>
-          There&apos;s no {what.toLowerCase()} named <code>{name}</code>. It may have been deleted, or the link may be
-          wrong.
+          No {what.toLowerCase()} named <code>{name}</code> exists. It might have been deleted.
         </>
       )}
     </EmptyStateBody>

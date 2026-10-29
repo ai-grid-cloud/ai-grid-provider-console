@@ -25,7 +25,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
   // Step 3: review
   await expect(page.getByText(issuer).first()).toBeVisible();
   await page.getByRole('button', { name: 'Create organization' }).click();
-  await expect(page.getByText('Organization and identity provider saved')).toBeVisible();
+  await expect(page.getByText('Organization created')).toBeVisible();
 
   const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: unique, exact: true }) });
   await expect(row).toContainText(domain);
@@ -44,7 +44,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
   await page.getByRole('textbox', { name: /^Domain 1/ }).fill(editedDomain);
   await page.getByRole('button', { name: 'Review', exact: true }).click();
   await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Organization configuration saved')).toBeVisible();
+  await expect(page.getByText('Organization updated')).toBeVisible();
   await expect(page.getByTestId('organization-configuration-details')).toContainText(editedDomain);
 
   // Delete from the organization's page, with the typed confirmation

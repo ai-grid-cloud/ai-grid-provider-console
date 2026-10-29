@@ -175,8 +175,8 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
   the phase and `status.message` only.
 - **Writes.** The wizard calls `Models/Create` with the id and `metadata.name`, the annotations,
   `spec.model` (the URI only: no served name, because the backend serves a model as its id, the
-  name tenants send; the wizard starts the id from the URI's last path segment and shows it on
-  Review as "Name tenants call"), `replicas`, `base_refs` (the model server's presets), `spec.main` (the image, the
+  name users send; the wizard starts the id from the URI's last path segment and shows it on
+  Review as "Model name in requests"), `replicas`, `base_refs` (the model server's presets), `spec.main` (the image, the
   requests it asks for and `VLLM_ADDITIONAL_ARGS` for runtime arguments) and a `name In [...]`
   placement over the clusters `Models/ListPlacementClusters` offers, and the router
   `{ scheduler: true, managedRoute: true }` (`modelRequests.ts`): the backend defaults the

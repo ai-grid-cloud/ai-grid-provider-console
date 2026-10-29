@@ -33,20 +33,20 @@ describe('describeError', () => {
 
   it.each(
     byName<[ApiErrorKind, string]>([
-      [Code.Unauthenticated, 'unauthenticated', 'the AI Grid backend rejected the credentials; log in again'],
-      [Code.Unimplemented, 'notAvailable', 'the AI Grid backend does not support this operation yet'],
-      [Code.Unavailable, 'unavailable', 'the AI Grid backend is unavailable; try again'],
-      [Code.DeadlineExceeded, 'unavailable', 'the AI Grid backend did not answer in time'],
+      [Code.Unauthenticated, 'unauthenticated', 'The AI Grid backend rejected your credentials. Log in again.'],
+      [Code.Unimplemented, 'notAvailable', 'The AI Grid backend does not support this operation.'],
+      [Code.Unavailable, 'unavailable', 'The AI Grid backend is unavailable. Try again.'],
+      [Code.DeadlineExceeded, 'unavailable', 'The AI Grid backend did not respond in time. Try again.'],
       [
         Code.ResourceExhausted,
         'unavailable',
-        'the request is too large, or the AI Grid backend is limiting requests; make it smaller or try again shortly',
+        'The request is too large, or the AI Grid backend is limiting requests. Try again later.',
       ],
-      [Code.Canceled, 'unavailable', 'the AI Grid backend is unavailable; try again'],
+      [Code.Canceled, 'unavailable', 'The AI Grid backend is unavailable. Try again.'],
       // Never the backend's own words about its failure: they can name its internals.
-      [Code.Internal, 'error', 'the AI Grid backend failed to process the request'],
-      [Code.Unknown, 'error', 'the AI Grid backend failed to process the request'],
-      [Code.DataLoss, 'error', 'the AI Grid backend failed to process the request'],
+      [Code.Internal, 'error', 'The AI Grid backend failed to process the request.'],
+      [Code.Unknown, 'error', 'The AI Grid backend failed to process the request.'],
+      [Code.DataLoss, 'error', 'The AI Grid backend failed to process the request.'],
     ]),
   )("%s (%i) is %s with the console's message where the backend's is about itself", (_name, code, kind, message) => {
     const got = describeError(new ConnectError('dial tcp 192.0.2.1:443: connection refused', code));
@@ -89,7 +89,7 @@ describe('describeError', () => {
     expect(describeError(new TypeError('Failed to fetch'))).toEqual({
       kind: 'error',
       code: Code.Unknown,
-      message: 'the AI Grid backend failed to process the request',
+      message: 'The AI Grid backend failed to process the request.',
     });
   });
 });

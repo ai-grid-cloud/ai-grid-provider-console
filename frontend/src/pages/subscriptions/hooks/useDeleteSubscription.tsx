@@ -16,11 +16,13 @@ import { useSubscriptionWrites } from '../useSubscriptions';
 const deleteErrorOf = (err: unknown) => {
   const error = toServiceError(err);
   if (error.isNotImplemented) {
-    return new Error('Deleting subscriptions is not available on this backend yet.');
+    return new Error('Deleting subscriptions is not available on this AI Grid backend.');
   }
   // Aborted: the version sent is not the stored one (gitDelete, internal/servers/subscriptions_git.go).
   if (error.isConflict) {
-    return new Error('This subscription changed since you opened this dialog. Check it and try again.');
+    return new Error(
+      'This subscription was changed after this dialog opened. The latest version is now shown. Review it and try again.',
+    );
   }
   return error;
 };
@@ -91,9 +93,8 @@ export const useDeleteSubscription = ({
     >
       <Stack hasGutter>
         <StackItem data-testid="delete-modal-confirmation-message">
-          Are you sure you want to delete the subscription <strong>{name}</strong>?
+          The subscription <strong>{name}</strong> and the authorization policy created with it will be deleted.
         </StackItem>
-        <StackItem>The automatically created authorization policy will also be deleted.</StackItem>
       </Stack>
     </DeleteModal>
   );

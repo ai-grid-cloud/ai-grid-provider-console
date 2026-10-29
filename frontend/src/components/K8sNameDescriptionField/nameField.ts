@@ -188,7 +188,7 @@ export const isValidK8sName = (name?: string, regExp = /^[a-z0-9]([-a-z0-9]*[a-z
 // Subscription names have no OpenShift route constraint. These exports keep the
 // extracted field reusable without bringing a Kubernetes SDK into the browser.
 export const ROUTE_BASED_RESOURCE_TYPES = new Set<number>();
-export const ROUTE_NAME_TOO_LONG_MESSAGE = 'Resource name and project name combined cannot exceed 63 characters';
+export const ROUTE_NAME_TOO_LONG_MESSAGE = 'The resource name cannot exceed 63 characters.';
 export const isRouteNameTooLong = (_name: string, _namespace?: string): boolean => false;
 export const setupDefaults = (configuration: UseK8sNameDescriptionDataConfiguration): K8sNameDescriptionFieldData => {
   const { initialData, editableK8sName } = configuration;
