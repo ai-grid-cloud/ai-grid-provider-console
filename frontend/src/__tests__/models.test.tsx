@@ -900,6 +900,102 @@ describe('the model server', () => {
     expect(spec?.main?.limits).toEqual({});
   });
 
+  it('leaves the image to the CPU preset when the field is empty, and sends one the user enters', async () => {
+    const user = userEvent.setup();
+    const create = await openDeployment(user);
+    const image = screen.getByRole('textbox', { name: /Runtime image/ });
+    expect(image).toBeRequired();
+    await chooseServer(user);
+    expect(image).not.toBeRequired();
+    expect(image).toHaveAccessibleDescription(
+      'Optional. Left empty, the model server’s image applies; an image entered here replaces it.',
+    );
+    act(() => image.focus());
+    await user.tab();
+    expect(image).not.toHaveAccessibleDescription(/Required\./);
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    const review = await toReview(user);
+    expect(review).toHaveTextContent('Runtime imageThe model server’s image');
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    const spec = create.mock.calls[0][0].object?.spec;
+    expect(spec?.baseRefs).toEqual([cpuPreset]);
+    expect(spec?.main?.image).toBe('');
+  });
+
+  it('takes an image of only spaces on the CPU preset as none, and sends it empty', async () => {
+    const user = userEvent.setup();
+    const create = await openDeployment(user);
+    await chooseServer(user);
+    await user.type(screen.getByRole('textbox', { name: /Runtime image/ }), '   ');
+    await user.tab();
+    expect(screen.getByRole('textbox', { name: /Runtime image/ })).not.toHaveAccessibleDescription(/Required\./);
+    const review = await toReview(user);
+    expect(review).toHaveTextContent('Runtime imageThe model server’s image');
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(create.mock.calls[0][0].object?.spec?.main?.image).toBe('');
+  });
+
+  it('shows no image for a model on presets the console doesn’t offer, as its edit does', async () => {
+    const service = new MockConsoleService();
+    const granite = modelsOf(service).find('granite-3-8b');
+    granite.spec!.baseRefs = ['custom-preset'];
+    granite.spec!.main!.image = '';
+    renderAt('/models/granite-3-8b', service);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Granite 3.3 8B Instruct' })).toBeVisible();
+    expect(screen.queryByText('The model server’s image')).not.toBeInTheDocument();
+  });
+
+  it('still requires an image for the GPU server, which has no presets', async () => {
+    const user = userEvent.setup();
+    await openDeployment(user);
+    await chooseServer(user);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Model server' }), 'vLLM on NVIDIA GPU');
+    const image = screen.getByRole('textbox', { name: /Runtime image/ });
+    expect(image).toBeRequired();
+    act(() => image.focus());
+    await user.tab();
+    expect(image).toHaveAccessibleDescription(/Required\./);
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('refuses spaces in an image the CPU preset would otherwise provide', async () => {
+    const user = userEvent.setup();
+    await openDeployment(user);
+    await chooseServer(user);
+    await user.type(screen.getByRole('textbox', { name: /Runtime image/ }), 'bad image');
+    await user.tab();
+    expect(screen.getByRole('textbox', { name: /Runtime image/ })).toHaveAccessibleDescription(
+      /Enter a container image without spaces\./,
+    );
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('says a deployed model without an image runs its server’s image, and lets an edit clear one', async () => {
+    const service = new MockConsoleService();
+    const models = modelsOf(service);
+    const granite = models.find('granite-3-8b');
+    granite.spec!.baseRefs = [cpuPreset];
+    const update = vi.spyOn(models, 'update');
+    const user = userEvent.setup();
+    renderAt('/models/granite-3-8b/edit', service);
+    await user.click(
+      within(await screen.findByRole('navigation', { name: 'Wizard steps' })).getByRole('button', {
+        name: 'Deployment',
+      }),
+    );
+    await user.clear(await screen.findByRole('textbox', { name: /Runtime image/ }));
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Wizard steps' })).getByRole('button', { name: 'Review' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Model deployment updated')).toBeVisible();
+    const [request] = update.mock.calls[0];
+    expect(request.updateMask?.paths).toEqual(['spec.main.image']);
+    expect(request.object?.spec?.main?.image).toBe('');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Granite 3.3 8B Instruct' })).toBeVisible();
+    expect(screen.getByText('The model server’s image')).toBeVisible();
+  });
+
   it('still refuses an image with spaces', async () => {
     const user = userEvent.setup();
     await openDeployment(user);
