@@ -10,7 +10,8 @@ import { Code, ConnectError } from '@connectrpc/connect';
 import { focusManager } from '@tanstack/react-query';
 import { ServiceError } from '../api/ConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
-import { ModelPhase } from '../gen/ai_grid/v1/model_type_pb';
+import { clone } from '@bufbuild/protobuf';
+import { ModelPhase, ModelSchema } from '../gen/ai_grid/v1/model_type_pb';
 import { modelObject, modelsOf, subscriptionUsing } from './connectModels';
 import { deferred, renderAt } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
@@ -678,8 +679,69 @@ it('takes a display name longer than a resource name', async () => {
   await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
   await user.paste('registry.example/runtime:test');
   await chooseServer(user);
-  expect(screen.getByText('w'.repeat(63))).toBeVisible();
+  expect(screen.getByText('w'.repeat(35))).toBeVisible();
+  expect(screen.queryByText('w'.repeat(36))).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+});
+
+it("caps a new resource name at 35 characters, so the gateway's Service name for it fits", async () => {
+  const user = userEvent.setup();
+  renderAt('/models/deploy', new MockConsoleService());
+  await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
+  await user.paste('hf://org/widget');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  expect(
+    await screen.findByText(
+      'Use at most 35 characters: the AI gateway adds a 28-character prefix to this name, and the result must fit the 63-character Kubernetes name limit. Tenants send it as the model in their requests.',
+    ),
+  ).toBeInTheDocument();
+  await nameDeployment(user, 'modelcar-granite-4-0-h-tiny-fp8-dynamic');
+  expect(screen.getByText('modelcar-granite-4-0-h-tiny-fp8-dyn')).toBeVisible();
+});
+
+it('refuses a resource name typed longer than 35 characters', async () => {
+  const user = userEvent.setup();
+  renderAt('/models/deploy', new MockConsoleService());
+  await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
+  await user.paste('hf://org/widget');
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  await nameDeployment(user, 'Widget');
+  await user.click(screen.getByRole('textbox', { name: /Runtime image/ }));
+  await user.paste('registry.example/runtime:test');
+  await chooseServer(user);
+  expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  await user.click(screen.getByTestId('model-name-desc-editResourceLink'));
+  const resourceName = screen.getByTestId('model-name-desc-resourceName');
+  await user.clear(resourceName);
+  await user.paste('a'.repeat(36));
+  expect(screen.getByText(/Cannot exceed 35 characters/)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  await user.clear(resourceName);
+  await user.paste('a'.repeat(35));
+  expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+});
+
+it('still edits a deployed model whose id is longer than a new one may be', async () => {
+  const service = new MockConsoleService();
+  const models = modelsOf(service);
+  const id = 'modelcar-granite-4-0-h-tiny-fp8-dynamic';
+  const long = clone(ModelSchema, models.find('granite-3-8b'));
+  long.id = id;
+  long.metadata!.name = id;
+  models.models.push(long);
+  const update = vi.spyOn(models, 'update');
+  const user = userEvent.setup();
+  renderAt(`/models/${id}/edit`, service);
+  const openStep = async (name: string) =>
+    user.click(within(await screen.findByRole('navigation', { name: 'Wizard steps' })).getByRole('button', { name }));
+  await openStep('Deployment');
+  const replicas = screen.getByRole('spinbutton', { name: 'Replicas' });
+  await user.clear(replicas);
+  await user.paste('3');
+  await openStep('Review');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  expect(await screen.findByText('Model deployment updated')).toBeVisible();
+  expect(update.mock.calls[0][0].object?.id).toBe(id);
 });
 
 it('starts the deployment name from the model URI, and keeps a name the user typed', async () => {
