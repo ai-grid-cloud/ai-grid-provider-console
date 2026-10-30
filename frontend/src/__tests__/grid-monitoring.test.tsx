@@ -188,28 +188,26 @@ it('loads organization usage when opened from the map', async () => {
   expect(within(usage).getByRole('link', { name: 'acme-robotics' })).toBeVisible();
 });
 
-it('lists the models with the sites their placement chose', async () => {
+it('lists the models with the clusters their placement chose, by name', async () => {
   const user = userEvent.setup();
   const service = serviceOnBffExamples();
-  // A model of the Models API placed at the example clusters' location (status.placement.locations).
+  // A model of the Models API placed on an example cluster (status.placement.selected_clusters).
   const granite = modelsOf(service).find('granite-3-8b');
   granite.metadata!.annotations['openshift.io/display-name'] = 'Granite 8B Instruct';
-  granite.status!.placement!.locations = ['paris'];
+  granite.status!.placement!.selectedClusters = ['site-paris-1'];
   renderAt('/monitoring', service);
   await user.click(await screen.findByRole('tab', { name: 'Models' }));
   const table = screen.getByRole('grid', { name: 'Model deployments' });
   const row = within(table).getByText('Granite 8B Instruct').closest('tr')!;
-  expect(row).toHaveTextContent('Paris DC1');
+  expect(row).toHaveTextContent('site-paris-1');
 });
 
-it('explains the target sites in a help popover', async () => {
+it('explains the clusters column in a help popover', async () => {
   const user = userEvent.setup();
   renderAt('/monitoring', withOrganizations());
   await user.click(await screen.findByRole('tab', { name: 'Models' }));
   await user.click(screen.getByRole('button', { name: 'More about model deployments' }));
-  expect(
-    await screen.findByText(/^Target sites are the sites of the clusters each model's placement chose/),
-  ).toBeVisible();
+  expect(await screen.findByText(/^Clusters are the AI Grid clusters each model's placement chose/)).toBeVisible();
 });
 
 it('does not name Thanos when the backend reports no metrics source', async () => {

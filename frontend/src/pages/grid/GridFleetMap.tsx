@@ -35,10 +35,10 @@ const pinColor = (cluster: FleetCluster) => statusColor[cluster.status];
 /** Which status a shared pin shows: the worst among its clusters. */
 const statusRank: Record<FleetCluster['status'], number> = { Ready: 0, Unknown: 1, Offline: 2 };
 
-/** "Site name · cluster name": the site's name, else the cloud region, else the cluster's name alone. */
+/** "Data center · cluster name": the data center, else the cloud region, else the cluster's name alone. */
 const pinLabel = (c: FleetCluster) => {
-  const site = c.siteName || c.region || c.site;
-  return site ? `${site} · ${c.name}` : c.name;
+  const where = c.siteName || c.region;
+  return where ? `${where} · ${c.name}` : c.name;
 };
 
 const isMapped = (c: FleetCluster) => c.latitude !== undefined && c.longitude !== undefined;
@@ -49,7 +49,7 @@ const isMapped = (c: FleetCluster) => c.latitude !== undefined && c.longitude !=
  */
 const pinsSignature = (clusters: FleetCluster[]) =>
   JSON.stringify(
-    clusters.filter(isMapped).map((c) => [c.name, c.latitude, c.longitude, c.status, c.siteName, c.region, c.site]),
+    clusters.filter(isMapped).map((c) => [c.name, c.latitude, c.longitude, c.status, c.siteName, c.region]),
   );
 
 export const GridFleetMap: React.FC<Props> = ({ clusters, selected, onSelect, tiles, isFiltered }) => {

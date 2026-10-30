@@ -46,7 +46,14 @@ it('uses the reference map-and-drawer layout and opens cluster details from a pi
   const overview = vi.spyOn(service, 'getGridOverview');
   const user = userEvent.setup();
   renderAt('/ai-grid', service);
-  expect(await screen.findByLabelText('Fleet summary')).toBeVisible();
+  const summary = await screen.findByLabelText('Fleet summary');
+  expect(summary).toBeVisible();
+  // The AI Grid clusters, then the distinct regions they run in: no "Sites" count, since every
+  // member is one site.
+  expect(within(summary).queryByText('Sites')).not.toBeInTheDocument();
+  const regions = new Set(service.clusters.filter((c) => c.aiGridEnabled && c.region).map((c) => c.region)).size;
+  expect(regions).toBeGreaterThan(1);
+  expect(within(summary).getByText('Regions').closest('.pf-v6-c-card')).toHaveTextContent(`Regions${regions}`);
   expect(screen.queryByText(/simulated/)).not.toBeInTheDocument();
   expect(overview).not.toHaveBeenCalled();
   await user.click(await screen.findByRole('button', { name: 'Map pin site3' }));
@@ -55,6 +62,14 @@ it('uses the reference map-and-drawer layout and opens cluster details from a pi
   await user.click(screen.getByRole('button', { name: 'Clusters' }));
   expect(screen.getByRole('button', { name: 'View site2 details' })).toBeVisible();
   expect(screen.queryByRole('combobox', { name: 'Filter by site' })).not.toBeInTheDocument();
+});
+
+it('counts no regions as a dash when no member reports one', async () => {
+  const service = new MockConsoleService();
+  service.clusters = service.clusters.map((c) => ({ ...c, region: undefined }));
+  renderAt('/ai-grid', service);
+  const summary = await screen.findByLabelText('Fleet summary');
+  expect(within(summary).getByText('Regions').closest('.pf-v6-c-card')).toHaveTextContent('Regions—');
 });
 
 it('opens the drawer on the cluster or model a link names', async () => {
@@ -93,8 +108,8 @@ it('switches between clusters and models and follows placement cross-links', asy
   await user.click(await screen.findByRole('button', { name: 'View site3 details' }));
   await user.click(await screen.findByRole('button', { name: model.displayName }));
   expect(screen.getByRole('heading', { name: 'Model configuration' })).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Brussels · site3' }));
-  expect(screen.getByRole('heading', { name: 'Site and cluster' })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'site3' }));
+  expect(screen.getByRole('heading', { name: 'Cluster' })).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Back' }));
   expect(screen.getByRole('heading', { name: 'Model configuration' })).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Back' }));
@@ -103,7 +118,7 @@ it('switches between clusters and models and follows placement cross-links', asy
     within(screen.getByRole('group', { name: 'Grid object type' })).getByRole('button', { name: 'Models' }),
   );
   expect(screen.getByRole('heading', { name: 'Models' })).toBeVisible();
-  expect(screen.getByText('Sites: Brussels')).toBeVisible();
+  expect(screen.getByText('Clusters: site3')).toBeVisible();
   expect(screen.queryByText('GPU utilization')).not.toBeInTheDocument();
   expect(screen.queryByText('Fleet metrics')).not.toBeInTheDocument();
 });
@@ -119,8 +134,8 @@ it("follows placement cross-links on the BFF's example model JSON", async () => 
   await user.click(await screen.findByRole('button', { name: 'View site-paris-1 details' }));
   await user.click(await screen.findByRole('button', { name: 'Granite 8B Instruct' }));
   expect(screen.getByRole('heading', { name: 'Model configuration' })).toBeVisible();
-  await user.click(screen.getByRole('button', { name: 'Paris DC1 · site-paris-1' }));
-  expect(screen.getByRole('heading', { name: 'Site and cluster' })).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'site-paris-1' }));
+  expect(screen.getByRole('heading', { name: 'Cluster' })).toBeVisible();
 });
 
 it('places a model on the clusters its placement chose, by name, when they share one location', async () => {
@@ -141,14 +156,14 @@ it('places a model on the clusters its placement chose, by name, when they share
   await user.click(screen.getByRole('button', { name: 'Clusters' }));
   await user.click(screen.getByRole('button', { name: 'View site-b details' }));
   await user.click(screen.getByRole('button', { name: 'Granite 8B Instruct' }));
-  expect(screen.getByRole('button', { name: 'Site B · site-b' })).toBeVisible();
-  expect(screen.queryByRole('button', { name: 'Site A · site-a' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'site-b' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'site-a' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Back' }));
   await user.click(screen.getByRole('button', { name: 'Clusters' }));
   await user.click(
     within(screen.getByRole('group', { name: 'Grid object type' })).getByRole('button', { name: 'Models' }),
   );
-  expect(screen.getByText('Sites: Site B')).toBeVisible();
+  expect(screen.getByText('Clusters: site-b')).toBeVisible();
 });
 
 it('uses the configured tile URL, or none for the bundled land outline', () => {
