@@ -6,8 +6,5 @@ import type { ClusterView } from './clusterView';
 export const LOCATION_DOCS_URL =
   'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations';
 
-/** The site's name, or the cloud region when the hub admin named no site. */
-export const siteOf = (c: Pick<ClusterView, 'siteName' | 'region'>) => c.siteName ?? c.region;
-
 /** A position from the cluster's cloud region (no site is set): the area its provider names, not the data center. */
 export const isFromCloudRegion = (c: Pick<ClusterView, 'locationSource'>) => c.locationSource === 'cloud region';

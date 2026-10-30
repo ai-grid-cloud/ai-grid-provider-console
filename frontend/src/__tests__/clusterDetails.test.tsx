@@ -54,7 +54,7 @@ it('shows a member: AI Grid, the cluster, its capacity and GPUs', async () => {
     within(aiGrid)
       .getAllByRole('term')
       .map((t) => t.textContent),
-  ).toEqual(['Status', 'Location', 'Role']);
+  ).toEqual(['Status', 'Location label', 'Role']);
 
   const cluster = details('Cluster');
   // The hub's connection to the cluster is the Cluster card's status, not an unlabeled one in the
@@ -525,7 +525,9 @@ it('says where the map puts the cluster, from its cloud region, with how to set 
     'href',
     'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
   );
-  expect(screen.getByTestId('cluster-site')).toHaveTextContent('us-east-2 (cloud region)');
+  // The cloud region is the Region, not a data center.
+  expect(screen.queryByTestId('cluster-data-center')).not.toBeInTheDocument();
+  expect(screen.getByText('us-east-2')).toBeVisible();
 });
 
 it('says what to fix when the coordinate annotations are wrong', async () => {

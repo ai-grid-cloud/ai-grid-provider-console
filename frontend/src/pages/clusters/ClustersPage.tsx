@@ -27,8 +27,7 @@ import type { MembershipChange } from './MembershipModal';
 import { changeMembership } from './changeMembership';
 import { MembershipModal } from './MembershipModal';
 import { MissingLabel } from './MissingLabel';
-import { ClusterSite } from './ClusterSite';
-import { siteOf } from './site';
+import { ClusterDataCenter } from './ClusterSite';
 import { gpuCount, membershipAction, statusReason } from './clusterInfo';
 import { capacityText, configurationText, gpuCountText, gpuSharing } from './gpuText';
 import { clusterRoles, roleOf } from './roles';
@@ -43,14 +42,13 @@ import { useClusterList, useMembershipWrites } from './useClusters';
 // cards (UX review). Each name opens the cluster's details page. No Hub column: a cluster the hub
 // hasn't accepted shows Not accepted in the cluster status's tooltip, and Add says why it's
 // disabled (on the real backend the BFF derives that state from spec.hub_accepts_client,
-// the backend's state). Site is where the backend's status.location puts the cluster: the site
-// name a hub admin set, or the cloud region (marked "(cloud region)"), with a warning when the coordinate
-// annotations are wrong. It is a column of its own, beside but apart from the AI Grid Location (the
-// location label Add writes). The status tooltip adds the ACM state behind Unknown (such as
+// the backend's state). Data center is the name a hub admin set (annotation ai-grid/site-name), with a
+// warning when the coordinate annotations are wrong; Region is the cloud region ACM reports. Location
+// label is the `location` label Add can write, which nothing places or routes by. The status tooltip adds the ACM state behind Unknown (such as
 // Importing) and the backend's message, which the PoC's three states don't have.
 
 type Column = {
-  /** The header under its group: Name, Status, Location, ... */
+  /** The header under its group: Name, Status, Data center, ... */
   label: string;
   /** The label on a phone, where the table stacks and the group headers are hidden. */
   dataLabel: string;
@@ -73,7 +71,12 @@ const columns: Column[] = [
     srPrefix: 'Cluster',
     sort: (a, b) => a.status.localeCompare(b.status),
   },
-  { label: 'Site', dataLabel: 'Site', sort: (a, b) => (siteOf(a) ?? '').localeCompare(siteOf(b) ?? '') },
+  {
+    label: 'Data center',
+    dataLabel: 'Data center',
+    sort: (a, b) => (a.siteName ?? '').localeCompare(b.siteName ?? ''),
+  },
+  { label: 'Region', dataLabel: 'Region', sort: (a, b) => (a.region ?? '').localeCompare(b.region ?? '') },
   {
     label: 'Status',
     dataLabel: 'AI Grid status',
@@ -81,8 +84,8 @@ const columns: Column[] = [
     sort: (a, b) => membership(a).localeCompare(membership(b)),
   },
   {
-    label: 'Location',
-    dataLabel: 'Location',
+    label: 'Location label',
+    dataLabel: 'Location label',
     sort: (a, b) => (a.location ?? '').localeCompare(b.location ?? ''),
   },
   {
@@ -114,7 +117,7 @@ const columns: Column[] = [
 
 /** The header groups over the columns, in order: each spans that many columns. */
 const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
-  { label: 'Cluster', span: 3 },
+  { label: 'Cluster', span: 4 },
   { label: 'AI Grid', span: 3 },
   {
     label: 'GPUs',
@@ -280,7 +283,7 @@ export const ClustersPage: React.FC = () => {
                         sort={sortParams(i)}
                         info={c.info}
                         modifier="wrap"
-                        hasRightBorder={i === 1 || i === 4}
+                        hasRightBorder={i === 3 || i === 6}
                       >
                         {c.srPrefix && <span className="pf-v6-screen-reader">{c.srPrefix} </span>}
                         {c.label}
@@ -304,25 +307,16 @@ export const ClustersPage: React.FC = () => {
                         <Td dataLabel="Cluster status">
                           <StatusLabel isCompact status={c.status} reason={statusReason(c)} />
                         </Td>
-                        <Td dataLabel="Site" hasRightBorder>
-                          <ClusterSite cluster={c} testId={`cluster-site-${c.name}`} />
+                        <Td dataLabel="Data center">
+                          <ClusterDataCenter cluster={c} testId={`cluster-data-center-${c.name}`} />
+                        </Td>
+                        <Td dataLabel="Region" hasRightBorder>
+                          {c.region ?? EMPTY_VALUE}
                         </Td>
                         <Td dataLabel="AI Grid status">
                           <StatusLabel isCompact status={c.aiGridEnabled ? c.provisioningStatus : 'Not added'} />
                         </Td>
-                        <Td dataLabel="Location">
-                          {c.location ??
-                            (c.aiGridEnabled ? (
-                              <MissingLabel
-                                testId={`missing-location-${c.name}`}
-                                reason="This member has no location label, so models can't be deployed to it."
-                              >
-                                No location
-                              </MissingLabel>
-                            ) : (
-                              EMPTY_VALUE
-                            ))}
-                        </Td>
+                        <Td dataLabel="Location label">{c.location ?? EMPTY_VALUE}</Td>
                         <Td dataLabel="Role" hasRightBorder>
                           {!c.aiGridEnabled
                             ? EMPTY_VALUE

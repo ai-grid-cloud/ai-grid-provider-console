@@ -128,7 +128,7 @@ it('does not say the hub is disconnected when removing local-cluster', async () 
   );
 });
 
-it('warns about a member without a location, and asks for a location and role before adding', async () => {
+it('asks for a location label and role before adding', async () => {
   const user = userEvent.setup();
   const service = serviceWith([
     cluster('no-location-member', 'Ready', { 'ai-grid/enabled': 'true' }),
@@ -136,7 +136,8 @@ it('warns about a member without a location, and asks for a location and role be
     cluster('local-cluster', 'Ready'),
   ]);
   renderAt('/clusters', service);
-  expect(await screen.findByTestId('missing-location-no-location-member')).toHaveTextContent('No location');
+  // A member without a location label gets no warning: nothing places models by it.
+  expect(within(await screen.findByRole('row', { name: /^no-location-member / })).queryByRole('img')).toBeNull();
   await pick(user, 'no-location', 'Add to AI Grid');
   const modal = await screen.findByTestId('cluster-membership-modal');
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
@@ -229,7 +230,6 @@ it('shows the role and location Add wrote while the list reloads', async () => {
   expect(row).toHaveTextContent('Inference');
   expect(row).toHaveTextContent('paris');
   expect(screen.queryByTestId('missing-role-cluster-b')).not.toBeInTheDocument();
-  expect(screen.queryByTestId('missing-location-cluster-b')).not.toBeInTheDocument();
   // The reloaded list replaces it: here someone changed the role in the meantime.
   service.clusters[0] = {
     ...service.clusters[0],
@@ -324,16 +324,16 @@ it('keeps the list under a warning when a reload fails, and clears it on the nex
   await waitFor(() => expect(screen.queryByTestId('stale-data-alert')).not.toBeInTheDocument());
 });
 
-it('shows the seeded clusters with location, status and provisioning, and no site or region', async () => {
+it('shows the seeded clusters with region, location label, status and provisioning', async () => {
   renderAt('/clusters', new MockConsoleService());
   const table = await screen.findByTestId('clusters-table');
   const sydney = within(table).getByRole('row', { name: /^site4 / });
   // site4 is both the name and the location.
   expect(within(sydney).getAllByText('site4')).toHaveLength(2);
   expect(sydney).toHaveTextContent('Ready');
-  // Its ai-grid/site and ai-grid/region labels aren't shown.
+  // Its region shows in the Region column; its ai-grid/site label isn't shown.
+  expect(within(sydney).getByRole('cell', { name: 'asia-pacific' })).toBeVisible();
   expect(sydney).not.toHaveTextContent('sydney');
-  expect(sydney).not.toHaveTextContent('asia-pacific');
   // Not a member: says so, with no provisioning and no role.
   expect(sydney).not.toHaveTextContent('provisioned');
   expect(within(sydney).getByText('Not added')).toBeVisible();
@@ -584,7 +584,7 @@ it('shows no GPUs for a cluster whose capacity has none, and sorts by GPU count'
   expect(names[0]).toMatch(/^site4/);
 });
 
-it('groups the columns as the details page does, wraps them, and has a Site but no Hub or Region column', async () => {
+it('groups the columns as the details page does, wraps them, and has Data center and Region but no Hub column', async () => {
   renderAt('/clusters', serviceWith(hubClusters()));
   const table = await screen.findByTestId('clusters-table');
   const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
@@ -599,9 +599,10 @@ it('groups the columns as the details page does, wraps them, and has a Site but 
   expect(headers.map((h) => h.textContent)).toEqual([
     'Name',
     'Cluster Status',
-    'Site',
+    'Data center',
+    'Region',
     'AI Grid Status',
-    'Location',
+    'Location label',
     'Role',
     'Capacity',
     'Configuration',
@@ -614,11 +615,8 @@ it('groups the columns as the details page does, wraps them, and has a Site but 
   expect(within(columns).getByRole('button', { name: 'AI Grid Status' })).toBeInTheDocument();
   expect(within(columns).getAllByText('Status')).toHaveLength(2);
   expect(within(table).getByRole('columnheader', { name: /^Role/ })).not.toHaveClass('pf-m-hidden');
-  // A cluster the hub hasn't accepted says so under Connection. Site is where the backend puts the
-  // cluster (its site name, or its cloud region); the cloud region has no column of its own.
-  for (const name of ['Hub', 'Region']) {
-    expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument();
-  }
+  // A cluster the hub hasn't accepted says so under Connection, so there is no Hub column.
+  expect(within(table).queryByRole('columnheader', { name: 'Hub' })).not.toBeInTheDocument();
   // The OpenShift version is on the details page, leaving room for GPUs and Capacity.
   expect(within(table).queryByRole('columnheader', { name: 'OpenShift' })).not.toBeInTheDocument();
   // The actions column stays in view: it sticks to the right edge of the scrolling table.
@@ -750,7 +748,7 @@ it('returns focus to the row’s menu button when the dialog it opened closes', 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for site4' })).toHaveFocus());
 });
 
-it("shows each cluster's site: its name, the cloud region marked as such, or what to fix", async () => {
+it("shows each cluster's data center and region apart, or what to fix", async () => {
   const user = userEvent.setup();
   renderAt(
     '/clusters',
@@ -797,15 +795,12 @@ it("shows each cluster's site: its name, the cloud region marked as such, or wha
       },
     ),
   );
-  expect(await screen.findByTestId('cluster-site-named')).toHaveTextContent(/^Columbus DC2$/);
-  const inRegion = screen.getByTestId('cluster-site-in-region');
-  expect(inRegion).toHaveTextContent('us-east-2 (cloud region)');
-  // What "(cloud region)" means, from the keyboard too.
-  inRegion.focus();
-  expect(await screen.findByRole('tooltip')).toHaveTextContent(
-    'No site is set on this cluster; the map places it by its cloud region.',
-  );
-  const wrong = screen.getByTestId('cluster-site-wrong');
+  expect(await screen.findByTestId('cluster-data-center-named')).toHaveTextContent(/^Columbus DC2$/);
+  // The cloud region is the Region column, never the data center.
+  const inRegion = screen.getByRole('row', { name: /^in-region / });
+  expect(screen.queryByTestId('cluster-data-center-in-region')).not.toBeInTheDocument();
+  expect(within(inRegion).getByRole('cell', { name: 'us-east-2' })).toBeVisible();
+  const wrong = screen.getByTestId('cluster-data-center-wrong');
   expect(wrong).toHaveTextContent('Position not readable');
   await user.hover(wrong);
   expect(await screen.findByText('ai-grid/latitude "40,7" is not a decimal number of degrees')).toBeInTheDocument();

@@ -46,7 +46,7 @@ import { MissingLabel } from './MissingLabel';
 import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
-import { ClusterSite } from './ClusterSite';
+import { ClusterDataCenter } from './ClusterSite';
 import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
@@ -62,17 +62,8 @@ const aiGridItems = (c: ClusterView) => {
       'data-testid': 'cluster-membership',
     },
     {
-      term: 'Location',
-      value:
-        c.location ??
-        (c.aiGridEnabled ? (
-          <MissingLabel
-            testId="missing-location"
-            reason="This member has no location label, so models can't be deployed to it."
-          >
-            No location
-          </MissingLabel>
-        ) : undefined),
+      term: 'Location label',
+      value: c.location,
     },
     {
       term: 'Role',
@@ -107,7 +98,7 @@ const clusterItems = (c: ClusterView) => [
     ),
     'data-testid': 'cluster-status',
   },
-  { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" /> },
+  { term: 'Data center', value: <ClusterDataCenter cluster={c} testId="cluster-data-center" /> },
   { term: 'Region', value: c.region },
   { term: 'Map position', value: <MapPosition cluster={c} />, 'data-testid': 'cluster-map-position' },
   ...(c.openshiftVersion ? [{ term: 'OpenShift version', value: c.openshiftVersion }] : []),
