@@ -59,8 +59,8 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await page.getByRole('combobox', { name: 'Model server' }).selectOption({ label: 'vLLM on CPU' });
   await page.getByRole('button', { name: 'Next' }).click();
 
-  // Locations: options read "<site name> (<cluster>)", from Models/ListPlacementClusters.
-  await page.getByRole('combobox', { name: 'Locations' }).click();
+  // Clusters: options read the cluster name, then its data center and region, from Models/ListPlacementClusters.
+  await page.getByRole('combobox', { name: 'Clusters' }).click();
   await page.getByRole('option', { name: CLUSTER }).click();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Next' }).click();
