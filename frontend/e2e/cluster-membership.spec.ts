@@ -16,7 +16,7 @@ test('adds an enrollable cluster to the AI Grid, keeps it after a reload, and re
   await page.getByRole('menuitem', { name: 'Add to AI Grid' }).click();
   // The location is prefilled from the cluster's label; the role has to be chosen.
   const add = page.getByRole('dialog', { name: `Add ${ENROLLABLE} to AI Grid?` });
-  await expect(add.getByRole('textbox', { name: 'Location' })).toHaveValue(ENROLLABLE);
+  await expect(add.getByRole('textbox', { name: 'Location label' })).toHaveValue(ENROLLABLE);
   await add.getByRole('combobox', { name: 'Role' }).click();
   await page.getByRole('option', { name: /Combined/ }).click();
   await add.getByRole('button', { name: 'Add to AI Grid' }).click();

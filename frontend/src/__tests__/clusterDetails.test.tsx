@@ -416,7 +416,7 @@ const openAddSite4 = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(await screen.findByRole('button', { name: 'Actions for site4' }));
   await user.click(screen.getByRole('menuitem', { name: 'Add to AI Grid' }));
   const modal = await screen.findByTestId('cluster-membership-modal');
-  const location = within(modal).getByRole('textbox', { name: 'Location' });
+  const location = within(modal).getByRole('textbox', { name: 'Location label' });
   await user.clear(location);
   await user.paste('us-east');
   await user.click(within(modal).getByRole('combobox', { name: 'Role' }));
@@ -444,7 +444,7 @@ it('loads the cluster again into the open dialog after a conflict, so the next A
     await within(modal).findByText('This cluster changed since you opened this dialog. Check it and try again.'),
   ).toBeVisible();
   // The user's choices stand when the other change didn't touch them.
-  expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('us-east');
+  expect(within(modal).getByRole('textbox', { name: 'Location label' })).toHaveValue('us-east');
 
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(await screen.findByText('site4 added to AI Grid')).toBeVisible();
@@ -474,10 +474,10 @@ it('shows the location and role someone else set meanwhile instead of sending th
   await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
   expect(
     await within(modal).findByText(
-      'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+      'Someone else changed the location label or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
     ),
   ).toBeVisible();
-  expect(within(modal).getByRole('textbox', { name: 'Location' })).toHaveValue('eu-west');
+  expect(within(modal).getByRole('textbox', { name: 'Location label' })).toHaveValue('eu-west');
   expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('MaaS (ingress)');
 });
 

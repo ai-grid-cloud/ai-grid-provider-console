@@ -30,12 +30,11 @@ type Props = MembershipChange & {
   onClose: () => void;
 };
 
-// A Kubernetes label value: what the hub accepts for `location`.
+// A Kubernetes label value: what the hub accepts for `location`. Empty leaves the cluster without one.
 const labelValue = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
 
 const locationError = (location: string) => {
-  if (!location) return 'Required.';
-  if (!labelValue.test(location)) {
+  if (location && !labelValue.test(location)) {
     return 'Use up to 63 letters, digits, hyphens, underscores or dots, starting and ending with a letter or digit.';
   }
   return undefined;
@@ -59,7 +58,7 @@ const errorMessage = (err: unknown, join: boolean) => {
   return err instanceof Error ? err.message : 'The cluster could not be changed.';
 };
 
-/** Confirms adding a cluster to AI Grid, with its location and role, or removing it, and keeps a failure in view. */
+/** Confirms adding a cluster to AI Grid, with its role and an optional location label, or removing it, and keeps a failure in view. */
 export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onClose }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -93,7 +92,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         setRole(defaultRole(current));
         setTouched({ location: false, role: false });
         setError(
-          'Someone else changed the location or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
+          'Someone else changed the location label or role of this cluster since you opened this dialog. The dialog now shows theirs; check them and try again.',
         );
       } else {
         setError(errorMessage(err, join));
@@ -140,14 +139,14 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
       <ModalBody>
         <Stack hasGutter>
           <p>
-            The hub installs AI Grid on the cluster for its role, and model placements can then choose its location.
+            The hub installs AI Grid on the cluster for its role. Once a cluster that serves models is provisioned, you
+            can choose it when you deploy a model.
           </p>
           <Form id="cluster-membership-form" onSubmit={(e) => e.preventDefault()}>
-            <FormGroup label="Location" fieldId="cluster-location" isRequired>
+            <FormGroup label="Location label" fieldId="cluster-location">
               <TextInput
                 id="cluster-location"
                 value={location}
-                isRequired
                 isDisabled={busy}
                 validated={shownLocationError ? 'error' : 'default'}
                 aria-describedby="cluster-location-help"
@@ -158,7 +157,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
                 <HelperText id="cluster-location-help">
                   <HelperTextItem variant={shownLocationError ? 'error' : 'default'}>
                     {shownLocationError ??
-                      'The location label that model placements choose clusters by, such as us-east.'}
+                      'Optional. Sets the cluster’s location label, such as us-east. Models are placed on clusters by name, not by this label.'}
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>

@@ -82,11 +82,10 @@ export class MockConsoleService implements ConsoleService {
     const labels = { ...cluster.labels };
     const member = !!membership;
     if (membership) {
-      Object.assign(labels, {
-        'ai-grid/enabled': 'true',
-        'ai-grid/role': membership.role,
-        location: membership.location,
-      });
+      Object.assign(labels, { 'ai-grid/enabled': 'true', 'ai-grid/role': membership.role });
+      // An empty location label is no label, as the Clusters update writes it.
+      if (membership.location) labels.location = membership.location;
+      else delete labels.location;
     } else {
       delete labels['ai-grid/enabled'];
     }
@@ -94,7 +93,7 @@ export class MockConsoleService implements ConsoleService {
       ...current,
       aiGridEnabled: member,
       provisioningStatus: !member ? 'Not provisioned' : current.provisioned ? 'Provisioned' : 'Provisioning',
-      ...(labels.location ? { location: labels.location } : {}),
+      location: labels.location || undefined,
       labels,
       resourceVersion: String(Number(current.resourceVersion ?? '0') + 1),
     };
