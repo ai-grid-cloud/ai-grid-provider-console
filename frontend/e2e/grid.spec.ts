@@ -41,7 +41,7 @@ test('shows the fixture pins on the bundled land outline, and a pin opens its de
   await hover(pins.first());
   await expect(tooltip).toBeVisible();
   await pins.first().click();
-  await expect(page.getByRole('heading', { name: 'Site and cluster' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cluster', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Models on this cluster' })).toBeVisible();
   await expect(map.getByText(/ · .* · Ready/).first()).toBeVisible();
 });

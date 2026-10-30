@@ -43,7 +43,7 @@ import { DEFAULT_REPLICAS, sameSet, updateRequestOf, type ModelInput } from './m
 import { titleOf, type ModelView } from './modelView';
 import { OlderServedNameAlert } from './OlderServedNameAlert';
 import { useModelWrites, usePlacementClusters } from './useModels';
-import { deploymentNameFromUri, locationLabel, modelPath, siteNamesOf } from './modelUtils';
+import { deploymentNameFromUri, modelPath } from './modelUtils';
 import { type ModelServer, modelServerLabel, modelServers } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
@@ -82,7 +82,7 @@ const initialValues = (model?: ModelView) => ({
   memory: model ? (model.memory ?? '') : defaults.memory,
   gpuCount: model ? String(model.gpuCount ?? 0) : defaults.gpuCount,
   runtimeArgs: runtimeArgsOf(model?.env),
-  // Only a `name In [...]` placement can be edited as locations (placementClustersOf).
+  // Only a `name In [...]` placement can be edited as a list of clusters (placementClustersOf).
   locations: model?.placementClusters ?? [],
 });
 
@@ -98,7 +98,7 @@ const Help: React.FC<{ children: React.ReactNode; error?: string; id?: string }>
 const notAvailable = (err: unknown, what: string) =>
   err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this backend yet.` : undefined;
 
-/** Says which chosen locations are no longer offered; undefined when none are. */
+/** Says which chosen clusters are no longer offered; undefined when none are. */
 const goneLocationsError = (names: string[]) =>
   names.length === 0
     ? undefined
@@ -131,7 +131,7 @@ const ReviewStep: React.FC<{
 };
 
 /**
- * The four-step deploy wizard at /models/deploy: source, deployment, locations, review. With
+ * The four-step deploy wizard at /models/deploy: source, deployment, clusters, review. With
  * `model` it edits that deployment at /models/:id/edit through the same steps: every step can be
  * opened from the start, the fields the console doesn't edit are read-only, and Save changes sends
  * only what changed (Models/Update with its mask).
@@ -140,7 +140,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const navigate = useNavigate();
   const editing = !!model;
   const [start] = useState(() => initialValues(model));
-  // Editing any other placement as locations would change what else it selects.
+  // Editing any other placement as a list of clusters would change what else it selects.
   const locationsEditable = !model || model.placementClusters !== undefined;
   const replicasEditable = !model?.autoscaled;
   const writes = useModelWrites();
@@ -151,11 +151,15 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     refresh: reloadLocations,
   } = usePlacementClusters();
   const { data: clusters, refresh: reloadClusters } = useClusterList();
-  // Site names by location label, for a placement the console didn't write (its model.locations).
-  const siteNames = useMemo(() => siteNamesOf(clusters), [clusters]);
-  // Site names by cluster name, for the clusters Models/ListPlacementClusters offers and the placement takes.
-  const clusterSiteNames = useMemo(
-    () => new Map(clusters.flatMap((c) => (c.siteName ? [[c.name, c.siteName] as const] : []))),
+  // Each offered cluster's data center and region, the description under its name.
+  const clusterDescriptions = useMemo(
+    () =>
+      new Map(
+        clusters.flatMap((c) => {
+          const where = [c.siteName, c.region].filter(Boolean).join(' · ');
+          return where ? [[c.name, where] as const] : [];
+        }),
+      ),
     [clusters],
   );
   // AI Grid members ListPlacementClusters doesn't offer: not Available, not Compliant, or not a cluster
@@ -167,7 +171,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const reloadRef = useRef(0);
   // Chosen locations that a reload no longer offers. They stay as chips, so the user sees why Next is disabled.
   const goneLocations = locationsLoaded ? locations.filter((location) => !availableLocations.includes(location)) : [];
-  // Like the text fields, Locations shows its error only once the user has changed it.
+  // Like the text fields, Clusters shows its error only once the user has changed it.
   const [locationsTouched, setLocationsTouched] = useState(false);
   const { data: nameDescData, onDataChange: onNameDescChange } = useK8sNameDescriptionFieldData({
     maxLength: 63,
@@ -196,7 +200,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     enabled: start.runtimeArgs.length > 0,
     args: start.runtimeArgs,
   });
-  // A field shows its error only once the user has left it, as Locations does.
+  // A field shows its error only once the user has left it, as Clusters does.
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
   const touch = (field: string) => setTouched((prev) => (prev.has(field) ? prev : new Set(prev).add(field)));
   const [saving, setSaving] = useState(false);
@@ -314,22 +318,20 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   // A placement the console doesn't edit, or none, as the review and the step show it.
   const placedAt = () => {
     if (!model?.placed) return 'No placement';
-    return model.locations.length > 0
-      ? model.locations.map((l) => locationLabel(l, siteNames)).join(', ')
-      : 'No locations chosen yet';
+    return model.selectedClusters.length > 0 ? model.selectedClusters.join(', ') : 'No clusters chosen yet';
   };
 
   const locationsStep = () => {
     if (!locationsEditable) {
       return (
         <ReadOnlyField
-          label="Locations"
+          label="Clusters"
           fieldId="model-locations"
           value={placedAt()}
           reason={
             model?.placed
-              ? 'This placement selects clusters by more than location, so it can’t be edited as locations here.'
-              : 'This model has no placement, so it isn’t placed on any AI Grid location.'
+              ? 'This placement selects clusters by more than their names, so its clusters can’t be changed here.'
+              : 'This model has no placement, so it isn’t placed on any AI Grid cluster.'
           }
         />
       );
@@ -339,47 +341,44 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         <Alert
           isInline
           variant="danger"
-          title="Error loading locations"
+          title="Error loading clusters"
           actionLinks={<AlertActionLink onClick={() => void reloadLocations()}>Retry</AlertActionLink>}
         >
-          {notAvailable(locationsError, 'Locations are') ?? locationsError.message}
+          {notAvailable(locationsError, 'Clusters are') ?? locationsError.message}
         </Alert>
       );
     }
     if (!locationsLoaded) {
-      return <p>Loading locations...</p>;
+      return <p>Loading clusters...</p>;
     }
-    // With chosen locations to show, the field stays, so the user can see and remove them.
+    // With chosen clusters to show, the field stays, so the user can see and remove them.
     if (availableLocations.length === 0 && goneLocations.length === 0) {
       return (
-        <Alert isInline variant="warning" title="No locations available">
-          Locations become available when an AI Grid member that serves models is Available and provisioned.
+        <Alert isInline variant="warning" title="No clusters available">
+          A cluster is offered here when it is in AI Grid, serves models, and is Available and provisioned.
         </Alert>
       );
     }
     return (
-      <FormGroup label="Locations" fieldId="model-locations" isRequired>
+      <FormGroup label="Clusters" fieldId="model-locations" isRequired>
         <MultiSelection
           id="model-locations-select"
           inputId="model-locations"
-          ariaLabel="Locations"
-          placeholder="Select locations"
+          ariaLabel="Clusters"
+          placeholder="Select clusters"
           selectionRequired={locationsTouched}
-          noSelectedOptionsMessage="Select at least one location."
-          errorMessage={
-            locationsChanged
-              ? goneLocationsError(goneLocations.map((location) => locationLabel(location, clusterSiteNames)))
-              : undefined
-          }
+          noSelectedOptionsMessage="Select at least one cluster."
+          errorMessage={locationsChanged ? goneLocationsError(goneLocations) : undefined}
           value={[
             ...availableLocations.map((location) => ({
               id: location,
-              name: locationLabel(location, clusterSiteNames),
+              name: location,
+              description: clusterDescriptions.get(location),
               selected: locations.includes(location),
             })),
             ...goneLocations.map((location) => ({
               id: location,
-              name: locationLabel(location, clusterSiteNames),
+              name: location,
               selected: true,
               chipOnly: true,
             })),
@@ -403,9 +402,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   // with no GPUs never schedules, and a CPU server on a GPU cluster leaves its GPUs unused.
   const serverMismatch = (() => {
     if (editing || !server) return undefined;
-    const chosen = clusters.filter(
-      (c) => c.aiGridEnabled && (locations.includes(c.name) || (c.location && locations.includes(c.location))),
-    );
+    // The chosen ids are cluster names, never `location` labels.
+    const chosen = clusters.filter((c) => c.aiGridEnabled && locations.includes(c.name));
     const mismatched = chosen
       .filter((c) => c.gpuCapacity !== undefined && (server.usesGpus ? c.gpuCapacity === 0 : c.gpuCapacity > 0))
       .map((c) => c.name)
@@ -444,12 +442,12 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       ],
     },
     {
-      title: 'Locations',
+      title: 'Clusters',
       step: steps.locations,
       items: [
         {
-          term: 'Locations',
-          value: locationsEditable ? locations.map((l) => locationLabel(l, clusterSiteNames)).join(', ') : placedAt(),
+          term: 'Clusters',
+          value: locationsEditable ? locations.join(', ') : placedAt(),
         },
       ],
     },
@@ -460,7 +458,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       <PageHeader
         title={model ? `Edit ${titleOf(model)}` : 'Deploy model'}
         description={
-          model ? 'Change the model deployment’s settings and locations.' : 'Deploy a model to AI Grid locations.'
+          model ? 'Change the model deployment’s settings and clusters.' : 'Deploy a model to AI Grid clusters.'
         }
         breadcrumb={
           <Breadcrumb>
@@ -492,7 +490,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
               void reloadLocations().then(() => {
                 if (reload === reloadRef.current) setReloadingLocations(false);
               });
-              // The clusters only name the sites and count the unlisted members, so Next doesn't wait for them.
+              // The clusters only describe the options and count the unlisted members, so Next doesn't wait for them.
               void reloadClusters();
             }
           }}
@@ -701,7 +699,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
               </ExpandableSection>
             </Form>
           </WizardStep>
-          <WizardStep name="Locations" id={steps.locations} isDisabled={!sourceValid || !deploymentValid || saving}>
+          <WizardStep name="Clusters" id={steps.locations} isDisabled={!sourceValid || !deploymentValid || saving}>
             <Form maxWidth="750px">{locationsStep()}</Form>
           </WizardStep>
           <WizardStep

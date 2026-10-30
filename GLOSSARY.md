@@ -1,7 +1,7 @@
 # AI Grid Provider Console
 
 The administrative interface a cloud provider uses to run an AI Grid: enrolling clusters,
-onboarding organizations, deploying models across locations, and watching the result. It is
+onboarding organizations, deploying models across clusters, and watching the result. It is
 one of three faces of the product, alongside the organization administrator's and the end user's.
 
 ## Language
@@ -19,17 +19,29 @@ shows or hides actions based on whether the caller is one. Backend enforcement i
 ([ADR-0004](docs/adr/0004-the-bff-is-a-thin-relay.md)); today the BFF enforces this gate.
 _Avoid_: cluster admin, superuser, operator
 
-**Location**:
-Where a cluster physically is, as a single label shared by everything in that place. Models
-are deployed to locations in the console; underneath, a Placement selects grid clusters,
-including by cluster set, labels, claims or a cluster count.
-_Avoid_: datacenter, zone, geo
+**Region**:
+The geographic area a cluster runs in: today the cloud region ACM reports (the
+`region.open-cluster-management.io` claim). Used for grouping and for the map's fallback
+position; models are not placed by it.
+_Avoid_: location, geo, zone
+
+**Data center**:
+The display name a hub admin gives a cluster's physical place (annotation `ai-grid/site-name`),
+shown on the map and the Clusters pages.
+_Avoid_: site, location
+
+**Location label**:
+The cluster's `location` label, which Add to AI Grid can write. Nothing in delivery or routing
+reads it; models are placed on clusters by name. Whether it becomes the grid's region is open.
+_Avoid_: location (alone), where a model is deployed
 
 ### Resources
 
 **Cluster**:
-An OpenShift cluster managed by the hub. Not every cluster is part of the grid.
-_Avoid_: ManagedCluster, GridCluster, node, site
+An OpenShift cluster managed by the hub. Not every cluster is part of the grid. Models are
+deployed to clusters, chosen by name. In the grid each member cluster is one site (a GridSite of
+the same name), so the console says cluster.
+_Avoid_: ManagedCluster, GridCluster, node, site, location
 
 **Grid member**:
 A cluster that has been enrolled in the grid and provisioned for it. The distinction matters:

@@ -115,21 +115,21 @@ export type MembershipWrites = {
 };
 
 /**
- * Add writes `ai-grid/enabled: "true"`, the role and the location; Remove drops `ai-grid/enabled`
- * and keeps the rest, so the role and location are there if the cluster is added again.
+ * Add writes `ai-grid/enabled: "true"`, the role and the location label when one is given; Remove
+ * drops `ai-grid/enabled` and keeps the rest, so the role and label are there if the cluster is added again.
  */
 export const useMembershipWrites = (): MembershipWrites => {
   const transport = useTransport();
   return useMemo(() => {
     const client = createClient(Clusters, transport);
     return {
-      enrollCluster: (cluster, { location, role }) =>
-        writeLabels(client, cluster, {
-          ...cluster.labels,
-          [LABEL_ENABLED]: 'true',
-          [LABEL_ROLE]: role,
-          [LABEL_LOCATION]: location,
-        }),
+      enrollCluster: (cluster, { location, role }) => {
+        const labels: Record<string, string> = { ...cluster.labels, [LABEL_ENABLED]: 'true', [LABEL_ROLE]: role };
+        // An empty location label is no label: the update sends the whole set, so this removes one.
+        if (location) labels[LABEL_LOCATION] = location;
+        else delete labels[LABEL_LOCATION];
+        return writeLabels(client, cluster, labels);
+      },
       removeClusterFromGrid: (cluster) => {
         const labels = { ...cluster.labels };
         delete labels[LABEL_ENABLED];
