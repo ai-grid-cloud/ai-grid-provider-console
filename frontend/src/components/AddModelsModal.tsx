@@ -15,9 +15,14 @@ import {
   StackItem,
 } from '@patternfly/react-core';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
-import { entryModelId, type SubscriptionModelEntry } from '../pages/subscriptions/hooks/useSubscriptionModels';
+import { useClusterList } from '../pages/clusters/useClusters';
+import { ModelStatusModal } from '../pages/models/ModelStatusModal';
+import { PARTIALLY_AVAILABLE } from '../pages/models/modelStatusInfo';
+import { devReviewModel } from '../pages/models/statusReview';
 import type { ModelView } from '../pages/models/modelView';
+import { siteNamesOf } from '../pages/models/modelUtils';
 import { useModelList } from '../pages/models/useModels';
+import { entryModelId, type SubscriptionModelEntry } from '../pages/subscriptions/hooks/useSubscriptionModels';
 import { LoadError } from './LoadError';
 import { PageLoading } from './PageLoading';
 import { StatusLabel } from './StatusLabel';
@@ -42,7 +47,11 @@ const toggled = (set: Set<string>, key: string) => {
  */
 export const AddModelsModal: React.FC<Props> = ({ currentModels, onAdd, onRemove, onClose }) => {
   // Every model, from Models/List: the picker is the one place a subscription page reads the fleet.
-  const { data: availableModels, loaded, error, refresh } = useModelList();
+  const { data: listedModels, loaded, error, refresh } = useModelList();
+  const availableModels = useMemo(() => listedModels.map(devReviewModel), [listedModels]);
+  const { data: clusters } = useClusterList();
+  const siteNames = useMemo(() => siteNamesOf(clusters ?? []), [clusters]);
+  const [statusModel, setStatusModel] = useState<ModelView>();
   const [filter, setFilter] = useState('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [pendingAdds, setPendingAdds] = useState<Set<string>>(new Set());
@@ -86,96 +95,118 @@ export const AddModelsModal: React.FC<Props> = ({ currentModels, onAdd, onRemove
   };
 
   return (
-    <Modal isOpen onClose={onClose} variant="large" aria-label="Add models" data-testid="add-models-modal">
-      <ModalHeader title="Add models" />
-      <ModalBody>
-        <Stack hasGutter>
-          <StackItem>
-            Select the models members of this subscription can use. You set their token limits next.
-          </StackItem>
-          <StackItem>
-            <SearchInput
-              placeholder="Filter by model name"
-              value={filter}
-              onChange={(_e, val) => setFilter(val)}
-              onClear={() => setFilter('')}
-              data-testid="add-models-filter"
-            />
-          </StackItem>
-          {!loaded && (
+    <>
+      <Modal isOpen onClose={onClose} variant="large" aria-label="Add models" data-testid="add-models-modal">
+        <ModalHeader title="Add models" />
+        <ModalBody>
+          <Stack hasGutter>
             <StackItem>
-              <PageLoading label="Loading models" />
+              Select the models members of this subscription can use. You set their token limits next.
             </StackItem>
-          )}
-          {loaded && error && (
             <StackItem>
-              <LoadError subject="Models" error={error} onRetry={() => void refresh()} />
+              <SearchInput
+                placeholder="Filter by model name"
+                value={filter}
+                onChange={(_e, val) => setFilter(val)}
+                onClear={() => setFilter('')}
+                data-testid="add-models-filter"
+              />
             </StackItem>
-          )}
-          {loaded && !error && (
-            <StackItem>
-              <Table aria-label="Available models" data-testid="add-models-table">
-                <Thead>
-                  <Tr>
-                    <Th screenReaderText="Selected" />
-                    <Th
-                      sort={{
-                        sortBy: { index: 0, direction: sortDirection },
-                        onSort: () => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc')),
-                        columnIndex: 0,
-                      }}
-                    >
-                      Model name
-                    </Th>
-                    <Th>Status</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {filteredModels.map((model, rowIndex) => {
-                    const name = model.displayName ?? model.id;
-                    return (
-                      <Tr key={model.id}>
-                        {/* PatternFly's select cell names every box "Select row N"; this one names the model. */}
-                        <Td className="pf-v6-c-table__check">
-                          <Checkbox
-                            id={`add-model-${rowIndex}`}
-                            aria-label={`Select ${name}`}
-                            data-testid={`toggle-model-${model.id}`}
-                            isChecked={isInCurrentSelection(model)}
-                            onChange={() => handleToggleModel(model)}
-                          />
-                        </Td>
-                        <Td dataLabel="Model name">{name}</Td>
-                        <Td dataLabel="Status">
-                          <StatusLabel isCompact status={model.phase} reason={model.statusMessage} />
-                        </Td>
-                      </Tr>
-                    );
-                  })}
-                  {filteredModels.length === 0 && (
+            {!loaded && (
+              <StackItem>
+                <PageLoading label="Loading models" />
+              </StackItem>
+            )}
+            {loaded && error && (
+              <StackItem>
+                <LoadError subject="Models" error={error} onRetry={() => void refresh()} />
+              </StackItem>
+            )}
+            {loaded && !error && (
+              <StackItem>
+                <Table aria-label="Available models" data-testid="add-models-table">
+                  <Thead>
                     <Tr>
-                      <Td colSpan={3}>No models match the filter criteria.</Td>
+                      <Th screenReaderText="Selected" />
+                      <Th
+                        sort={{
+                          sortBy: { index: 0, direction: sortDirection },
+                          onSort: () => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc')),
+                          columnIndex: 0,
+                        }}
+                      >
+                        Model name
+                      </Th>
+                      <Th>Status</Th>
                     </Tr>
-                  )}
-                </Tbody>
-              </Table>
-            </StackItem>
-          )}
-        </Stack>
-      </ModalBody>
-      <ModalFooter>
-        <Button
-          variant="primary"
-          onClick={handleConfirm}
-          isDisabled={!loaded || !!error}
-          data-testid="confirm-add-models"
-        >
-          {currentModels.length ? 'Update models' : 'Add models'}
-        </Button>
-        <Button variant="link" onClick={onClose}>
-          Cancel
-        </Button>
-      </ModalFooter>
-    </Modal>
+                  </Thead>
+                  <Tbody>
+                    {filteredModels.map((model, rowIndex) => {
+                      const name = model.displayName ?? model.id;
+                      return (
+                        <Tr key={model.id}>
+                          {/* PatternFly's select cell names every box "Select row N"; this one names the model. */}
+                          <Td className="pf-v6-c-table__check">
+                            <Checkbox
+                              id={`add-model-${rowIndex}`}
+                              aria-label={`Select ${name}`}
+                              data-testid={`toggle-model-${model.id}`}
+                              isChecked={isInCurrentSelection(model)}
+                              onChange={() => handleToggleModel(model)}
+                            />
+                          </Td>
+                          <Td dataLabel="Model name">{name}</Td>
+                          <Td dataLabel="Status">
+                            <StatusLabel
+                              isCompact
+                              status={model.phase}
+                              reason={model.phase === PARTIALLY_AVAILABLE ? undefined : model.statusMessage}
+                              onClick={
+                                model.phase === PARTIALLY_AVAILABLE
+                                  ? (event) => {
+                                      event.stopPropagation();
+                                      setStatusModel(model);
+                                    }
+                                  : undefined
+                              }
+                            />
+                          </Td>
+                        </Tr>
+                      );
+                    })}
+                    {filteredModels.length === 0 && (
+                      <Tr>
+                        <Td colSpan={3}>No models match the filter criteria.</Td>
+                      </Tr>
+                    )}
+                  </Tbody>
+                </Table>
+              </StackItem>
+            )}
+          </Stack>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="primary"
+            onClick={handleConfirm}
+            isDisabled={!loaded || !!error}
+            data-testid="confirm-add-models"
+          >
+            {currentModels.length ? 'Update models' : 'Add models'}
+          </Button>
+          <Button variant="link" onClick={onClose}>
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
+      {statusModel && (
+        <ModelStatusModal
+          model={statusModel}
+          clusters={clusters ?? []}
+          siteNames={siteNames}
+          onClose={() => setStatusModel(undefined)}
+        />
+      )}
+    </>
   );
 };

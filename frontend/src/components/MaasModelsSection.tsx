@@ -18,6 +18,8 @@ import {
 } from '@patternfly/react-core';
 import { MinusCircleIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
+import { PARTIALLY_AVAILABLE } from '../pages/models/modelStatusInfo';
+import type { ModelView } from '../pages/models/modelView';
 import { formatTokenRateLimitLine, type TokenLimit } from '../utilities/rateLimits';
 import { DetailsSection } from './DetailsSection';
 import { StatusLabel } from './StatusLabel';
@@ -33,6 +35,8 @@ export type SubscriptionModelRow = {
   /** The status label's word, and its reason in the tooltip. */
   status: string;
   reason?: string;
+  /** Set when the row comes from Models/List, so Partially ready can open its dialog. */
+  model?: ModelView;
   tokenRateLimits: TokenLimit[];
   unlimited: boolean;
 };
@@ -44,6 +48,8 @@ type Props = {
   onAddModels?: () => void;
   onEditLimits?: (index: number) => void;
   onRemoveModel?: (index: number) => void;
+  /** Partially ready opens the same deployment dialog as the Models list. */
+  onOpenStatus?: (row: SubscriptionModelRow) => void;
   validationError?: string;
 };
 
@@ -58,6 +64,7 @@ export const MaasModelsSection: React.FC<Props> = ({
   onAddModels,
   onEditLimits,
   onRemoveModel,
+  onOpenStatus,
   validationError,
 }) => {
   const table = rows.length > 0 && (
@@ -122,7 +129,19 @@ export const MaasModelsSection: React.FC<Props> = ({
                 <TableRowTitleDescription title={<strong>{row.title}</strong>} subtitle={<code>{row.name}</code>} />
               </Td>
               <Td dataLabel="Status">
-                <StatusLabel isCompact status={row.status} reason={row.reason} />
+                <StatusLabel
+                  isCompact
+                  status={row.status}
+                  reason={row.status === PARTIALLY_AVAILABLE && onOpenStatus ? undefined : row.reason}
+                  onClick={
+                    row.status === PARTIALLY_AVAILABLE && onOpenStatus && row.model
+                      ? (event) => {
+                          event.stopPropagation();
+                          onOpenStatus(row);
+                        }
+                      : undefined
+                  }
+                />
               </Td>
               <Td dataLabel="Token limits">{tokenLimits}</Td>
               {editable && (

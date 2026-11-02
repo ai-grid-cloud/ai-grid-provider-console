@@ -6,7 +6,7 @@
 // row expands to its locations and each one's status; the Locations cell shows up to five compact
 // labels. The models are the backend's Models/List over Connect (useModels.ts).
 import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Label, LabelGroup, ToolbarItem } from '@patternfly/react-core';
 import { ExpandableRowContent, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import type { ThProps } from '@patternfly/react-table';
@@ -23,9 +23,11 @@ import { EMPTY_VALUE } from '../../utilities/format';
 import { locationLabel, modelPath, siteNamesOf } from './modelUtils';
 import { ModelLocationsTable } from './ModelLocationsTable';
 import { NotPlaced } from './NotPlaced';
+import { ModelAvailability } from './ModelAvailability';
 import { ModelStatusLabel } from './ModelStatus';
 import { ModelStatusModal } from './ModelStatusModal';
-import { PARTIALLY_AVAILABLE } from './modelStatusInfo';
+import { availabilityOf, deploymentPageAvailable, listStatusOf } from './modelStatusInfo';
+import { devReviewModel, statusReviewClusters, statusReviewModels } from './statusReview';
 import { titleOf, type ModelView } from './modelView';
 import { useDeleteModel } from './useDeleteModel';
 import { useModelList } from './useModels';
@@ -33,24 +35,67 @@ import { useClusterList } from '../clusters/useClusters';
 
 type Column = { label: string; isNumber?: boolean; sort: (a: ModelView, b: ModelView) => number };
 
+/** Deployment lifecycle, so the list reads from saved through ready, then the later states. */
+const statusSequence = [
+  'Saved to Git',
+  'Syncing',
+  'Synced',
+  'Starting',
+  'Ready',
+  'Partially ready',
+  'Failed',
+  'Stopping',
+  'Stopped',
+  'Unknown',
+  'Pending',
+];
+
+const statusRank = (model: ModelView) => {
+  const index = statusSequence.indexOf(listStatusOf(model));
+  return index === -1 ? statusSequence.length : index;
+};
+
 const columns: Column[] = [
   { label: 'Name', sort: (a, b) => titleOf(a).localeCompare(titleOf(b)) },
   { label: 'Model', sort: (a, b) => (a.modelName ?? a.id).localeCompare(b.modelName ?? b.id) },
   { label: 'Replicas', isNumber: true, sort: (a, b) => (a.replicas ?? 0) - (b.replicas ?? 0) },
   { label: 'Locations', sort: (a, b) => a.locations.length - b.locations.length },
   { label: 'Created', sort: (a, b) => (a.creationTimestamp ?? '').localeCompare(b.creationTimestamp ?? '') },
-  { label: 'Status', sort: (a, b) => a.phase.localeCompare(b.phase) },
+  {
+    label: 'Status',
+    sort: (a, b) => statusRank(a) - statusRank(b) || titleOf(a).localeCompare(titleOf(b)),
+  },
+  {
+    label: 'Availability',
+    sort: (a, b) => (availabilityOf(a)?.label ?? '').localeCompare(availabilityOf(b)?.label ?? ''),
+  },
 ];
 
 export const ModelsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { data: models, loaded, error, refresh } = useModelList();
-  const { data: clusters } = useClusterList();
+  const location = useLocation();
+  const reviewQuery = new URLSearchParams(location.search).get('review') === '1';
+  // A dev build lists the sample rows on /models. Tests opt in with ?review=1, which shows only
+  // those rows. import.meta.env.MODE is "test" under Vitest and "development" under the dev server.
+  const showReview = import.meta.env.MODE === 'development' || reviewQuery;
+  const { data: loadedModels, loaded, error, refresh } = useModelList();
+  const { data: loadedClusters } = useClusterList();
+  const models = useMemo(() => {
+    if (!showReview) {
+      return loadedModels ?? [];
+    }
+    const live = (loadedModels ?? []).map(devReviewModel);
+    return reviewQuery ? statusReviewModels : [...statusReviewModels, ...live];
+  }, [showReview, reviewQuery, loadedModels]);
+  const clusters = useMemo(
+    () => (showReview ? [...statusReviewClusters, ...(loadedClusters ?? [])] : (loadedClusters ?? [])),
+    [showReview, loadedClusters],
+  );
   const { user } = useConsoleSession();
   const siteNames = useMemo(() => siteNamesOf(clusters), [clusters]);
   const canWrite = !!user?.isProviderAdmin;
   const [filter, setFilter] = useState('');
-  const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 0, direction: 'asc' });
+  const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 5, direction: 'asc' });
   // The models whose rows show their locations.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const setRowExpanded = (id: string, open: boolean) =>
@@ -129,7 +174,7 @@ export const ModelsPage: React.FC = () => {
                     key={c.label}
                     sort={sortParams(i)}
                     modifier="wrap"
-                    className={c.isNumber ? 'console-number' : undefined}
+                    className={c.isNumber ? 'pf-v6-u-text-align-end' : undefined}
                   >
                     {c.label}
                   </Th>
@@ -148,11 +193,12 @@ export const ModelsPage: React.FC = () => {
             ) : (
               pageRows.map((model, rowIndex) => {
                 const title = titleOf(model);
+                const availability = availabilityOf(model);
                 const isExpanded = expanded.has(model.id);
                 const edit = canWrite ? () => navigate(`${modelPath(model)}/edit`) : undefined;
                 return (
                   <Tbody key={model.id} isExpanded={isExpanded}>
-                    <Tr isContentExpanded={isExpanded}>
+                    <Tr isContentExpanded={isExpanded} isControlRow>
                       {/* Every row expands: to each placed cluster's status, to the clusters its
                           placement chose while none has reported, or to say it has none. */}
                       <Td
@@ -164,12 +210,16 @@ export const ModelsPage: React.FC = () => {
                         }}
                       />
                       <Td dataLabel="Name">
-                        <Link to={modelPath(model)}>{title}</Link>
+                        {deploymentPageAvailable(listStatusOf(model)) ? (
+                          <Link to={modelPath(model)}>{title}</Link>
+                        ) : (
+                          title
+                        )}
                       </Td>
                       <Td dataLabel="Model" modifier="breakWord">
                         {model.modelName ?? EMPTY_VALUE}
                       </Td>
-                      <Td dataLabel="Replicas" className="console-number">
+                      <Td dataLabel="Replicas" className="pf-v6-u-text-align-end">
                         {model.replicas ?? EMPTY_VALUE}
                       </Td>
                       <Td dataLabel="Locations" data-testid={`model-locations-${model.id}`}>
@@ -190,6 +240,9 @@ export const ModelsPage: React.FC = () => {
                       </Td>
                       <Td dataLabel="Status">
                         <ModelStatusLabel model={model} onOpen={() => setStatusModelId(model.id)} />
+                      </Td>
+                      <Td dataLabel="Availability" data-testid={`model-availability-${model.id}`}>
+                        {availability ? <ModelAvailability model={model} availability={availability} /> : EMPTY_VALUE}
                       </Td>
                       {canWrite && (
                         <Td isActionCell>
@@ -212,19 +265,11 @@ export const ModelsPage: React.FC = () => {
                       )}
                     </Tr>
                     <Tr isExpanded={isExpanded}>
-                      <Td />
-                      <Td colSpan={columns.length + (canWrite ? 1 : 0)}>
+                      <Td colSpan={columns.length + 1 + (canWrite ? 1 : 0)}>
                         <ExpandableRowContent>
                           {isExpanded &&
                             (model.clusters.length > 0 || model.selectedClusters.length > 0 ? (
-                              <ModelLocationsTable
-                                model={model}
-                                clusters={clusters}
-                                siteNames={siteNames}
-                                onEdit={edit}
-                                onDelete={canWrite ? () => confirmDelete(model) : undefined}
-                                isNested
-                              />
+                              <ModelLocationsTable model={model} clusters={clusters} siteNames={siteNames} />
                             ) : (
                               <NotPlaced model={model} onEdit={edit} />
                             ))}
@@ -246,8 +291,8 @@ export const ModelsPage: React.FC = () => {
       <PageStateSection
         title="Models"
         description="Add and remove model deployments."
-        loaded={loaded}
-        error={error}
+        loaded={reviewQuery || loaded}
+        error={reviewQuery ? undefined : error}
         onRetry={() => void refresh()}
         subject="Models"
         loadingLabel="Loading models"
@@ -258,15 +303,9 @@ export const ModelsPage: React.FC = () => {
       {statusModel && (
         <ModelStatusModal
           model={statusModel}
+          clusters={clusters}
+          siteNames={siteNames}
           onClose={() => setStatusModelId(undefined)}
-          onViewDeployments={
-            statusModel.phase === PARTIALLY_AVAILABLE
-              ? () => {
-                  setRowExpanded(statusModel.id, true);
-                  setStatusModelId(undefined);
-                }
-              : undefined
-          }
         />
       )}
     </>

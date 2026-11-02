@@ -478,10 +478,9 @@ it('shows the ACM state for an importing cluster', async () => {
     }),
   );
   const row = await screen.findByRole('row', { name: /^site-berlin-1 / });
-  // One status line; the state and the message are in its tooltip.
-  expect(within(row).getByText('Unknown')).toBeInTheDocument();
+  // One status word. The ACM state and the hub's message open from it.
   expect(within(row).queryByText('Importing')).not.toBeInTheDocument();
-  await user.hover(within(row).getByText('Unknown'));
+  await user.click(within(row).getByRole('button', { name: 'Unknown' }));
   expect(await screen.findByText('Importing: Import of the managed cluster is in progress')).toBeInTheDocument();
 });
 

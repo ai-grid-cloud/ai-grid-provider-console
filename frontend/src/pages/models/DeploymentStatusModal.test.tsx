@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
 import { DeploymentStatusModal } from './DeploymentStatusModal';
 import { siteDeploymentConditions } from './siteDeploymentConditions';
 
@@ -23,26 +23,23 @@ describe('siteDeploymentConditions', () => {
 });
 
 describe('DeploymentStatusModal', () => {
-  it('opens the progress tab with what the cluster reported, and stop and edit actions', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const onEdit = vi.fn();
-    const onStop = vi.fn();
+  it('opens the progress tab with what the cluster reported, and links the cluster name', () => {
     render(
-      <DeploymentStatusModal
-        title="Granite 8B Instruct"
-        phase="Ready"
-        locationLabel="Paris DC1 (paris)"
-        cluster="site-paris-1"
-        reason="Ready"
-        message="LLMInferenceService ready"
-        createdAt={createdAt}
-        onClose={onClose}
-        onEdit={onEdit}
-        onStop={onStop}
-      />,
+      <MemoryRouter>
+        <DeploymentStatusModal
+          title="Granite 8B Instruct"
+          phase="Ready"
+          locationLabel="Paris DC1 (paris)"
+          cluster="site-paris-1"
+          reason="Ready"
+          message="LLMInferenceService ready"
+          createdAt={createdAt}
+          onClose={() => undefined}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByTestId('deployment-status-modal')).toBeVisible();
+    expect(screen.getByRole('dialog')).toHaveClass('pf-m-md');
     const header = screen.getByTestId('deployment-status-modal-header');
     expect(header).toHaveTextContent('Granite 8B Instruct status');
     expect(screen.getByTestId('model-status-text')).toHaveTextContent('Ready');
@@ -50,13 +47,13 @@ describe('DeploymentStatusModal', () => {
     expect(subtitle.tagName).toBe('P');
     expect(subtitle).toHaveTextContent(/Deployment status for/);
     expect(screen.getByTestId('deployment-status-location')).toHaveTextContent('Paris DC1 (paris)');
-    expect(subtitle).toHaveTextContent('on cluster site-paris-1');
-    expect(within(subtitle).getByTestId('deployment-status-location')).toBeVisible();
+    expect(within(subtitle).getByRole('link', { name: 'site-paris-1' })).toHaveAttribute(
+      'href',
+      '/clusters/site-paris-1',
+    );
     expect(screen.getByTestId('deployment-status-steps')).toBeVisible();
     expect(screen.getByText('LLMInferenceService ready')).toBeVisible();
-    await user.click(screen.getByTestId('deployment-status-edit-button'));
-    expect(onEdit).toHaveBeenCalled();
-    await user.click(screen.getByTestId('deployment-status-stop-button'));
-    expect(onStop).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Edit deployment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop deployment' })).not.toBeInTheDocument();
   });
 });

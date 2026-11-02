@@ -45,9 +45,3 @@ dl.console-about-facts {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-/* A number in a table: right-aligned, with digits of one width so columns line up. */
-.console-number {
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-}

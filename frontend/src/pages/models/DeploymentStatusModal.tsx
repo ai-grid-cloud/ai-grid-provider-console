@@ -4,8 +4,8 @@
 // the same shape the dashboard shows for a deployment, filled from that phase: the fake and git
 // mode do not send the full LLMInferenceService condition tree.
 import type { CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Button,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
@@ -17,7 +17,6 @@ import {
   Label,
   Modal,
   ModalBody,
-  ModalFooter,
   ModalHeader,
   ProgressStep,
   ProgressStepper,
@@ -34,6 +33,7 @@ import { InfoCircleIcon } from '@patternfly/react-icons';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { statusLabelProps } from '../../utilities/status';
 import { siteDeploymentConditions, type DeploymentCondition } from './siteDeploymentConditions';
+import { statusModalLayout } from './statusModalLayout';
 
 type ConditionStatus = 'True' | 'False' | 'Unknown';
 
@@ -50,8 +50,6 @@ type Props = {
   message?: string;
   createdAt?: string;
   onClose: () => void;
-  onEdit?: () => void;
-  onStop?: () => void;
 };
 
 const stepVariant = (status: ConditionStatus) => {
@@ -106,14 +104,12 @@ export const DeploymentStatusModal: React.FC<Props> = ({
   message,
   createdAt,
   onClose,
-  onEdit,
-  onStop,
 }) => {
   const conditions = siteDeploymentConditions(phase, createdAt);
 
   return (
     <Modal
-      variant="medium"
+      {...statusModalLayout}
       isOpen
       onClose={onClose}
       data-testid="deployment-status-modal"
@@ -127,18 +123,23 @@ export const DeploymentStatusModal: React.FC<Props> = ({
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
             <FlexItem>{title} status</FlexItem>
             <FlexItem>
-              <Label {...statusLabelProps(phase)} variant="filled" data-testid="model-status-text">
+              <Label isCompact {...statusLabelProps(phase)} variant="filled" data-testid="model-status-text">
                 {phase}
               </Label>
             </FlexItem>
           </Flex>
         </Title>
         <p data-testid="deployment-status-subtitle">
-          Deployment status for{' '}
-          <Label color="grey" data-testid="deployment-status-location">
+          <strong>Deployment status</strong> for{' '}
+          <Label isCompact color="grey" data-testid="deployment-status-location">
             {locationText}
           </Label>
-          {locationText !== cluster && <> on cluster {cluster}</>}
+          {locationText !== cluster && (
+            <>
+              {' '}
+              on cluster <Link to={`/clusters/${encodeURIComponent(cluster)}`}>{cluster}</Link>
+            </>
+          )}
         </p>
       </ModalHeader>
       <ModalBody>
@@ -146,11 +147,15 @@ export const DeploymentStatusModal: React.FC<Props> = ({
           <StackItem>
             <DescriptionList isCompact aria-label={`What ${cluster} reported`}>
               <DescriptionListGroup>
-                <DescriptionListTerm>Reason</DescriptionListTerm>
+                <DescriptionListTerm>
+                  <strong>Reason</strong>
+                </DescriptionListTerm>
                 <DescriptionListDescription>{reason || EMPTY_VALUE}</DescriptionListDescription>
               </DescriptionListGroup>
               <DescriptionListGroup>
-                <DescriptionListTerm>Message</DescriptionListTerm>
+                <DescriptionListTerm>
+                  <strong>Message</strong>
+                </DescriptionListTerm>
                 <DescriptionListDescription>{message ?? EMPTY_VALUE}</DescriptionListDescription>
               </DescriptionListGroup>
             </DescriptionList>
@@ -206,26 +211,6 @@ export const DeploymentStatusModal: React.FC<Props> = ({
           </StackItem>
         </Stack>
       </ModalBody>
-      {(onStop || onEdit) && (
-        <ModalFooter>
-          <Flex gap={{ default: 'gapMd' }}>
-            {onStop && (
-              <FlexItem>
-                <Button variant="primary" onClick={onStop} data-testid="deployment-status-stop-button">
-                  Stop deployment
-                </Button>
-              </FlexItem>
-            )}
-            {onEdit && (
-              <FlexItem>
-                <Button variant="link" onClick={onEdit} data-testid="deployment-status-edit-button">
-                  Edit deployment
-                </Button>
-              </FlexItem>
-            )}
-          </Flex>
-        </ModalFooter>
-      )}
     </Modal>
   );
 };

@@ -27,7 +27,19 @@ export const REQUEST_GPU = 'nvidia.com/gpu';
 const SAVED_TO_GIT = 'SavedToGit';
 
 /** A model's phase as the pages word it. */
-export type ModelPhaseWord = 'Ready' | 'Pending' | 'Failed' | 'Partially available' | 'Saved to Git' | 'Unknown';
+export type ModelPhaseWord =
+  | 'Ready'
+  | 'Pending'
+  | 'Failed'
+  | 'Partially ready'
+  | 'Saved to Git'
+  | 'Syncing'
+  | 'Synced'
+  // Open Data Hub deployment labels (ModelStatusIcon). Pending, Loading, and Standby all show as Starting.
+  | 'Starting'
+  | 'Stopped'
+  | 'Stopping'
+  | 'Unknown';
 
 /** The model on one cluster its placement names, as the backend reports it (`status.clusters`). */
 export type ModelClusterView = {
@@ -82,6 +94,11 @@ export type ModelView = {
   placementClusters?: string[];
   /** Whether the model has a placement at all. */
   placed: boolean;
+  /**
+   * Review rows only. The MaaSModelRef Ready.message this sample stands in for, until that
+   * condition is its own field. availabilityOf prefers it to the cluster deployment messages.
+   */
+  maasReport?: string;
 };
 
 const phaseWords: Record<ModelPhase, ModelPhaseWord> = {
@@ -89,7 +106,7 @@ const phaseWords: Record<ModelPhase, ModelPhaseWord> = {
   [ModelPhase.PENDING]: 'Pending',
   [ModelPhase.READY]: 'Ready',
   [ModelPhase.FAILED]: 'Failed',
-  [ModelPhase.PARTIALLY_AVAILABLE]: 'Partially available',
+  [ModelPhase.PARTIALLY_AVAILABLE]: 'Partially ready',
 };
 
 /**

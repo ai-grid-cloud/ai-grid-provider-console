@@ -61,7 +61,7 @@ it('gives every status label in one column one variant, whatever the status: /su
   }
 });
 
-it("gives the Models list's status column one variant, whatever the phase: outline, opening nothing", async () => {
+it('opens a Models list status only when the word is not the whole fact', async () => {
   const service = new MockConsoleService();
   const models = modelsOf(service);
   const phases = [ModelPhase.READY, ModelPhase.FAILED, ModelPhase.PARTIALLY_AVAILABLE];
@@ -70,9 +70,11 @@ it("gives the Models list's status column one variant, whatever the phase: outli
   const rows = await screen.findByTestId('model-deployments-table');
   const labels = Array.from(rows.querySelectorAll<HTMLElement>('td[data-label="Status"] .pf-v6-c-label'));
   expect(new Set(labels.map((l) => l.textContent)).size).toBeGreaterThan(2);
-  expect(new Set(labels.map((l) => l.classList.contains('pf-m-outline')))).toEqual(new Set([true]));
   for (const label of labels) {
-    expect(within(label).queryByRole('button')).not.toBeInTheDocument();
+    const opens = (label.textContent ?? '').includes('Partially ready');
+    expect(label.classList.contains('pf-m-outline')).toBe(!opens);
+    const cell = label.closest('td');
+    expect(cell !== null && within(cell).queryByRole('button') !== null).toBe(opens);
   }
 });
 
@@ -117,7 +119,7 @@ it('shows billions as B on chart ticks', () => {
 it('gives a phase the same colour in its label and its subtext', () => {
   expect(statusLabelProps('Failed').status).toBe('danger');
   expect(getSubtextProps('Failed')).toEqual({ className: 'pf-v6-u-text-color-status-danger' });
-  expect(getSubtextProps('Partially available')).toEqual({ className: 'pf-v6-u-text-color-status-warning' });
+  expect(getSubtextProps('Partially ready')).toEqual({ className: 'pf-v6-u-text-color-status-warning' });
   expect(getSubtextProps('Ready')).toBeUndefined();
 });
 

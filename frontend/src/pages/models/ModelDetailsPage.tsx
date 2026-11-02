@@ -40,7 +40,6 @@ export const ModelDetailsPage: React.FC = () => {
       return null;
     }
     const phase = modelPhase(model);
-    const edit = user?.isProviderAdmin ? () => navigate(`${modelPath(model)}/edit`) : undefined;
     return (
       <Flex direction={{ default: 'column' }} flexWrap={{ default: 'nowrap' }} spaceItems={{ default: 'spaceItemsXl' }}>
         {/* Saved to Git says all the backend knows yet; the status label shows it, so no alert repeats it. */}
@@ -76,13 +75,7 @@ export const ModelDetailsPage: React.FC = () => {
             // the clusters the placement chose until then.
             <Stack hasGutter data-testid="model-locations">
               {model.clusters.length || model.selectedClusters.length ? (
-                <ModelLocationsTable
-                  model={model}
-                  clusters={clusters}
-                  siteNames={siteNames}
-                  onEdit={edit}
-                  onDelete={user?.isProviderAdmin ? () => confirmDelete(model) : undefined}
-                />
+                <ModelLocationsTable model={model} clusters={clusters} siteNames={siteNames} />
               ) : (
                 <List>
                   {model.locations.map((location) => (

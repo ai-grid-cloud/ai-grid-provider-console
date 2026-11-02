@@ -1,7 +1,7 @@
 import type { ClusterView } from './clusterView';
 import type { MembershipChange } from './MembershipModal';
 
-/** The Connection tooltip: the ACM state behind Unknown, then the backend's message. */
+/** The cluster status dialog: the ACM state behind Unknown, then the backend's message. */
 export const statusReason = (c: ClusterView) => [c.state, c.statusMessage].filter(Boolean).join(': ') || undefined;
 
 /** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */

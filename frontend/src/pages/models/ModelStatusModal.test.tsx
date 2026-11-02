@@ -1,6 +1,7 @@
+import type { ReactElement } from 'react';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
 import { ModelStatusModal } from './ModelStatusModal';
 import type { ModelView } from './modelView';
 
@@ -20,9 +21,11 @@ const model = (partial: Partial<ModelView>): ModelView => ({
   ...partial,
 });
 
+const renderModal = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
+
 describe('ModelStatusModal', () => {
   it('shows model name, status label, and Deployment status subtitle', () => {
-    render(
+    renderModal(
       <ModelStatusModal
         model={model({
           phase: 'Failed',
@@ -30,36 +33,44 @@ describe('ModelStatusModal', () => {
           statusMessage: 'template missing',
           locations: ['paris'],
         })}
-        onClose={vi.fn()}
+        onClose={() => undefined}
       />,
     );
+    expect(screen.getByRole('dialog')).toHaveClass('pf-m-md');
     expect(screen.getByTestId('model-status-modal-title')).toHaveTextContent('Granite 8B Instruct');
     expect(screen.getByTestId('model-status-text')).toHaveTextContent('Failed');
     expect(screen.getByTestId('model-status-modal-subtitle')).toHaveTextContent('Deployment status');
     expect(screen.getByTestId('model-status-modal-subtitle').tagName).toBe('P');
     expect(screen.getByText('Deployment failed')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Sync now' })).not.toBeInTheDocument();
     expect(screen.getByText('A runtime template this model needs isn’t installed on the hub.')).toBeVisible();
   });
 
-  it('offers a link to view per-location deployments when Partially available', async () => {
-    const user = userEvent.setup();
-    const onViewDeployments = vi.fn();
-    render(
+  it('shows the locations table for Partially ready, without the summary sentence or a link back to the list', () => {
+    renderModal(
       <ModelStatusModal
         model={model({
-          phase: 'Partially available',
+          phase: 'Partially ready',
           statusMessage: 'Not ready on madrid; ready on paris',
+          clusters: [
+            { cluster: 'site-madrid-1', phase: 'Pending', reason: 'NotReady' },
+            { cluster: 'site-paris-1', phase: 'Ready', reason: 'Ready' },
+          ],
         })}
-        onClose={vi.fn()}
-        onViewDeployments={onViewDeployments}
+        clusters={[
+          { name: 'site-madrid-1', location: 'madrid' },
+          { name: 'site-paris-1', location: 'paris', consoleUrl: 'https://console.example.com' },
+        ]}
+        siteNames={new Map([['paris', 'Paris DC1']])}
+        onClose={() => undefined}
       />,
     );
-    expect(screen.getByTestId('model-status-text')).toHaveTextContent('Partially available');
-    expect(screen.getByTestId('model-status-modal-message')).toHaveTextContent(
-      'One or more model deployments are not ready',
-    );
-    expect(screen.getByText('Not ready on madrid; ready on paris')).toBeVisible();
-    await user.click(screen.getByTestId('model-status-view-deployments'));
-    expect(onViewDeployments).toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toHaveClass('pf-m-md');
+    expect(screen.getByTestId('model-status-text')).toHaveTextContent('Partially ready');
+    expect(screen.getByText('One or more model deployments are not ready')).toBeVisible();
+    expect(screen.getByTestId('model-clusters-granite-8b-instruct')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'site-madrid-1' })).toHaveAttribute('href', '/clusters/site-madrid-1');
+    expect(screen.queryByText('Not ready on madrid; ready on paris')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'View model deployments per location' })).not.toBeInTheDocument();
   });
 });

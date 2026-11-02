@@ -4,10 +4,11 @@ import {
   CheckCircleIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
-  InfoCircleIcon,
   InProgressIcon,
   OutlinedQuestionCircleIcon,
   PendingIcon,
+  RhUiClockIcon,
+  RhUiOffIcon,
 } from '@patternfly/react-icons';
 
 /**
@@ -35,11 +36,24 @@ const tones: Record<string, StatusTone> = {
   Pending: 'info',
   Failed: 'danger',
   // A placed model serving on some of its clusters but not all (proposal P13).
-  'Partially available': 'warning',
-  // A model the backend saved to Git in git mode, without reading its status from the clusters.
+  'Partially ready': 'warning',
+  // Draft word for the MaaS model ref, beside deployment Status. Not the ref's final status.
+  'Pending subscription': 'info',
+  // Git / Argo, before a cluster reports a deployment. Saved to Git is grey; Syncing is blue nonstatus.
   'Saved to Git': 'neutral',
+  Syncing: 'info',
+  Synced: 'success',
+  // Model deployment labels (the design handed to development). Starting is blue nonstatus, not
+  // PatternFly info, which is purple. Stopping, Stopped, and Unknown are grey.
+  Starting: 'neutral',
+  Stopped: 'neutral',
+  Stopping: 'neutral',
   // A subscription's model that the hub doesn't have.
   'Not found': 'danger',
+  // MaaS model ref, on the Models list Availability column. Pending stays the info tone; the
+  // availability label draws that word in nonstatus purple itself.
+  Unavailable: 'warning',
+  Invalid: 'danger',
   // ACM add-ons (feature.open-cluster-management.io/addon-* labels).
   Available: 'success',
   Unreachable: 'danger',
@@ -63,11 +77,38 @@ const toneProps: Record<StatusTone, Pick<LabelProps, 'status' | 'color' | 'icon'
 export const statusLabelProps = (status: string | undefined): Pick<LabelProps, 'status' | 'color' | 'icon'> => {
   const props = toneProps[statusTone(status)];
   // A few states have a more specific icon than their tone's.
-  if (status === 'Pending') {
+  if (status === 'Pending' || status === 'Pending subscription') {
     return { ...props, icon: <PendingIcon /> };
   }
+  if (status === 'Starting') {
+    return { color: 'blue', icon: <InProgressIcon /> };
+  }
+  if (status === 'Stopping') {
+    return { color: 'grey', icon: <InProgressIcon /> };
+  }
+  if (status === 'Stopped') {
+    return { color: 'grey', icon: <RhUiOffIcon /> };
+  }
+  if (status === 'Unknown') {
+    return { color: 'grey', icon: <OutlinedQuestionCircleIcon /> };
+  }
+  if (status === 'Pending sync') {
+    return { color: 'purple', icon: <PendingIcon /> };
+  }
   if (status === 'Saved to Git') {
-    return { ...props, icon: <InfoCircleIcon /> };
+    return { color: 'grey', icon: <RhUiClockIcon /> };
+  }
+  if (status === 'Syncing') {
+    return { color: 'blue', icon: <InProgressIcon /> };
+  }
+  if (status === 'Synced') {
+    return { status: 'success', icon: <CheckCircleIcon /> };
+  }
+  if (status === 'Unavailable') {
+    return { status: 'warning', icon: <ExclamationTriangleIcon /> };
+  }
+  if (status === 'Invalid') {
+    return { color: 'orange', icon: <ExclamationCircleIcon /> };
   }
   if (status === 'Disabled' || status === 'Not provisioned' || status === 'Not added') {
     return { ...props, icon: <BanIcon /> };

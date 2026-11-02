@@ -391,9 +391,9 @@ export function ObservabilityPanel({
             <Thead>
               <Tr>
                 <Th>Organization</Th>
-                <Th className="console-number">Uncached input tokens</Th>
-                <Th className="console-number">Output tokens</Th>
-                <Th className="console-number">Cached input tokens</Th>
+                <Th className="pf-v6-u-text-align-end">Uncached input tokens</Th>
+                <Th className="pf-v6-u-text-align-end">Output tokens</Th>
+                <Th className="pf-v6-u-text-align-end">Cached input tokens</Th>
               </Tr>
             </Thead>
             <Tbody>
@@ -402,13 +402,13 @@ export function ObservabilityPanel({
                   <Td dataLabel="Organization">
                     <Link to={`/organizations/${encodeURIComponent(t.id)}`}>{t.name}</Link>
                   </Td>
-                  <Td dataLabel="Uncached input tokens" className="console-number">
+                  <Td dataLabel="Uncached input tokens" className="pf-v6-u-text-align-end">
                     {t.input.toLocaleString()}
                   </Td>
-                  <Td dataLabel="Output tokens" className="console-number">
+                  <Td dataLabel="Output tokens" className="pf-v6-u-text-align-end">
                     {t.output.toLocaleString()}
                   </Td>
-                  <Td dataLabel="Cached input tokens" className="console-number">
+                  <Td dataLabel="Cached input tokens" className="pf-v6-u-text-align-end">
                     {t.cached.toLocaleString()}
                   </Td>
                 </Tr>
@@ -540,7 +540,7 @@ export function ObservabilityPanel({
                     <Th>Model deployment</Th>
                     <Th>Model</Th>
                     <Th>Target sites</Th>
-                    <Th className="console-number">Replicas</Th>
+                    <Th className="pf-v6-u-text-align-end">Replicas</Th>
                     <Th>Status</Th>
                   </Tr>
                 </Thead>
@@ -578,7 +578,7 @@ export function ObservabilityPanel({
                           ),
                         ].join(', ') || EMPTY_VALUE}
                       </Td>
-                      <Td dataLabel="Replicas" className="console-number">
+                      <Td dataLabel="Replicas" className="pf-v6-u-text-align-end">
                         {m.replicas ?? EMPTY_VALUE}
                       </Td>
                       <Td dataLabel="Status">

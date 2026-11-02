@@ -77,8 +77,9 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await expect(row.getByTestId('model-phase')).toHaveText('Saved to Git');
   await expect(row.getByTestId(`model-locations-${unique}`)).toContainText(CLUSTER);
 
-  // The model's page, at /models/<id>.
-  await row.getByRole('link', { name: unique, exact: true }).click();
+  // Saved to Git has no deployment page yet, so the name is not a link. View details opens it.
+  await row.getByRole('button', { name: `Actions for ${unique}` }).click();
+  await page.getByRole('menuitem', { name: 'View details' }).click();
   await expect(page).toHaveURL(`/models/${unique}`);
   await expect(page.getByRole('heading', { name: unique })).toBeVisible();
   await expect(page.getByTestId('model-locations')).toContainText(CLUSTER);

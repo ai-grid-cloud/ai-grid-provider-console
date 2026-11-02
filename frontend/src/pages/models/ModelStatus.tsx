@@ -1,7 +1,7 @@
 import { ExpandableSection, Stack } from '@patternfly/react-core';
 import type { ModelView } from './modelView';
 import { StatusLabel } from '../../components/StatusLabel';
-import { failureExplanations, modelPhase } from './modelStatusInfo';
+import { failureExplanations, listStatusOf, modelPhase, statusOpens } from './modelStatusInfo';
 
 /**
  * The status in words: a sentence and the next step for a known failure, else the backend's
@@ -27,13 +27,14 @@ export const ModelStatusDetails: React.FC<{ model: ModelView }> = ({ model }) =>
 };
 
 /**
- * The model's phase. Ready is an outline label and opens nothing. On the Models list, every other
- * phase is filled and `onOpen` opens ModelStatusModal. Without `onOpen` (the model page), the
- * backend's message stays in a tooltip; the page explains it in the alert.
+ * The model's phase. Saved to Git, Syncing, and Partially ready open. Synced keeps its
+ * sentence and does not open. Ready, Pending, Starting, Failed, Stopped, Stopping, and Unknown
+ * stay outline. Without `onOpen` (the model page), the backend's message stays in a tooltip;
+ * the page explains a failure in the alert.
  */
 export const ModelStatusLabel: React.FC<{ model: ModelView; onOpen?: () => void }> = ({ model, onOpen }) => {
-  const phase = modelPhase(model);
-  const opens = phase !== 'Ready' && !!onOpen;
+  const phase = listStatusOf(model);
+  const opens = statusOpens(phase) && !!onOpen;
   return (
     <span data-testid="model-phase">
       <StatusLabel

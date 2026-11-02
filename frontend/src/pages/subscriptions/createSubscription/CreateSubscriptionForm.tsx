@@ -53,7 +53,10 @@ import {
   tenantNameOf,
   toTokenLimits,
 } from '../subscriptionText';
+import { useClusterList } from '../../clusters/useClusters';
+import { ModelStatusModal } from '../../models/ModelStatusModal';
 import { DESCRIPTION, DISPLAY_NAME, displayNameOf, type ModelView } from '../../models/modelView';
+import { siteNamesOf } from '../../models/modelUtils';
 import { useSubscriptionWrites, useTenantList } from '../useSubscriptions';
 import { EditRateLimitsModal } from './EditRateLimitsModal';
 
@@ -122,6 +125,9 @@ const errorText = (message: string) => (
 export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModels, subscriptionInfo, returnTo }) => {
   const navigate = useNavigate();
   const { data: organizations, error: organizationsError } = useTenantList();
+  const { data: clusters } = useClusterList();
+  const siteNames = useMemo(() => siteNamesOf(clusters ?? []), [clusters]);
+  const [statusModel, setStatusModel] = useState<ModelView>();
   const { createSubscription, updateSubscription } = useSubscriptionWrites();
   const isEditing = !!subscriptionInfo?.object;
   const subscription = subscriptionInfo?.object;
@@ -315,6 +321,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
       key: entryKey(entry),
       title: refTitleOf(entry.ref, entry.model),
       name: entry.ref.name,
+      model: entry.model,
       ...status,
       tokenRateLimits: entry.tokenRateLimits,
       unlimited: entry.unlimited,
@@ -454,6 +461,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
               setModelsTouched(true);
               handleRemoveModel(index);
             }}
+            onOpenStatus={(row) => row.model && setStatusModel(row.model)}
             validationError={modelsTouched ? fieldErrors.models : undefined}
           />
         )}
@@ -470,6 +478,15 @@ export const CreateSubscriptionForm: React.FC<Props> = ({ models: availableModel
               handleRemoveModels(removed);
             }}
             onClose={() => setIsAddModelsModalOpen(false)}
+          />
+        )}
+
+        {statusModel && (
+          <ModelStatusModal
+            model={statusModel}
+            clusters={clusters ?? []}
+            siteNames={siteNames}
+            onClose={() => setStatusModel(undefined)}
           />
         )}
 

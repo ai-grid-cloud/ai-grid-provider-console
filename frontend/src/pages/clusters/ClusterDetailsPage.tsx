@@ -26,6 +26,7 @@ import { PageStateSection } from '../../components/states/PageStateSection';
 import { RelativeTime } from '../../components/RelativeTime';
 import { SimpleMenuActions } from '../../components/SimpleMenuActions';
 import { StatusLabel } from '../../components/StatusLabel';
+import { ClusterStatusLabel } from './ClusterStatusLabel';
 import { useConsoleSession } from '../../context/useConsoleSession';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { formatCores, formatGiB } from '../../utilities/quantity';
@@ -98,13 +99,7 @@ const aiGridItems = (c: ClusterView) => {
 const clusterItems = (c: ClusterView) => [
   {
     term: 'Status',
-    value: (
-      <StatusLabel
-        isCompact
-        status={c.status}
-        reason={['Connection to the hub', statusReason(c)].filter(Boolean).join(': ')}
-      />
-    ),
+    value: <ClusterStatusLabel name={c.name} status={c.status} detail={statusReason(c)} />,
     'data-testid': 'cluster-status',
   },
   { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" /> },
@@ -260,7 +255,7 @@ const GPUNodesTable: React.FC<{ nodes: GPUNode[] }> = ({ nodes }) => (
           Node
         </Th>
         <Th modifier="wrap">Model</Th>
-        <Th modifier="wrap" className="console-number">
+        <Th modifier="wrap" className="pf-v6-u-text-align-end">
           GPUs
         </Th>
         <Th modifier="wrap">Memory</Th>
@@ -286,7 +281,7 @@ const GPUNodesTable: React.FC<{ nodes: GPUNode[] }> = ({ nodes }) => (
             />
           </Td>
           <Td dataLabel="Model">{gpuModel(n.product)}</Td>
-          <Td dataLabel="GPUs" className="console-number">
+          <Td dataLabel="GPUs" className="pf-v6-u-text-align-end">
             {n.count}
           </Td>
           <Td dataLabel="Memory">{gpuMemory(n.memoryMib) ?? EMPTY_VALUE}</Td>

@@ -13,45 +13,57 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core';
+import type { ClusterView } from '../clusters/clusterView';
 import { statusLabelProps } from '../../utilities/status';
+import { ModelLocationsTable } from './ModelLocationsTable';
 import { ModelStatusDetails } from './ModelStatus';
-import { hasModelStatusDetails, modelPhase, modelStatusTitle, PARTIALLY_AVAILABLE } from './modelStatusInfo';
+import {
+  gitStatusMessage,
+  hasModelStatusDetails,
+  listStatusOf,
+  modelStatusTitle,
+  PARTIALLY_AVAILABLE,
+} from './modelStatusInfo';
 import { titleOf, type ModelView } from './modelView';
+import { statusModalLayout } from './statusModalLayout';
 
 type Props = {
   model: ModelView;
+  /** The hub's clusters, so the locations table can name each site and link to the cluster. */
+  clusters?: Pick<ClusterView, 'name' | 'location' | 'consoleUrl'>[];
+  siteNames?: Map<string, string>;
   onClose: () => void;
-  /** Partially available: close the modal and expand the model's location rows. */
-  onViewDeployments?: () => void;
 };
 
 /**
  * High-level model status from the Models list. Ready does not open this. The phase is the
- * backend's (including Partially available); the body is that phase in words.
+ * backend's (including Partially ready); the body is that phase in words.
  */
-export const ModelStatusModal: React.FC<Props> = ({ model, onClose, onViewDeployments }) => {
+export const ModelStatusModal: React.FC<Props> = ({ model, clusters = [], siteNames = new Map(), onClose }) => {
   const title = titleOf(model);
-  const displayStatus = modelPhase(model);
+  const displayStatus = listStatusOf(model);
   const partiallyAvailable = displayStatus === PARTIALLY_AVAILABLE;
+  const gitMessage = gitStatusMessage[displayStatus];
 
   let body: ReactNode;
-  if (partiallyAvailable) {
+  if (gitMessage) {
+    body = <p data-testid="model-status-modal-message">{gitMessage}</p>;
+  } else if (partiallyAvailable) {
     body = (
-      <Stack hasGutter data-testid="model-status-modal-message">
+      <Stack hasGutter>
         <StackItem>
           <p>One or more model deployments are not ready</p>
         </StackItem>
-        {model.statusMessage && (
-          <StackItem>
-            <p>{model.statusMessage}</p>
-          </StackItem>
-        )}
+        <StackItem>
+          <ModelLocationsTable model={model} clusters={clusters} siteNames={siteNames} />
+        </StackItem>
       </Stack>
     );
   } else if (displayStatus === 'Failed' || hasModelStatusDetails(model)) {
     body = (
       <Alert
         isInline
+        isPlain
         variant={displayStatus === 'Failed' ? 'danger' : 'info'}
         title={modelStatusTitle(model)}
         data-testid="model-status-modal-alert"
@@ -82,7 +94,7 @@ export const ModelStatusModal: React.FC<Props> = ({ model, onClose, onViewDeploy
 
   return (
     <Modal
-      variant="medium"
+      {...statusModalLayout}
       isOpen
       onClose={onClose}
       data-testid="model-status-modal"
@@ -96,19 +108,22 @@ export const ModelStatusModal: React.FC<Props> = ({ model, onClose, onViewDeploy
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
             <FlexItem>{title}</FlexItem>
             <FlexItem>
-              <Label {...statusLabelProps(displayStatus)} variant="filled" data-testid="model-status-text">
+              <Label isCompact {...statusLabelProps(displayStatus)} variant="filled" data-testid="model-status-text">
                 {displayStatus}
               </Label>
             </FlexItem>
           </Flex>
         </Title>
-        <p data-testid="model-status-modal-subtitle">Deployment status</p>
+        <p data-testid="model-status-modal-subtitle">
+          <strong>Deployment status</strong>
+        </p>
       </ModalHeader>
       <ModalBody>{body}</ModalBody>
-      {partiallyAvailable && onViewDeployments && (
+      {displayStatus === 'Saved to Git' && (
         <ModalFooter>
-          <Button variant="link" isInline onClick={onViewDeployments} data-testid="model-status-view-deployments">
-            View model deployments per location
+          {/* Argo CD refresh is not a console call yet. The action is the proposed footer. */}
+          <Button variant="primary" onClick={() => undefined} data-testid="model-status-sync-now">
+            Sync now
           </Button>
         </ModalFooter>
       )}

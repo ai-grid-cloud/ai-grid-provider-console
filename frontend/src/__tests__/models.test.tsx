@@ -18,6 +18,9 @@ import '../pages/models/ModelDetailsPage';
 import '../pages/models/ModelEditPage';
 import '../pages/models/ModelWizard';
 import '../pages/models/ModelsPage';
+import { ModelAvailability } from '../pages/models/ModelAvailability';
+import { availabilityOf, gitStatusMessage, statusOpens } from '../pages/models/modelStatusInfo';
+import type { ModelView } from '../pages/models/modelView';
 import { TestApp } from './TestApp';
 
 /** A user the console couldn't load: the pages show, but without write actions. A viewer
@@ -379,6 +382,159 @@ it('shows one pagination, in the toolbar, for a single page', async () => {
   expect(screen.getAllByRole('navigation', { name: /pagination/i })).toHaveLength(1);
 });
 
+it('keeps deployment status and MaaS availability in separate columns', async () => {
+  renderAt('/models', new MockConsoleService());
+  expect(await screen.findByRole('columnheader', { name: 'Availability' })).toBeVisible();
+  // Ready on every cluster, with no report that the MaaS ref is missing.
+  expect(screen.getByTestId('model-availability-granite-3-8b')).toHaveTextContent('Available');
+  // No cluster has reported this model.
+  expect(screen.getByTestId('model-availability-llama-3-70b')).toHaveTextContent('—');
+});
+
+it('lists a model in every deployment state at /models?review=1', async () => {
+  const user = userEvent.setup();
+  renderAt('/models?review=1', new MockConsoleService());
+  expect(await screen.findByText('Add and remove model deployments.')).toBeVisible();
+  expect(screen.queryByText(/not from the backend/)).not.toBeInTheDocument();
+  // Saved to Git and Syncing have no deployment page yet, so the name is text.
+  expect(screen.getByRole('cell', { name: 'Granite 3.3 2B' })).toBeVisible();
+  expect(screen.queryByRole('link', { name: 'Granite 3.3 2B' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Codestral' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Llama 3.2 3B' })).toBeVisible();
+  expect(screen.queryByRole('link', { name: /Saved to Git|Syncing|Deploying/ })).not.toBeInTheDocument();
+  const mistral = screen.getByTestId('model-availability-mistral-nemo');
+  expect(mistral).toHaveTextContent('Pending');
+  expect(mistral).toHaveTextContent('Awaiting subscription');
+  expect(screen.getByTestId('model-availability-llama-3.1-8b')).toHaveTextContent('Available');
+  expect(within(screen.getByTestId('model-availability-llama-3.1-8b')).queryByRole('button')).not.toBeInTheDocument();
+  // Partially ready can carry a pending MaaS report. The other pending variants are Awaiting
+  // subscription (Mistral, above) and Awaiting subscription and backend (the live Granite 3B).
+  expect(screen.getByTestId('model-availability-llama-3.3-70b')).toHaveTextContent('Configuring routing');
+  expect(screen.getByTestId('model-availability-phi-4-mini')).toHaveTextContent('Gateway not found');
+  expect(screen.getByTestId('model-availability-qwen2.5-7b')).toHaveTextContent('—');
+  // Not Ready yet, and the report is not a deployment failure, so the column stays empty.
+  expect(screen.getByTestId('model-availability-granite-3.3-2b')).toHaveTextContent('—');
+  expect(screen.getByTestId('model-availability-llama-3.2-3b')).toHaveTextContent('—');
+  expect(screen.getByTestId('model-availability-deepseek-r1-8b')).toHaveTextContent('—');
+  // Synced keeps its sentence and does not open.
+  const synced = within(await rowOf('llama-3.2-1b')).getByTestId('model-phase');
+  expect(synced).toHaveTextContent(/^Synced$/);
+  expect(within(synced).queryByRole('button')).not.toBeInTheDocument();
+  await user.click(within(mistral).getByRole('button', { name: 'Awaiting subscription' }));
+  const availability = await screen.findByTestId('model-availability-modal');
+  expect(within(availability).getByTestId('model-availability-modal-subtitle')).toHaveTextContent('Availability');
+  expect(availability).toHaveTextContent('Pending MaaS governance');
+  expect(availability).toHaveTextContent(
+    'Consumers can’t access this model yet. To enable access, set up a subscription.',
+  );
+  expect(availability).not.toHaveTextContent('authorization');
+  const subscriptions = within(availability).getByRole('link', { name: 'Go to Subscriptions' });
+  expect(subscriptions).toHaveAttribute('href', '/subscriptions');
+  expect(subscriptions.querySelector('strong')).toHaveTextContent('Subscriptions');
+  expect(availability.querySelector('.pf-v6-c-alert')).not.toHaveTextContent('Go to Subscriptions');
+  expect(availability.querySelector('.pf-v6-c-modal-box__footer')).toContainElement(subscriptions);
+  await user.click(within(availability).getByRole('button', { name: 'Close' }));
+  await user.click(within(await rowOf('llama-3.3-70b')).getByRole('button', { name: 'Details' }));
+  const table = screen.getByTestId('model-clusters-llama-3.3-70b');
+  expect(within(table).getAllByRole('columnheader')[0]).toHaveTextContent('Cluster');
+  expect(within(table).getByRole('columnheader', { name: 'Status' })).not.toHaveClass('pf-m-fit-content');
+  expect(within(table).getAllByRole('columnheader').at(-1)).toHaveClass('pf-m-fit-content');
+  const rows = within(table).getAllByTestId('model-cluster-row');
+  expect(rows).toHaveLength(5);
+  expect(within(rows[0]).getByRole('link', { name: 'site-paris-1' })).toHaveAttribute('href', '/clusters/site-paris-1');
+  const viewParis = within(rows[0]).getByRole('link', { name: 'View site-paris-1 in cluster console' });
+  expect(viewParis).toHaveTextContent(/^View$/);
+  expect(viewParis).toHaveAttribute('href', 'https://console-openshift-console.apps.site-paris-1.example.com');
+  await user.hover(viewParis);
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('View more details and options in the cluster console');
+  expect(within(rows[4]).getByRole('link', { name: 'site-berlin-1' })).toHaveAttribute(
+    'href',
+    '/clusters/site-berlin-1',
+  );
+  expect(within(rows[4]).queryByRole('link', { name: /cluster console/ })).not.toBeInTheDocument();
+});
+
+it('keeps the Synced sentence and maps the other MaaS model ref reports', () => {
+  expect(statusOpens('Synced')).toBe(false);
+  expect(statusOpens('Saved to Git')).toBe(true);
+  expect(gitStatusMessage.Synced).toBe(
+    'Argo CD has successfully synchronized configuration manifests to all target clusters. The cluster is now spinning up the model deployment.',
+  );
+  const view = (maasReport: string) =>
+    availabilityOf({
+      phase: 'Ready',
+      clusters: [{ cluster: 'site-paris-1', phase: 'Ready', reason: 'Ready' }],
+      maasReport,
+    });
+  expect(view('Waiting for HTTPRoute to be created')).toMatchObject({
+    label: 'Pending',
+    subtext: 'Configuring routing',
+    body: 'The model’s HTTPRoute is being created.',
+  });
+  const both = view('Awaiting governance pairing and backend readiness');
+  expect(both).toMatchObject({
+    label: 'Pending',
+    subtext: 'Awaiting subscription and backend',
+    body: 'Consumers can’t access this model yet. To enable access, set up a subscription. Availability also depends on a healthy inference service. Check the deployment status on the Models page.',
+    subscriptionsLink: true,
+    modelsLink: true,
+  });
+  render(
+    <MemoryRouter>
+      <ModelAvailability
+        model={{ id: 'granite-3b', displayName: 'Granite 3B', phase: 'Partially ready' } as ModelView}
+        availability={both!}
+      />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Awaiting subscription and backend' }));
+  const bothModal = screen.getByTestId('model-availability-modal');
+  const subscriptions = within(bothModal).getByRole('link', { name: 'Go to Subscriptions' });
+  const models = within(bothModal).getByRole('link', { name: 'Go to Models' });
+  expect(subscriptions).toHaveAttribute('href', '/subscriptions');
+  expect(subscriptions.querySelector('strong')).toHaveTextContent('Subscriptions');
+  expect(models).toHaveAttribute('href', '/models/granite-3b');
+  expect(models.querySelector('strong')).toHaveTextContent('Models');
+  expect(bothModal.querySelector('.pf-v6-c-alert')).not.toHaveTextContent('Go to');
+  expect(bothModal.querySelector('.pf-v6-c-modal-box__footer')).toContainElement(subscriptions);
+  expect(bothModal.querySelector('.pf-v6-c-modal-box__footer')).toContainElement(models);
+  expect(view('kind not implemented')).toMatchObject({
+    label: 'Failed',
+    subtext: 'Unsupported model type',
+    body: 'This model kind or format is not supported.',
+  });
+  expect(view('Failed to reconcile HTTPRoute')).toMatchObject({
+    label: 'Failed',
+    subtext: 'Routing configuration failed',
+    body: 'The model’s HTTPRoute could not be created or updated.',
+  });
+  expect(view('Governed and runtime-healthy')).toEqual({ label: 'Available' });
+  expect(view('Awaiting governance pairing')).toMatchObject({
+    heading: 'Pending MaaS governance',
+    subscriptionsLink: true,
+  });
+  expect(view('Awaiting governance pairing')?.body).not.toMatch(/authorization/);
+  const cluster = [{ cluster: 'site-paris-1', phase: 'Ready' as const, reason: 'Ready' }];
+  expect(availabilityOf({ phase: 'Starting', clusters: cluster, maasReport: 'Gateway not found' })).toBeUndefined();
+  expect(availabilityOf({ phase: 'Failed', clusters: cluster, maasReport: 'Gateway not found' })?.subtext).toBe(
+    'Gateway not found',
+  );
+  expect(
+    availabilityOf({
+      phase: 'Partially ready',
+      clusters: cluster,
+      maasReport: 'Waiting for HTTPRoute to be created',
+    })?.subtext,
+  ).toBe('Configuring routing');
+  expect(
+    availabilityOf({
+      phase: 'Partially ready',
+      clusters: cluster,
+      maasReport: 'Awaiting governance pairing and backend readiness',
+    })?.subtext,
+  ).toBe('Awaiting subscription and backend');
+});
+
 describe('the phase', () => {
   /** The service with one model per phase the backend reports. */
   const phases = () => {
@@ -407,25 +563,31 @@ describe('the phase', () => {
     return service;
   };
 
-  it('words each phase; Ready stays outline, and any other status opens its message', async () => {
+  it('words each phase; only Partially ready opens, and the modal lists each cluster', async () => {
     const user = userEvent.setup();
     renderAt('/models', phases());
     const phase = async (id: string) => within(await rowOf(id)).getByTestId('model-phase');
     expect(await phase('ready')).toHaveTextContent(/^Ready$/);
     expect(await phase('pending')).toHaveTextContent(/^Pending$/);
     expect(await phase('failed')).toHaveTextContent(/^Failed$/);
-    expect(await phase('partial')).toHaveTextContent(/^Partially available$/);
+    expect(await phase('partial')).toHaveTextContent(/^Partially ready$/);
     expect(await phase('saved')).toHaveTextContent(/^Saved to Git$/);
     // An unspecified phase without SavedToGit isn't Pending: the console doesn't know.
     expect(await phase('unknown')).toHaveTextContent(/^Unknown$/);
-    const ready = (await phase('ready')).querySelector('.pf-v6-c-label');
-    expect(ready).toHaveClass('pf-m-outline');
-    expect(within(await phase('ready')).queryByRole('button')).not.toBeInTheDocument();
-    for (const id of ['pending', 'failed', 'partial', 'saved', 'unknown']) {
-      expect(within(await phase(id)).getByRole('button')).toBeInTheDocument();
+    for (const id of ['ready', 'pending', 'failed', 'unknown']) {
+      const label = (await phase(id)).querySelector('.pf-v6-c-label');
+      expect(label).toHaveClass('pf-m-outline');
+      expect(within(await phase(id)).queryByRole('button')).not.toBeInTheDocument();
     }
-    await user.click(within(await phase('partial')).getByRole('button', { name: 'Partially available' }));
-    expect(await screen.findByTestId('model-status-modal')).toHaveTextContent('Not ready on site2; ready on site1');
+    await user.click(within(await phase('saved')).getByRole('button', { name: 'Saved to Git' }));
+    const saved = await screen.findByTestId('model-status-modal');
+    expect(saved).toHaveTextContent('waiting for Argo CD to synchronize');
+    expect(within(saved).getByRole('button', { name: 'Sync now' })).toBeVisible();
+    await user.click(within(saved).getByRole('button', { name: 'Close' }));
+    await user.click(within(await phase('partial')).getByRole('button', { name: 'Partially ready' }));
+    const modal = await screen.findByTestId('model-status-modal');
+    expect(modal).not.toHaveTextContent('Not ready on site2; ready on site1');
+    expect(screen.queryByRole('button', { name: 'View model deployments per location' })).not.toBeInTheDocument();
   });
 
   it("explains a failure on the model's page, the backend's own words folded away", async () => {
@@ -604,9 +766,9 @@ describe('a background poll', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderAt('/models', service);
     await user.click(within(await rowOf('granite-3-8b')).getByRole('button', { name: 'Details' }));
-    await user.click(screen.getByRole('button', { name: `Pending at ${site1}` }));
+    await user.click(screen.getByRole('button', { name: `Starting at ${site1}` }));
     const modal = await screen.findByTestId('deployment-status-modal');
-    expect(within(modal).getByRole('heading', { name: /status/ })).toHaveTextContent('Pending');
+    expect(within(modal).getByRole('heading', { name: /status/ })).toHaveTextContent('Starting');
     granite.status!.clusters[0].phase = ModelPhase.READY;
     await act(() => vi.advanceTimersByTimeAsync(30000));
     await waitFor(() => expect(within(modal).getByRole('heading', { name: /status/ })).toHaveTextContent('Ready'));
@@ -1336,36 +1498,38 @@ describe('each cluster of a placed model (status.clusters, proposal P13)', () =>
     const user = userEvent.setup();
     renderAt('/models', partial());
     const row = await rowOf('mistral-7b-instruct');
-    expect(within(row).getByTestId('model-phase')).toHaveTextContent('Partially available');
+    expect(within(row).getByTestId('model-phase')).toHaveTextContent('Partially ready');
     await user.click(within(row).getByRole('button', { name: 'Details' }));
     const rows = screen.getAllByTestId('model-cluster-row');
     // As the backend lists them: hub-ingress, in the message only, has no row.
     expect(rows.map((r) => within(r).getByTestId('model-cluster-phase').textContent)).toEqual([
       `Ready at ${site1}`,
-      `Pending at ${site2}`,
-      `Pending at ${site3}`,
+      `Starting at ${site2}`,
+      `Starting at ${site3}`,
     ]);
     const location = within(rows[0]).getByTestId('model-cluster-location');
-    expect(location).toHaveTextContent(`${site1}, cluster site1`);
-    await user.hover(location);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Cluster: site1');
+    expect(location).toHaveTextContent(site1);
+    expect(within(rows[0]).getByRole('link', { name: 'site1' })).toHaveAttribute('href', '/clusters/site1');
+    const viewSite = within(rows[0]).getByRole('link', { name: 'View site1 in cluster console' });
+    expect(viewSite).toHaveTextContent(/^View$/);
+    expect(viewSite).toHaveAttribute('href', 'https://console-openshift-console.apps.site1.example.com');
     // The column is all clickable: every row's status is a button.
     for (const r of rows) expect(within(r).getByRole('button')).toBeInTheDocument();
   });
 
-  it('opens what a cluster reported, and offers Edit deployment', async () => {
+  it('opens what a cluster reported, and links the cluster name', async () => {
     const user = userEvent.setup();
     renderAt('/models', partial());
     await user.click(within(await rowOf('mistral-7b-instruct')).getByRole('button', { name: 'Details' }));
-    await user.click(screen.getByRole('button', { name: `Pending at ${site2}` }));
+    await user.click(screen.getByRole('button', { name: `Starting at ${site2}` }));
     const modal = await screen.findByTestId('deployment-status-modal');
     expect(within(modal).getByRole('heading', { name: /Mistral 7B Instruct status/ })).toBeVisible();
     expect(modal).toHaveTextContent(site2);
-    expect(modal).toHaveTextContent('on cluster site2');
+    expect(within(modal).getByRole('link', { name: 'site2' })).toHaveAttribute('href', '/clusters/site2');
     expect(modal).toHaveTextContent('NotReady');
     expect(modal).toHaveTextContent('LLMInferenceService not ready');
-    await user.click(within(modal).getByRole('button', { name: 'Edit deployment' }));
-    expect(await screen.findByRole('heading', { name: /^Edit / })).toBeVisible();
+    expect(within(modal).queryByRole('button', { name: 'Edit deployment' })).not.toBeInTheDocument();
+    expect(within(modal).queryByRole('button', { name: 'Stop deployment' })).not.toBeInTheDocument();
   });
 
   it('lists the same clusters on the model page', async () => {
@@ -1401,20 +1565,21 @@ describe('the Models list expands every row', () => {
     expect(await screen.findByRole('heading', { name: /^Edit / })).toBeVisible();
   });
 
-  it('lists the clusters the placement chose while none has reported, without a Status column', async () => {
+  it('lists the clusters the placement chose while none has reported, each Pending sync', async () => {
     const user = userEvent.setup();
     const service = new MockConsoleService();
     widget(service);
     renderAt('/models', service);
     await user.click(within(await rowOf('widget')).getByRole('button', { name: 'Details' }));
     const selected = await screen.findByTestId('model-selected-clusters-widget');
-    expect(selected).toHaveTextContent('No cluster has reported this model yet.');
-    expect(
-      within(selected)
-        .getAllByTestId('model-selected-cluster-row')
-        .map((r) => r.textContent),
-    ).toEqual([`${site1}, cluster site1`]);
-    expect(within(selected).queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument();
+    expect(selected).not.toHaveTextContent('No cluster has reported this model yet.');
+    expect(within(selected).getByRole('columnheader', { name: 'Status' })).toBeVisible();
+    const pending = within(selected).getByTestId('model-cluster-phase');
+    expect(pending).toHaveTextContent('Pending sync');
+    expect(pending).toHaveClass('pf-m-outline', 'pf-m-purple');
+    expect(within(selected).queryByRole('button', { name: /Pending sync/ })).not.toBeInTheDocument();
+    expect(within(selected).getByRole('link', { name: 'site1' })).toHaveAttribute('href', '/clusters/site1');
+    expect(within(selected).getByRole('link', { name: 'View site1 in cluster console' })).toHaveTextContent(/^View$/);
   });
 
   it('offers no Edit locations to a user the console could not load', async () => {

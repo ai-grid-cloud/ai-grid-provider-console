@@ -64,8 +64,9 @@ a failed load.
 - Every column sortable.
 - The row menu is `SimpleMenuActions`, last, for users who may write only: View details, Edit, a
   divider, Delete.
-- "—" (`EMPTY_VALUE`) for a missing value; numbers right-aligned (`className="console-number"` on
-  the `Th` and the `Td`).
+- "—" (`EMPTY_VALUE`) for a missing value; numbers right-aligned (`className="pf-v6-u-text-align-end"`
+  on the `Th` and the `Td`). PatternFly's cell props center a column (`textCenter`) and do not
+  right-align one.
 
 ## Status
 
@@ -74,6 +75,7 @@ a failed load.
 - A status label is an outline label with its reason in a tooltip, and opens nothing, except on the
   Models list: Ready stays outline and is not clickable, and every other model phase is filled and
   opens `ModelStatusModal`. A model's page keeps the outline label; its alert explains the phase.
+  The subscription creation form, including Add models, opens that same dialog for Partially ready.
 - A label is clickable (filled) where a whole column opens each row's details, for every row: the
   locations table of a model (`ModelLocationsTable`), which opens that cluster's deployment status.
   Never mix outline and filled labels in one column.

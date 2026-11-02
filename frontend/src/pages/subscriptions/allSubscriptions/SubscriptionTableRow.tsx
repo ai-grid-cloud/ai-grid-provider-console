@@ -120,7 +120,7 @@ export const SubscriptionTableRow: React.FC<Props> = ({
         </Td>
         {expandCell('groups', 3, groups.length)}
         {expandCell('models', 4, modelRefs.length)}
-        <Td dataLabel={columns[5].label} className="console-number">
+        <Td dataLabel={columns[5].label} className="pf-v6-u-text-align-end">
           {subscription.spec?.priority ?? EMPTY_VALUE}
         </Td>
         {canWrite && (
