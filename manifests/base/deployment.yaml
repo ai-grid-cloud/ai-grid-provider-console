@@ -216,6 +216,14 @@ spec:
                 secretKeyRef:
                   name: ai-grid-backend-keycloak
                   key: password
+            # The accelerator configurations the wizard offers: the defaults
+            # (serving-options.yaml) and the provider admin's custom list, read on every call.
+            - name: AI_GRID_SERVING_OPTIONS_NAMESPACE
+              value: "ai-grid"
+            - name: AI_GRID_SERVING_OPTIONS_CONFIGMAP
+              value: "ai-grid-provider-console-serving-options"
+            - name: AI_GRID_SERVING_OPTIONS_CUSTOM_CONFIGMAP
+              value: "ai-grid-provider-console-serving-options-custom"
           resources:
             requests:
               cpu: 50m

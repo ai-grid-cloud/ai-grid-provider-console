@@ -41,11 +41,11 @@ import { createModelSchema, fieldMessage } from '../../validation';
 import { RuntimeArgsField } from './fields/RuntimeArgsField';
 import { filterRuntimeArgsForContainer, runtimeArgsOf, type RuntimeArgsFieldData } from './fields/runtimeArgs';
 import { DEFAULT_REPLICAS, sameSet, updateRequestOf, type ModelInput } from './modelRequests';
-import { titleOf, type ModelView } from './modelView';
+import { REQUEST_GPU, titleOf, type ModelView } from './modelView';
 import { OlderServedNameAlert } from './OlderServedNameAlert';
 import { useModelWrites, usePlacementClusters } from './useModels';
 import { deploymentNameFromUri, locationLabel, modelPath, siteNamesOf } from './modelUtils';
-import { type ModelServer, modelServerLabel, modelServers } from './modelServers';
+import { modelServerLabel, modelServerOf, PRESET_IMAGE, serverSuitsText, useServingOptions } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
 type Props = {
@@ -60,7 +60,7 @@ const steps = {
   review: 'summary-step',
 } as const;
 
-const defaults = { replicas: String(DEFAULT_REPLICAS), cpu: '2', memory: '4Gi', gpuCount: '0' };
+const defaults = { replicas: String(DEFAULT_REPLICAS), cpu: '2', memory: '8Gi', gpuCount: '0' };
 
 /** A resource the model was deployed without, shown in its read-only field. */
 const NOT_SET = 'Not set';
@@ -180,18 +180,28 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const [cpu, setCpu] = useState(start.cpu);
   const [memory, setMemory] = useState(start.memory);
   const [gpuCount, setGpuCount] = useState(start.gpuCount);
+  // The accelerator configurations the backend offers (Models/ListServingOptions).
+  const {
+    data: servingOptions,
+    loaded: servingOptionsLoaded,
+    error: servingOptionsError,
+    refresh: reloadServingOptions,
+  } = useServingOptions();
   // A deployed model keeps its presets; the choice is only made when deploying.
-  // No default: the grid's sites can be GPU or CPU-only clusters, so the user picks one.
-  const [serverId, setServerId] = useState<ModelServer['id'] | ''>('');
-  const server = modelServers.find((s) => s.id === serverId);
-  const chooseServer = (id: ModelServer['id']) => {
-    setServerId(id);
-    // A GPU server starts at one GPU (none is what crash-loops); a CPU server hides the field,
+  // No default: the grid's clusters can have GPUs or not, so the user picks one.
+  const [serverName, setServerName] = useState('');
+  const server = servingOptions.servers.find((s) => s.name === serverName);
+  const chooseServer = (name: string) => {
+    setServerName(name);
+    // A GPU configuration starts at one GPU (none is what crash-loops); a CPU one hides the field,
     // so it goes back to its default rather than keep a value nobody can see or fix.
-    if (!modelServers.find((s) => s.id === id)?.usesGpus) setGpuCount(defaults.gpuCount);
+    if (!servingOptions.servers.find((s) => s.name === name)?.usesGpus) setGpuCount(defaults.gpuCount);
     else if (gpuCount === defaults.gpuCount || gpuCount === '') setGpuCount('1');
   };
-  const usesGpus = editing || Boolean(server?.usesGpus);
+  // A deployed model asks for GPUs when its configuration needs them, or, for one the list doesn't
+  // have, when it was deployed with some.
+  const editedServer = servingOptions.servers.find((s) => model?.baseRefs.includes(s.name));
+  const usesGpus = editing ? Boolean(editedServer?.usesGpus) || (model?.gpuCount ?? 0) > 0 : Boolean(server?.usesGpus);
   const [runtimeArgs, setRuntimeArgs] = useState<RuntimeArgsFieldData>({
     enabled: start.runtimeArgs.length > 0,
     args: start.runtimeArgs,
@@ -214,7 +224,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     // A CPU server asks for no GPUs, whatever the hidden field last held.
     gpuCount: usesGpus ? Number(gpuCount) : 0,
     runtimeArgs: filterRuntimeArgsForContainer(runtimeArgs.args),
-    baseRefs: model ? model.baseRefs : (server?.baseRefs ?? []),
+    baseRefs: model ? model.baseRefs : server ? [server.name] : [],
+    gpuResource: server?.accelerators[0],
     clusters: locations,
   };
   const edited: ModelInput = { ...input, clusters: locationsEditable ? locations : start.locations };
@@ -225,7 +236,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       cpu !== defaults.cpu ||
       memory !== defaults.memory ||
       gpuCount !== defaults.gpuCount ||
-      serverId !== '' ||
+      serverName !== '' ||
       runtimeArgs.enabled ||
       locations.length > 0;
   const detailsPath = model ? modelPath(model) : '';
@@ -239,17 +250,20 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       : value.trim()
         ? fieldMessage(createModelSchema.shape[field], value, parse)
         : 'Required.';
+  // An accelerator configuration's preset sets the image, so the field may stay empty and the preset's applies.
+  const imageOptional = editing ? Boolean(modelServerOf(model?.baseRefs)?.setsImage) : true;
+  const imageFromPreset = imageOptional && runtimeImage.trim() === '';
   const modelUriError = shownError('modelUri', modelUri);
-  const runtimeImageError = shownError('runtimeImage', runtimeImage);
+  const runtimeImageError = imageFromPreset ? undefined : shownError('runtimeImage', runtimeImage);
   const replicasError = shownError('replicas', replicas, Number);
   const cpuError = shownError('cpu', cpu);
   const memoryError = shownError('memory', memory);
   // KServe's GPU preset with no GPUs is what crash-loops on a CPU-only node.
-  const gpusMissing = !editing && Boolean(server?.usesGpus) && gpuCount !== '' && Number(gpuCount) < 1;
+  const gpusMissing = usesGpus && !editing && gpuCount !== '' && Number(gpuCount) < 1;
   const serverError = !editing && touched.has('server') && !server ? 'Required.' : undefined;
   const gpuCountError =
     shownError('gpuCount', gpuCount, Number) ??
-    (touched.has('gpuCount') && gpusMissing ? 'A GPU model server needs at least 1 GPU.' : undefined);
+    (touched.has('gpuCount') && gpusMissing ? 'A GPU accelerator configuration needs at least 1 GPU.' : undefined);
   // A deployed model's source, name and resources are fixed, so only what an edit can change is checked.
   const sourceValid = editing || createModelSchema.pick({ modelUri: true }).safeParse({ modelUri }).success;
   const deploymentValid = editing
@@ -258,6 +272,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         .safeParse({ displayName: input.displayName, description: input.description }).success &&
       // A model deployed without an image keeps none until one is entered.
       (runtimeImage === start.runtimeImage ||
+        imageFromPreset ||
         createModelSchema.shape.runtimeImage.safeParse(input.runtimeImage).success) &&
       // The deploy wizard's limits apply to a count the user sets, not to one the model already has.
       (!replicasEditable ||
@@ -267,7 +282,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       replicas !== '' &&
       gpuCount !== '' &&
       !gpusMissing &&
-      createModelSchema.omit({ locations: true }).strip().safeParse(input).success;
+      createModelSchema.omit({ locations: true, runtimeImage: true }).strip().safeParse(input).success &&
+      (imageFromPreset || createModelSchema.shape.runtimeImage.safeParse(input.runtimeImage).success);
   // An edit that keeps the locations doesn't depend on which locations are offered right now.
   const locationsChanged = !editing || !sameSet(locations, start.locations);
   const locationsValid =
@@ -402,7 +418,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   // A hint only, from the GPU counts the clusters list already carries: a GPU server on a cluster
   // with no GPUs never schedules, and a CPU server on a GPU cluster leaves its GPUs unused.
   const serverMismatch = (() => {
-    if (editing || !server) return undefined;
+    // The clusters' GPU counts are NVIDIA GPUs only, so they say nothing about another accelerator.
+    if (editing || !server || (server.usesGpus && !server.accelerators.includes(REQUEST_GPU))) return undefined;
     const chosen = clusters.filter(
       (c) => c.aiGridEnabled && (locations.includes(c.name) || (c.location && locations.includes(c.location))),
     );
@@ -434,12 +451,13 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         { term: 'Model name', value: nameDescData.name },
         ...(model ? [] : [{ term: 'Model name in requests', value: nameDescData.k8sName.value }]),
         { term: 'Description', value: nameDescData.description },
-        { term: 'Model server', value: modelServerLabel(input.baseRefs) },
-        { term: 'Runtime image', value: runtimeImage },
+        { term: 'Accelerator configuration', value: modelServerLabel(input.baseRefs, servingOptions.servers) },
+        { term: 'Runtime image', value: imageFromPreset ? PRESET_IMAGE : runtimeImage },
         { term: 'Replicas', value: replicasEditable ? replicas : 'Autoscaled' },
         { term: 'CPU', value: cpu },
         { term: 'Memory', value: memory },
-        { term: 'GPUs', value: String(input.gpuCount) },
+        // A CPU configuration asks for no GPUs, so there's no count to show.
+        ...(usesGpus ? [{ term: 'GPUs', value: String(input.gpuCount) }] : []),
         { term: 'Additional runtime arguments', value: input.runtimeArgs.join(' ') },
       ],
     },
@@ -555,34 +573,52 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
               />
               {editing ? (
                 <ReadOnlyField
-                  label="Model server"
+                  label="Accelerator configuration"
                   fieldId="model-server"
-                  value={modelServerLabel(input.baseRefs)}
+                  value={modelServerLabel(input.baseRefs, servingOptions.servers)}
                   reason={fixedReason.resources}
                 />
+              ) : servingOptionsError ? (
+                <Alert
+                  isInline
+                  variant="danger"
+                  title="Error loading accelerator configurations"
+                  actionLinks={<AlertActionLink onClick={() => void reloadServingOptions()}>Retry</AlertActionLink>}
+                >
+                  {notAvailable(servingOptionsError, 'Accelerator configurations are') ?? servingOptionsError.message}
+                </Alert>
+              ) : !servingOptionsLoaded ? (
+                <p>Loading accelerator configurations...</p>
+              ) : servingOptions.servers.length === 0 ? (
+                <Alert isInline variant="warning" title="No accelerator configurations to offer">
+                  The console’s backend has no accelerator configurations. Set servingOptions in the console’s Helm
+                  chart.
+                </Alert>
               ) : (
-                <FormGroup label="Model server" fieldId="model-server" isRequired>
+                <FormGroup label="Accelerator configuration" fieldId="model-server" isRequired>
                   <FormSelect
                     id="model-server"
                     aria-describedby="model-server-help"
-                    value={serverId}
-                    onChange={(_event, value) => chooseServer(value as ModelServer['id'])}
+                    // A choice a reload no longer lists shows as none, as the wizard then treats it.
+                    value={server?.name ?? ''}
+                    onChange={(_event, value) => chooseServer(value)}
                     onBlur={() => touch('server')}
                     validated={serverError ? 'error' : 'default'}
                     isRequired
                   >
-                    <FormSelectOption isPlaceholder isDisabled value="" label="Select a model server" />
-                    {modelServers.map((s) => (
-                      <FormSelectOption key={s.id} value={s.id} label={s.label} />
+                    <FormSelectOption isPlaceholder isDisabled value="" label="Select an accelerator configuration" />
+                    {servingOptions.servers.map((s) => (
+                      <FormSelectOption key={s.name} value={s.name} label={s.label} />
                     ))}
                   </FormSelect>
                   <Help id="model-server-help" error={serverError}>
-                    {server?.description ??
-                      'Select the model server that matches the hardware at the selected locations.'}
+                    {server
+                      ? `${server.description} ${serverSuitsText(server)}`.trim()
+                      : 'Select the accelerator configuration that matches the hardware of the clusters you deploy to.'}
                   </Help>
                 </FormGroup>
               )}
-              <FormGroup label="Runtime image" fieldId="runtime-image" isRequired>
+              <FormGroup label="Runtime image" fieldId="runtime-image" isRequired={!imageOptional}>
                 <TextInput
                   id="runtime-image"
                   aria-describedby="runtime-image-help"
@@ -590,10 +626,12 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   onChange={(_event, value) => setRuntimeImage(value)}
                   onBlur={() => touch('runtimeImage')}
                   validated={runtimeImageError ? 'error' : 'default'}
-                  isRequired
+                  isRequired={!imageOptional}
                 />
                 <Help id="runtime-image-help" error={runtimeImageError}>
-                  Must match the model server. For example, use a vLLM CPU image for vLLM on CPU.
+                  {imageOptional
+                    ? 'Optional. Leave empty to use the image from the selected accelerator configuration on each cluster. An image entered here replaces it.'
+                    : 'Must match the accelerator configuration. For example, use a vLLM CPU image for vLLM CPU.'}
                 </Help>
               </FormGroup>
               {replicasEditable ? (

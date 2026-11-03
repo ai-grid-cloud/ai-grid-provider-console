@@ -132,7 +132,9 @@ export const toModelView = (model: Model): ModelView => {
   const spec = model.spec;
   const requests = spec?.main?.requests ?? {};
   const status = model.status;
-  const gpu = requests[REQUEST_GPU];
+  // The model's accelerator count: nvidia.com/gpu, or another extended resource such as
+  // amd.com/gpu (cpu, memory and the other built-in resources have no "/").
+  const gpu = requests[REQUEST_GPU] ?? Object.entries(requests).find(([key]) => key.includes('/'))?.[1];
   const created = model.metadata?.creationTimestamp;
   return {
     id: model.id,

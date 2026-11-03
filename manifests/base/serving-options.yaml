@@ -1,0 +1,26 @@
+# The accelerator configurations the backend offers: the chart's default servingOptions,
+# rendered (charts/ai-grid-provider-console/values.yaml has the sources). hack/check-chart.sh keeps
+# the two the same: change the chart's values, then re-render this file from them.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-grid-provider-console-serving-options
+  namespace: ai-grid
+data:
+  serving-options.yaml: |
+    baseRefs:
+    - accelerators: []
+      description: vLLM on x86_64 CPU-only nodes. Needs about 8 GiB of memory.
+      displayName: vLLM CPU
+      name: v3-6-0-kserve-config-llm-template-cpu
+    - accelerators:
+      - nvidia.com/gpu
+      description: vLLM with NVIDIA CUDA GPUs, on one node.
+      displayName: vLLM NVIDIA GPU
+      name: v3-6-0-kserve-config-llm-single-node-template-nvidia-cuda
+    - accelerators:
+      - amd.com/gpu
+      description: vLLM with AMD ROCm GPUs.
+      displayName: vLLM AMD GPU
+      name: v3-6-0-kserve-config-llm-template-amd-rocm
+

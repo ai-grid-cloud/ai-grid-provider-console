@@ -23,3 +23,60 @@ Each image is `repository:tag`, `repository@digest`, or `repository:tag@digest` 
   values.yaml", before `helm package`).
 - **Proxy** (`images.authProxy`): `quay.io/opendatahub/odh-kube-auth-proxy:latest`; the kind test
   pins a digest.
+
+## Accelerator configurations
+
+`servingOptions` is the list of accelerator configurations the Deploy model wizard offers and the
+backend checks a model's `spec.base_refs` against (`Models/ListServingOptions`). Each is an OpenShift AI
+accelerator preset (an `LLMInferenceServiceConfig`). It's one list for every cluster. The backend
+reads two ConfigMaps in the release's namespace on every call, so a change applies without a restart:
+
+- **Defaults:** `<fullname>-serving-options`, which the chart renders from `servingOptions`: the vLLM
+  CPU, NVIDIA single-node and AMD ROCm presets OpenShift AI 3.6 installs. `values.yaml` cites the
+  sources. Helm or Argo CD manages this ConfigMap, so don't edit it on the cluster: an upgrade or sync
+  puts it back.
+- **Custom:** `<fullname>-serving-options-custom` (or `servingOptions.customConfigMap`), which you
+  own. The chart never creates or changes it.
+
+The backend's ServiceAccount can `get` those two ConfigMaps only.
+
+### Add your own entries
+
+Write the custom ConfigMap in the same format as the defaults, under the key
+`serving-options.yaml`. Use full preset names, release prefix included. A custom entry replaces the
+default with the same name, and any other entry is added:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-grid-provider-console-serving-options-custom
+  namespace: ai-grid
+data:
+  serving-options.yaml: |
+    baseRefs:
+      # Offer Intel Gaudi, which the defaults leave out.
+      - name: v3-6-0-kserve-config-llm-template-intel-gaudi
+        displayName: vLLM Intel Gaudi
+        description: vLLM with Intel Gaudi accelerators.
+        accelerators: [habana.ai/gaudi]
+```
+
+`accelerators` lists the node resources the preset needs (its
+`opendatahub.io/recommended-accelerators`): the wizard asks for a count of the first one, and an
+empty list runs on CPUs. If the backend can't read or parse the custom ConfigMap, it logs why and
+offers the defaults alone. Delete the ConfigMap to go back to the defaults.
+
+### Limits
+
+- OpenShift AI installs on each cluster only the presets its nodes can run. A model that names a GPU
+  preset fails on a cluster without that accelerator, and its status says so.
+- Preset names carry the OpenShift AI release (`v3-6-0-...`). After an OpenShift AI upgrade, list the
+  presets on the clusters (`oc get llminferenceserviceconfigs -n redhat-ods-applications -l
+  opendatahub.io/config-type=accelerator`) and set `servingOptions.openshiftAIRelease` to the new
+  release. A preset the upgrade didn't change keeps its older name: give that entry its own
+  `release`. Models keep the preset they were made with. Custom entries aren't renamed: update them.
+- Each preset sets the runtime image on each cluster; a model's own Runtime image, when one is
+  entered, replaces it.
+- The vLLM CPU preset reserves 4 GiB of memory for the KV cache (`VLLM_CPU_KVCACHE_SPACE=4`), so a
+  CPU model needs about 8 GiB, where the wizard's Memory field starts. With less, vLLM stops at start.

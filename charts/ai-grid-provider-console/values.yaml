@@ -119,6 +119,54 @@ backend:
     requests: { cpu: 50m, memory: 64Mi }
     limits: { memory: 256Mi }
 
+# The accelerator configurations the Deploy model wizard offers, and the backend checks a model's
+# spec.base_refs against (Models/ListServingOptions). One list for every cluster; the
+# backend doesn't read the clusters. The chart renders these defaults into the ConfigMap
+# <fullname>-serving-options. The backend reads it, and the custom ConfigMap below, on every call,
+# so a change applies without a restart. To offer your own entries, don't edit these: write the
+# custom ConfigMap (README, "Accelerator configurations"). The defaults are what OpenShift AI 3.6
+# installs for the three common accelerators:
+#   - baseRefs: the CPU, NVIDIA single-node and AMD presets (LLMInferenceServiceConfig labelled
+#     opendatahub.io/config-type=accelerator in the OpenShift AI namespace), from
+#     red-hat-data-services/kserve rhoai-3.6 at 71b7da36a3f8, config/overlays/odh/accelerators/.
+#     Intel Gaudi, IBM Spyre and the NVIDIA prefill/decode and multi-node presets are left out: add
+#     them in the custom ConfigMap where your clusters have them.
+# Limits:
+#   - OpenShift AI installs on each cluster only the presets its nodes can run (kserve-module
+#     hardware_filter.go): CPU everywhere, a GPU preset only where nodes have that accelerator. A
+#     model placed on a cluster without its preset fails there, and its status says so.
+#   - Preset names carry the OpenShift AI release (v3-6-0-...). After an OpenShift AI upgrade, list
+#     the presets on the clusters (oc get llminferenceserviceconfigs -n redhat-ods-applications
+#     -l opendatahub.io/config-type=accelerator) and set openshiftAIRelease to the new release. A
+#     preset the upgrade didn't change keeps its older name (kserve-module differential
+#     versioning): give that configuration its own release. Models keep the preset they were made with.
+#   - The vLLM CPU preset reserves 4 GiB for the KV cache (VLLM_CPU_KVCACHE_SPACE=4), so a CPU model
+#     needs about 8 GiB of memory, where the wizard's Memory field starts.
+servingOptions:
+  # The OpenShift AI release on the clusters. Each accelerator configuration's name is prefixed with it, as
+  # OpenShift AI names its presets: 3.6.0 gives v3-6-0-<name>.
+  openshiftAIRelease: "3.6.0"
+  # The provider admin's ConfigMap of their own entries, in this release's namespace. The chart
+  # never creates or changes it. Empty: <fullname>-serving-options-custom.
+  customConfigMap: ""
+  # name: the preset's name without the release prefix. release: optional, the release in this
+  # preset's name when it differs from openshiftAIRelease. accelerators: the node resources it
+  # needs (its opendatahub.io/recommended-accelerators); empty runs on CPUs. The preset sets the
+  # runtime image on each cluster.
+  baseRefs:
+    - name: kserve-config-llm-template-cpu
+      displayName: vLLM CPU
+      description: vLLM on x86_64 CPU-only nodes. Needs about 8 GiB of memory.
+      accelerators: []
+    - name: kserve-config-llm-single-node-template-nvidia-cuda
+      displayName: vLLM NVIDIA GPU
+      description: vLLM with NVIDIA CUDA GPUs, on one node.
+      accelerators: [nvidia.com/gpu]
+    - name: kserve-config-llm-template-amd-rocm
+      displayName: vLLM AMD GPU
+      description: vLLM with AMD ROCm GPUs.
+      accelerators: [amd.com/gpu]
+
 authProxy:
   resources:
     requests: { cpu: 50m, memory: 64Mi }

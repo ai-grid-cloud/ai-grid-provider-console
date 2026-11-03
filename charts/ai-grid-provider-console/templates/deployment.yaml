@@ -213,6 +213,14 @@ spec:
                   name: {{ $kc }}
                   key: {{ index . 1 }}
             {{- end }}
+            # The accelerator configurations the wizard offers: the chart's defaults
+            # (values servingOptions) and the provider admin's custom list, read on every call.
+            - name: AI_GRID_SERVING_OPTIONS_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+            - name: AI_GRID_SERVING_OPTIONS_CONFIGMAP
+              value: {{ printf "%s-serving-options" (include "console.fullname" .) | quote }}
+            - name: AI_GRID_SERVING_OPTIONS_CUSTOM_CONFIGMAP
+              value: {{ include "console.servingOptionsCustom" . | quote }}
             {{- with .Values.backend.git }}
             {{- if .url }}
             # Git mode: Models and Subscriptions are commits to this repository, which Argo CD

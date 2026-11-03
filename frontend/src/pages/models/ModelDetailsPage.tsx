@@ -15,7 +15,7 @@ import { PARTIALLY_AVAILABLE, hasModelStatusDetails, modelPhase, modelStatusTitl
 import { titleOf } from './modelView';
 import { useDeleteModel } from './useDeleteModel';
 import { useModel } from './useModels';
-import { modelServerLabel } from './modelServers';
+import { modelServerLabel, modelServerOf, PRESET_IMAGE, useServingOptions } from './modelServers';
 import { useClusterList } from '../clusters/useClusters';
 
 /** A model deployment at /models/:id: its status explained, its configuration and its locations. */
@@ -23,6 +23,8 @@ export const ModelDetailsPage: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { data: loadedModel, loaded, error, refresh } = useModel(id);
+  // The accelerator configuration's display name, when the backend's list has its preset.
+  const { data: servingOptions } = useServingOptions();
   const { data: clusters } = useClusterList();
   const { user } = useConsoleSession();
   // A 404 means the deployment is gone, even when an earlier answer is still held (PageStateSection
@@ -62,8 +64,15 @@ export const ModelDetailsPage: React.FC = () => {
               { term: 'Description', value: model.description },
               { term: 'Model', value: model.modelName },
               { term: 'Model URI', value: model.modelUri },
-              { term: 'Model server', value: modelServerLabel(model.baseRefs) || undefined },
-              { term: 'Runtime image', value: model.runtimeImage },
+              {
+                term: 'Accelerator configuration',
+                value: modelServerLabel(model.baseRefs, servingOptions.servers) || undefined,
+              },
+              {
+                term: 'Runtime image',
+                // As the wizard reads it: a model on a preset may leave the image to it.
+                value: model.runtimeImage || (modelServerOf(model.baseRefs)?.setsImage ? PRESET_IMAGE : undefined),
+              },
               { term: 'Replicas', value: model.autoscaled ? 'Autoscaled' : model.replicas },
               { term: 'Endpoint', value: model.url },
               { term: 'Created', value: model.creationTimestamp && <RelativeTime time={model.creationTimestamp} /> },

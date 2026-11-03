@@ -27,8 +27,10 @@ export type ModelInput = {
   memory: string;
   gpuCount: number;
   runtimeArgs: string[];
-  /** The model server's presets (spec.base_refs); empty for KServe's default. */
+  /** The accelerator configuration (spec.base_refs), one preset; a model deployed before may have none. */
   baseRefs: string[];
+  /** The resource gpuCount asks for: the accelerator configuration's first accelerator. Default nvidia.com/gpu. */
+  gpuResource?: string;
   /**
    * The clusters to place the model on, by name, from Models/ListPlacementClusters; not
    * `location` labels, which status.placement.locations reports.
@@ -45,7 +47,7 @@ export const namedPlacement = (clusters: string[]): PlacementInit => ({
 const requestsOf = (input: ModelInput): Record<string, string> => ({
   ...(input.cpu ? { cpu: input.cpu } : {}),
   ...(input.memory ? { memory: input.memory } : {}),
-  ...(input.gpuCount > 0 ? { [REQUEST_GPU]: String(input.gpuCount) } : {}),
+  ...(input.gpuCount > 0 ? { [input.gpuResource ?? REQUEST_GPU]: String(input.gpuCount) } : {}),
 });
 
 export const createRequestOf = (input: ModelInput): MessageInitShape<typeof ModelsCreateRequestSchema> => {
