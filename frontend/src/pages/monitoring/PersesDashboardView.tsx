@@ -36,11 +36,14 @@ import { useRelaySessionCheck } from './relaySession';
 // one for each of PatternFly's themes, built the first time the page shows in it.
 const themes: Partial<Record<PageTheme, ReturnType<typeof patternFlyTheme>>> = {};
 const themeFor = (mode: PageTheme) => (themes[mode] ??= patternFlyTheme(mode));
-const datasourceApi = new RelayDatasourceApi();
 // One cache for the page: switching tabs back reuses the answers until they're refetched.
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 0 } } });
 
-type Props = { dashboard: DashboardResource };
+type Props = {
+  dashboard: DashboardResource;
+  /** The page's one datasource API, so its cache lasts across tabs. */
+  datasourceApi: RelayDatasourceApi;
+};
 
 /**
  * The built-in variables Perses's own dashboard view defines (dashboards ViewDashboard): the
@@ -81,7 +84,7 @@ const useBuiltinVariables = (dashboard: DashboardResource): BuiltinVariableDefin
  * (start, end, refresh, var-<name>) as Perses's own view and odh-dashboard keep them, so a reload or
  * a link with var-<name> opens it as it was.
  */
-const DashboardBody: React.FC<Props> = ({ dashboard }) => {
+const DashboardBody: React.FC<Props> = ({ dashboard, datasourceApi }) => {
   const [timeZone, setTimeZone] = useState('local');
   const initialTimeRange = useInitialTimeRange(dashboard.spec.duration || '1h');
   const initialRefreshInterval = useInitialRefreshInterval(dashboard.spec.refreshInterval || '0s');
@@ -136,7 +139,7 @@ const DashboardBody: React.FC<Props> = ({ dashboard }) => {
 };
 
 /** The dashboard's time range, refresh, variables and panels, in the page's light or dark theme. */
-const PersesDashboardView: React.FC<Props> = ({ dashboard }) => {
+const PersesDashboardView: React.FC<Props> = ({ dashboard, datasourceApi }) => {
   const { muiTheme, chartsTheme } = themeFor(usePageTheme());
   // A 401 from the relay may be Perses's or a datasource's, not the session's: the console checks.
   useRelaySessionCheck(queryClient);
@@ -148,7 +151,7 @@ const PersesDashboardView: React.FC<Props> = ({ dashboard }) => {
             <SnackbarProvider anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="default">
               <PluginRegistry pluginLoader={pluginLoader}>
                 <PanelFocusProvider>
-                  <DashboardBody dashboard={dashboard} />
+                  <DashboardBody dashboard={dashboard} datasourceApi={datasourceApi} />
                 </PanelFocusProvider>
               </PluginRegistry>
             </SnackbarProvider>

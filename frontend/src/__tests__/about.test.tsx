@@ -77,9 +77,20 @@ describe('the config rows', () => {
   });
 
   it.each([
-    [{ enabled: false, persesProject: '' }, 'Off'],
-    [{ enabled: true, persesProject: 'ai-grid-monitoring' }, 'On: Perses project ai-grid-monitoring'],
-    [{ enabled: true, persesProject: '' }, 'On'],
+    [{ enabled: false, persesProject: '', extraDashboards: [] }, 'Off'],
+    [
+      { enabled: true, persesProject: 'ai-grid-monitoring', extraDashboards: [] },
+      'On: Perses project ai-grid-monitoring',
+    ],
+    [
+      {
+        enabled: true,
+        persesProject: 'ai-grid-monitoring',
+        extraDashboards: [{ project: 'acm', dashboards: [{ name: 'd' }], datasources: ['s'] }],
+      },
+      'On: Perses projects ai-grid-monitoring, acm',
+    ],
+    [{ enabled: true, persesProject: '', extraDashboards: [] }, 'On'],
   ])('say Monitoring %j as %s', async (monitoring, text) => {
     renderAbout({ config: { ...(await baseConfig()), monitoring } });
     expect(row('Monitoring')).toHaveTextContent(new RegExp(`^${text}$`));

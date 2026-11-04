@@ -48,6 +48,20 @@ export type MonitoringConfig = {
   enabled: boolean;
   /** The one Perses project the relay reads, whose `dashboard-*` objects are the Monitoring tabs; set whenever Monitoring is on. */
   persesProject: string;
+  /** Other projects' dashboards the relay passes by name, tabs after `persesProject`'s; empty when Monitoring is off. */
+  extraDashboards: MonitoringExtraProject[];
+};
+
+/**
+ * Another Perses project the relay reads, only the dashboards and datasources it names (the chart's
+ * console.perses.extraDashboards; bff/internal/config PersesExtraProject).
+ */
+export type MonitoringExtraProject = {
+  project: string;
+  /** Tabs, in this order; `title` replaces the dashboard's display name. */
+  dashboards: { name: string; title?: string }[];
+  /** The datasources in `project` the relay passes, and so the only ones these dashboards can query. */
+  datasources: string[];
 };
 
 export type ClusterStatus = 'Ready' | 'Offline' | 'Unknown';

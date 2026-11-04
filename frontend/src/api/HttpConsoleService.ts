@@ -42,9 +42,35 @@ export class HttpConsoleService implements ConsoleService {
    * relay's checks (401, 403, 404 when monitoring isn't configured).
    */
   async listMonitoringDashboards(project: string): Promise<DashboardResource[]> {
+    return (await this.persesGet(`projects/${encodeURIComponent(project)}/dashboards`)).json() as Promise<
+      DashboardResource[]
+    >;
+  }
+
+  /**
+   * GET /perses/api/api/v1/projects/<project>/dashboards/<name>: one dashboard of a project the relay
+   * reads only by name. Undefined when it isn't there (404, also the relay's answer for a name it
+   * doesn't pass) or the caller may not read it (403); any other failure as listMonitoringDashboards.
+   */
+  async getMonitoringDashboard(project: string, name: string): Promise<DashboardResource | undefined> {
+    try {
+      const response = await this.persesGet(
+        `projects/${encodeURIComponent(project)}/dashboards/${encodeURIComponent(name)}`,
+      );
+      return (await response.json()) as DashboardResource;
+    } catch (err) {
+      if (err instanceof RelayedError && (err.status === 403 || err.status === 404)) {
+        return undefined;
+      }
+      throw err;
+    }
+  }
+
+  /** A Perses API read through the relay; a failure is a RelayedError with Perses's or the BFF's message. */
+  private async persesGet(apiPath: string): Promise<Response> {
     let response: Response;
     try {
-      response = await this.fetchFn(`${PERSES_API}/api/v1/projects/${encodeURIComponent(project)}/dashboards`, {
+      response = await this.fetchFn(`${PERSES_API}/api/v1/${apiPath}`, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       });
@@ -61,7 +87,7 @@ export class HttpConsoleService implements ConsoleService {
       }
       throw new RelayedError(response.status, message);
     }
-    return (await response.json()) as DashboardResource[];
+    return response;
   }
 
   async listOrganizations(): Promise<Organization[]> {

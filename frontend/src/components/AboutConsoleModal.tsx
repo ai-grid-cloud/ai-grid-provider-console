@@ -60,7 +60,9 @@ export const AboutConsoleModal: React.FC<Props> = ({ isOpen, onClose, config, co
         !monitoring.enabled
           ? 'Off'
           : monitoring.persesProject
-            ? `On: Perses project ${monitoring.persesProject}`
+            ? monitoring.extraDashboards?.length
+              ? `On: Perses projects ${[monitoring.persesProject, ...monitoring.extraDashboards.map((p) => p.project)].join(', ')}`
+              : `On: Perses project ${monitoring.persesProject}`
             : 'On',
       ),
     ],

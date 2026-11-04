@@ -85,7 +85,7 @@ test('real Perses panels remain compatible with the shared Query runtime', async
     errors.push(msg.text());
   });
   const config = structuredClone(configExample.body);
-  config.data.monitoring = { enabled: true, persesProject: 'ai-grid' };
+  config.data.monitoring = { enabled: true, persesProject: 'ai-grid', extraDashboards: [] };
   config.data.fakeBackend = true;
   const user = userExample.body;
   await page.route('**/api/v1/user', (route) => {

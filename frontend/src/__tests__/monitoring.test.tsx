@@ -7,6 +7,7 @@ import { RelayedError, ServiceError } from '../api/ConsoleService';
 import { HttpConsoleService } from '../api/HttpConsoleService';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { monitoringLinkFor, monitoringTabs } from '../api/monitoring';
+import type { MonitoringExtraProject } from '../api/types';
 import { renderAt } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/monitoring/MonitoringPage';
@@ -36,6 +37,9 @@ vi.mock('../pages/monitoring/PersesDashboardView', async () => {
           usage of site-a
         </a>
         <a href="/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=ai-grid">optimization</a>
+        <a href="/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=acm&var-cluster=site-b">
+          acm optimization
+        </a>
       </div>
     ),
   };
@@ -48,12 +52,35 @@ const dashboard = (project: string, name: string, title?: string) =>
     spec: { display: title ? { name: title } : undefined, duration: '1h', variables: [], panels: {}, layouts: [] },
   }) as unknown as DashboardResource;
 
-const withMonitoring = (persesProject: string, dashboards: DashboardResource[]) => {
+const withMonitoring = (
+  persesProject: string,
+  dashboards: DashboardResource[],
+  extraDashboards: MonitoringExtraProject[] = [],
+) => {
   const service = new MockConsoleService();
-  service.config = { ...service.config, monitoring: { enabled: true, persesProject } };
+  service.config = { ...service.config, monitoring: { enabled: true, persesProject, extraDashboards } };
   service.monitoringDashboards = dashboards;
   return service;
 };
+
+const acmDashboards = [
+  dashboard('acm', 'acm-clusters-overview', 'ACM Clusters Overview'),
+  dashboard('acm', 'acm-optimization-overview', 'ACM Resource Optimization / Cluster'),
+  dashboard('acm', 'acm-node-rsrc-use', 'USE Method / Node'),
+];
+
+/** The chart's list for `acm`: two of its dashboards and one the hub doesn't have. */
+const acmExtra: MonitoringExtraProject[] = [
+  {
+    project: 'acm',
+    dashboards: [
+      { name: 'acm-clusters-overview', title: 'Clusters overview' },
+      { name: 'acm-missing' },
+      { name: 'acm-optimization-overview' },
+    ],
+    datasources: ['rbac-query-proxy-datasource'],
+  },
+];
 
 const hub = [
   dashboard('ai-grid', 'dashboard-2-usage', 'Token usage'),
@@ -145,9 +172,102 @@ it("opens a dashboard's link to another tab here, and says when a link goes else
   expect(screen.queryByText('Link not available in this console')).not.toBeInTheDocument();
 });
 
+describe("other projects' dashboards", () => {
+  it("adds the listed ones that are there as tabs after the project's, and none it doesn't list", async () => {
+    renderAt('/monitoring', withMonitoring('ai-grid', [...hub, ...acmDashboards], acmExtra));
+    const tabs = within(await screen.findByTestId('monitoring-tabs')).getByRole('tablist');
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((t) => t.textContent),
+    ).toEqual(['Fleet health', 'Token usage', 'Clusters overview', 'ACM Resource Optimization / Cluster']);
+  });
+
+  it("keeps the project's tabs when another project's dashboard fails, and says which", async () => {
+    const service = withMonitoring('ai-grid', [...hub, ...acmDashboards], acmExtra);
+    const get = service.getMonitoringDashboard;
+    service.getMonitoringDashboard = (project, name) =>
+      name === 'acm-optimization-overview'
+        ? Promise.reject(new RelayedError(502, 'perses is unavailable'))
+        : get(project, name);
+    renderAt('/monitoring', service);
+    const tabs = within(await screen.findByTestId('monitoring-tabs')).getByRole('tablist');
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((t) => t.textContent),
+    ).toEqual(['Fleet health', 'Token usage', 'Clusters overview']);
+    expect(screen.getByText('Some dashboards could not be loaded')).toBeVisible();
+    expect(screen.getByText(/acm-optimization-overview\. Refresh the page/)).toBeVisible();
+  });
+
+  it("fails the page on another project's 401, so the session is checked", async () => {
+    const service = withMonitoring('ai-grid', [...hub, ...acmDashboards], acmExtra);
+    service.getMonitoringDashboard = () => Promise.reject(new RelayedError(401, 'Perses refused the token'));
+    renderAt('/monitoring', service);
+    expect(await screen.findByText('Perses refused the token')).toBeVisible();
+    expect(screen.queryByTestId('monitoring-tabs')).not.toBeInTheDocument();
+  });
+
+  it('opens one by ?dashboard=<project>/<name>', async () => {
+    renderAt(
+      '/monitoring?dashboard=acm%2Facm-clusters-overview',
+      withMonitoring('ai-grid', [...hub, ...acmDashboards], acmExtra),
+    );
+    expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('acm/acm-clusters-overview');
+    expect(screen.getByRole('tab', { name: 'Clusters overview' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('are tabs even when the project has no dashboard-* dashboards', async () => {
+    renderAt('/monitoring', withMonitoring('ai-grid', acmDashboards, acmExtra));
+    expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('acm/acm-clusters-overview');
+  });
+
+  it("follows a dashboard's link to another listed dashboard of its project", async () => {
+    const user = userEvent.setup();
+    renderAt(
+      '/monitoring?dashboard=acm%2Facm-clusters-overview',
+      withMonitoring('ai-grid', [...hub, ...acmDashboards], acmExtra),
+    );
+    expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('acm/acm-clusters-overview');
+    await user.click(screen.getByRole('link', { name: 'acm optimization' }));
+    expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('acm/acm-optimization-overview');
+    expect(screen.getByRole('tab', { name: 'ACM Resource Optimization / Cluster' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // The main project's link to the same name is not that tab.
+    await user.click(screen.getByRole('link', { name: 'optimization' }));
+    expect(await screen.findByText('Link not available in this console')).toBeVisible();
+  });
+});
+
 describe('monitoringLinkFor', () => {
   // The page's tabs: the configured project's only.
   const tabs = monitoringTabs(hub.filter((d) => d.metadata.project === 'ai-grid'));
+  const withACM = monitoringTabs(
+    hub.filter((d) => d.metadata.project === 'ai-grid'),
+    acmDashboards.map((dashboard) => ({ dashboard })),
+  );
+
+  it("maps a link in another project's dashboard to a tab of that project, by its key", () => {
+    expect(
+      monitoringLinkFor(
+        '/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=acm&var-cluster=site-a',
+        withACM,
+        'acm',
+      ),
+    ).toBe('/monitoring?dashboard=acm%2Facm-optimization-overview&var-cluster=site-a');
+    // No project: the one the link is in.
+    expect(
+      monitoringLinkFor('/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview', withACM, 'acm'),
+    ).toBe('/monitoring?dashboard=acm%2Facm-optimization-overview');
+    // From the main project's dashboard, the name alone is that project's.
+    expect(
+      monitoringLinkFor('/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview', withACM, 'ai-grid'),
+    ).toBe(undefined);
+  });
+
   it("maps the OpenShift console's and Perses's dashboard links to a tab, keeping time and variables", () => {
     expect(
       monitoringLinkFor(
@@ -183,10 +303,48 @@ describe('monitoringLinkFor', () => {
 
 describe('monitoringTabs', () => {
   it('keeps the dashboard-* dashboards, ordered by name', () => {
-    expect(monitoringTabs(hub.slice(0, 3)).map((d) => d.metadata.name)).toEqual([
-      'dashboard-1-fleet',
-      'dashboard-2-usage',
+    expect(monitoringTabs(hub.slice(0, 3)).map((t) => t.key)).toEqual(['dashboard-1-fleet', 'dashboard-2-usage']);
+  });
+
+  it("adds other projects' dashboards after them, in order, keyed by project and name, with the chart's title", () => {
+    expect(
+      monitoringTabs(hub.slice(0, 2), [
+        { dashboard: acmDashboards[1], title: 'Cluster optimization' },
+        { dashboard: acmDashboards[0] },
+      ]).map((t) => [t.key, t.title]),
+    ).toEqual([
+      ['dashboard-1-fleet', 'Fleet health'],
+      ['dashboard-2-usage', 'Token usage'],
+      ['acm/acm-optimization-overview', 'Cluster optimization'],
+      ['acm/acm-clusters-overview', 'ACM Clusters Overview'],
     ]);
+  });
+});
+
+describe('HttpConsoleService.getMonitoringDashboard', () => {
+  const answer = (status: number, body: unknown) =>
+    vi.fn<typeof fetch>(() => Promise.resolve(new Response(JSON.stringify(body), { status })));
+
+  it('reads one dashboard by name through the relay', async () => {
+    const fetchFn = answer(200, acmDashboards[0]);
+    expect(await new HttpConsoleService(fetchFn).getMonitoringDashboard('acm', 'acm-clusters-overview')).toEqual(
+      acmDashboards[0],
+    );
+    expect(fetchFn.mock.calls.map(([url]) => url)).toEqual([
+      '/perses/api/api/v1/projects/acm/dashboards/acm-clusters-overview',
+    ]);
+  });
+
+  it("answers undefined when it isn't there or may not be read, and fails otherwise", async () => {
+    for (const status of [403, 404]) {
+      expect(await new HttpConsoleService(answer(status, {})).getMonitoringDashboard('acm', 'd')).toBeUndefined();
+    }
+    await expect(
+      new HttpConsoleService(answer(502, { error: { message: 'perses is down' } })).getMonitoringDashboard('acm', 'd'),
+    ).rejects.toMatchObject({ status: 502, message: 'perses is down' });
+    await expect(
+      new HttpConsoleService(answer(401, { message: 'token expired' })).getMonitoringDashboard('acm', 'd'),
+    ).rejects.toMatchObject({ status: 401 });
   });
 });
 

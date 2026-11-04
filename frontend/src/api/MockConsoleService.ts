@@ -31,7 +31,7 @@ export class MockConsoleService implements ConsoleService {
       billingUrl: '',
       version: 'mock',
       fakeBackend: false,
-      monitoring: { enabled: false, persesProject: '' },
+      monitoring: { enabled: false, persesProject: '', extraDashboards: [] },
       models: { hardware: builtInModelHardware() },
     },
   ) {}
@@ -41,6 +41,9 @@ export class MockConsoleService implements ConsoleService {
 
   listMonitoringDashboards = async (project: string): Promise<DashboardResource[]> =>
     this.monitoringDashboards.filter((d) => d.metadata.project === project);
+
+  getMonitoringDashboard = async (project: string, name: string): Promise<DashboardResource | undefined> =>
+    this.monitoringDashboards.find((d) => d.metadata.project === project && d.metadata.name === name);
 
   getUser = async (): Promise<User> => this.user;
 
