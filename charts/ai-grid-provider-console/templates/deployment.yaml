@@ -159,6 +159,17 @@ spec:
             - name: PERSES_CA_FILE
               value: {{ . | quote }}
             {{- end }}
+            {{- $main := .project }}
+            {{- range .extraDashboards }}
+            {{- if eq .project $main }}
+            {{- fail (printf "console.perses.extraDashboards: project %q is console.perses.project; list only other projects there" .project) }}
+            {{- end }}
+            {{- end }}
+            {{- with .extraDashboards }}
+            # Other projects' dashboards as tabs: the relay passes only these dashboards and datasources.
+            - name: PERSES_EXTRA_DASHBOARDS
+              value: {{ toJson . | quote }}
+            {{- end }}
             {{- end }}
             {{- end }}
             {{- with (.Values.console.models | default dict).hardware }}

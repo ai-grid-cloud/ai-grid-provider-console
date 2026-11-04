@@ -135,7 +135,7 @@ under `/perses/api`, and the Connect relay to the backend's own RPCs under `/ai_
 | GET | `/healthcheck` | `{status, version}` | none; no identity and no backend call: a check, by a person or a script on the pod, that the BFF process serves HTTP and which build it is (`version`). No probe uses it: the kubelet probes only `/readyz` (below), and there is deliberately no liveness probe, which would restart the BFF whenever the proxy in front of it is down. Through the route it is behind the login like any page (the proxy skips auth for `/readyz` only) |
 | GET | `/readyz` | `{status, version, backend}` | `AiGrid/Ping`; readiness, 503 when the backend does not answer. The pod is then unready, and with the one replica the chart runs, the Service has no endpoint left: the OpenShift router answers every request with its own 503 page (HTML, not this API's JSON error), until the backend answers again |
 | GET | `/api/v1/user` | `{username, email?, groups, isProviderAdmin}` (`email` omitted when the proxy sends none) | none; the identity from the proxy headers, `isProviderAdmin` from a hub `SelfSubjectAccessReview` |
-| GET | `/api/v1/config` | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, fakeBackend, monitoring: {enabled, persesProject}, models: {hardware}}`: `fakeBackend` makes the UI show its fake-backend banner, `monitoring.enabled` says the BFF relays `/perses/api` (it has a `PERSES_URL`) and `monitoring.persesProject` names the one Perses project the relay reads, whose `dashboard-*` objects are the Monitoring tabs (always set when `monitoring.enabled`); `models.hardware` is the Deploy model wizard's Hardware list, never empty, each `{id, label, description?, accelerator?, image?, env?, defaults?: {accelerators?, cpu?, memory?}}` (see "Model hardware" below) | none; env `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION` (the attribution shown with `MAP_TILE_URL`'s tiles; with no `MAP_TILE_URL` the map draws a bundled land outline), `BILLING_URL`, `FAKE_BACKEND`, `PERSES_URL`, `PERSES_PROJECT`, `MODEL_HARDWARE` |
+| GET | `/api/v1/config` | `{gridEndpoint, mapTileUrl, mapTileAttribution, billingUrl, version, fakeBackend, monitoring: {enabled, persesProject, extraDashboards}, models: {hardware}}`: `fakeBackend` makes the UI show its fake-backend banner, `monitoring.enabled` says the BFF relays `/perses/api` (it has a `PERSES_URL`) and `monitoring.persesProject` names the one Perses project the relay reads, whose `dashboard-*` objects are the Monitoring tabs (always set when `monitoring.enabled`) and `monitoring.extraDashboards` the other projects' dashboards it passes by name, each `{project, dashboards: [{name, title?}], datasources}` (empty when Monitoring is off; see "The Perses relay"); `models.hardware` is the Deploy model wizard's Hardware list, never empty, each `{id, label, description?, accelerator?, image?, env?, defaults?: {accelerators?, cpu?, memory?}}` (see "Model hardware" below) | none; env `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION` (the attribution shown with `MAP_TILE_URL`'s tiles; with no `MAP_TILE_URL` the map draws a bundled land outline), `BILLING_URL`, `FAKE_BACKEND`, `PERSES_URL`, `PERSES_PROJECT`, `PERSES_EXTRA_DASHBOARDS`, `MODEL_HARDWARE` |
 | GET | `/api/v1/tenants?offset=&limit=&filter=` | `Tenant[]` in Keycloak's order (by name, the realm database's collation) plus `meta`; `filter` is a CEL expression the client writes, over `this` (a Tenant), see "Writes, versions and lists"; `limit` omitted returns everything; the removed `search` is 422 | `Tenants/ListTenants` with `offset`, `limit` and `filter` exactly as sent |
 | GET | `/api/v1/tenants/{id}` | `Tenant`, `ETag: "<resourceVersion>"` | `Tenants/GetTenant`; 404 with the backend's message when absent |
 | POST | `/api/v1/tenants` | 201, `Tenant` as created, `Location: /api/v1/tenants/{id}`, `ETag` | `Tenants/CreateTenant`; 422 with Keycloak's message on a bad name, alias or domain, 409 on a taken name or alias |
@@ -476,12 +476,33 @@ where a datasource points, so the operator must make sure that only provider adm
 that project's dashboards and datasources, and that the global datasources point only at the
 hub's own Thanos and Loki.
 
+**Other projects, by name only.** `PERSES_EXTRA_DASHBOARDS` (the chart's
+`console.perses.extraDashboards`, empty by default) lists other projects, each with the dashboards
+to show and the datasources in that project they query, such as four of ACM observability's
+dashboards in `open-cluster-management-observability`, whose one datasource,
+`rbac-query-proxy-datasource`, is ACM's RBAC query proxy, which shows each caller only the clusters
+they may see (the chart's values.yaml has that list as an example). In such a project
+the relay passes only `GET /api/v1/projects/{X}/dashboards/{listed}`,
+`GET /api/v1/projects/{X}/datasources/{listed}` and the query APIs behind those datasources'
+proxies; its lists and every other name are 404, so a dashboard or datasource added there later is
+never relayed. The same rule as for `PERSES_PROJECT` holds: only cluster or ACM admins may write
+those objects. On ACM 2.17 hubs, `create`, `update` and `delete` on PersesDashboards and
+PersesDatasources in `open-cluster-management-observability` are held only by cluster admins and
+platform controllers, and ACM's observability add-on reapplies the objects it owns (checked on two
+hubs, 2026-11-03). Each listed dashboard is a tab after the main project's, in the listed order; one
+that isn't there, or that the caller may not read (404 or 403), gets no tab. `GET /config` returns
+the list as `monitoring.extraDashboards`, which the page uses to read those datasources one by one
+instead of listing the project. Names are single path segments, as for `PERSES_PROJECT`; a project,
+dashboard or datasource listed twice, an empty list, or the main project again stops the BFF from
+starting, and the list needs `PERSES_URL`.
+
 What the relay owns is the boundary:
 
 - Only the provider-admin check's callers pass, as on `/api/v1` (401 without a token, 403 for a
   non-admin), until Perses or the backend can tell provider views from tenant ones: an
   organization admin must never reach the provider dashboards.
-- Only the reads the Perses React components make, in the configured project `{P}`:
+- Only the reads the Perses React components make, in the configured project `{P}` (and, in each
+  extra project, the listed names only, as described earlier):
   `GET /api/v1/projects/{P}/dashboards[/{d}]`, `/api/v1/projects/{P}/datasources[/{d}]`,
   `/api/v1/globaldatasources[/{d}]`, and the Prometheus and Loki query APIs behind those
   datasources' proxies (`/proxy/projects/{P}/datasources/{d}/api/v1/query…`,

@@ -26,6 +26,9 @@ type ConsoleConfig struct {
 type MonitoringConfig struct {
 	Enabled       bool   `json:"enabled"`
 	PersesProject string `json:"persesProject"`
+	// ExtraDashboards are the other projects' dashboards the relay passes, by name, with the
+	// datasources it passes there; tabs after the main project's. Empty when Monitoring is off.
+	ExtraDashboards []config.PersesExtraProject `json:"extraDashboards"`
 }
 
 // ModelsConfig is the Models pages' part of ConsoleConfig.
@@ -43,7 +46,18 @@ func (a *App) getConfig(w http.ResponseWriter, _ *http.Request) {
 		BillingURL:         a.cfg.BillingURL,
 		Version:            Version,
 		FakeBackend:        a.cfg.FakeBackend,
-		Monitoring:         MonitoringConfig{Enabled: a.perses != nil, PersesProject: a.cfg.PersesProject},
+		Monitoring:         a.monitoringConfig(),
 		Models:             ModelsConfig{Hardware: a.cfg.ModelHardware},
 	})
+}
+
+func (a *App) monitoringConfig() MonitoringConfig {
+	if a.perses == nil {
+		return MonitoringConfig{PersesProject: a.cfg.PersesProject, ExtraDashboards: []config.PersesExtraProject{}}
+	}
+	extra := a.cfg.PersesExtra
+	if extra == nil {
+		extra = []config.PersesExtraProject{}
+	}
+	return MonitoringConfig{Enabled: true, PersesProject: a.cfg.PersesProject, ExtraDashboards: extra}
 }

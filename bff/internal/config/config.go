@@ -100,6 +100,9 @@ type Config struct {
 	// datasources); its dashboard- objects are the Monitoring tabs. Required
 	// with PersesURL (bff/internal/perses says why).
 	PersesProject string
+	// PersesExtra are the other Perses projects the relay reads, only the dashboards and
+	// datasources each names, from the JSON in PERSES_EXTRA_DASHBOARDS.
+	PersesExtra []PersesExtraProject
 
 	// ModelHardware is the Deploy model wizard's Hardware list, from the JSON in
 	// MODEL_HARDWARE; DefaultModelHardware when that is empty.
@@ -114,7 +117,7 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	env := envReader{lookup: lookupEnv}
 
 	var cfg Config
-	var logLevel, modelHardware string
+	var logLevel, modelHardware, persesExtra string
 
 	fs.StringVar(&cfg.BindAddress, "bind-address", env.str("BIND_ADDRESS", DefaultBindAddress), "Interface to listen on; 0.0.0.0 for all")
 	fs.IntVar(&cfg.Port, "port", env.int("port", "PORT", 8080), "Listen port")
@@ -144,6 +147,7 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	fs.BoolVar(&cfg.PersesInsecure, "perses-insecure", env.boolean("perses-insecure", "PERSES_INSECURE", false), "Allow plaintext to a non-loopback Perses server (development only)")
 	fs.DurationVar(&cfg.PersesTimeout, "perses-timeout", env.duration("perses-timeout", "PERSES_TIMEOUT", 30*time.Second), "Bound on the exchange with the Perses server, from connecting to the last byte of its answer; at most 50s")
 	fs.StringVar(&cfg.PersesProject, "perses-project", env.str("PERSES_PROJECT", ""), "Perses project the Monitoring page reads, whose dashboard- objects are its tabs; required with perses-url")
+	fs.StringVar(&persesExtra, "perses-extra-dashboards", env.str("PERSES_EXTRA_DASHBOARDS", ""), "Other Perses projects' dashboards to show as Monitoring tabs, a JSON list (the chart's console.perses.extraDashboards); the relay passes only the dashboards and datasources it names")
 	fs.StringVar(&modelHardware, "model-hardware", env.str("MODEL_HARDWARE", ""), "The Deploy model wizard's hardware choices, a JSON list (the chart's console.models.hardware); empty for the built-in NVIDIA GPU and CPU only")
 	fs.StringVar(&logLevel, "log-level", env.str("LOG_LEVEL", "info"), "Log level: debug, info, warn, error")
 
@@ -186,6 +190,14 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	if cfg.BackendTimeout <= 0 || cfg.BackendTimeout > MaxBackendTimeout {
 		return Config{}, fmt.Errorf("backend-timeout must be positive and at most %s, to stay inside the server's %s write timeout", MaxBackendTimeout, WriteTimeout)
 	}
+	extra, err := ParsePersesExtra(persesExtra)
+	if err != nil {
+		return Config{}, err
+	}
+	if len(extra) > 0 && cfg.PersesURL == "" {
+		return Config{}, errors.New("perses-extra-dashboards needs perses-url")
+	}
+	cfg.PersesExtra = extra
 	hardware, err := ParseModelHardware(modelHardware)
 	if err != nil {
 		return Config{}, err

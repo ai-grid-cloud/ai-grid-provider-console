@@ -131,6 +131,105 @@ func TestNewValidates(t *testing.T) {
 	}
 }
 
+// acm is an extra project as the chart lists ACM observability's.
+var acm = ExtraProject{
+	Project:     "open-cluster-management-observability",
+	Dashboards:  []string{"acm-clusters-overview", "acm-alerts-by-cluster"},
+	Datasources: []string{"rbac-query-proxy-datasource"},
+}
+
+func TestAllowedExtraProjectsOnlyByName(t *testing.T) {
+	t.Parallel()
+	relay, err := New(Config{URL: "https://perses.example.svc:8080", Project: project, Extra: []ExtraProject{acm}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const ns = "/api/v1/projects/open-cluster-management-observability"
+	const px = "/proxy/projects/open-cluster-management-observability"
+	for _, tc := range []struct {
+		method, path string
+		want         int
+	}{
+		// The listed dashboards and datasource, and queries through that datasource.
+		{"GET", ns + "/dashboards/acm-clusters-overview", 0},
+		{"GET", ns + "/dashboards/acm-alerts-by-cluster", 0},
+		{"GET", ns + "/datasources/rbac-query-proxy-datasource", 0},
+		{"GET", px + "/datasources/rbac-query-proxy-datasource/api/v1/query", 0},
+		{"POST", px + "/datasources/rbac-query-proxy-datasource/api/v1/query_range", 0},
+		{"GET", px + "/datasources/rbac-query-proxy-datasource/api/v1/label/cluster/values", 0},
+		// The main project still passes as before.
+		{"GET", "/api/v1/projects/ai-grid-monitoring/dashboards", 0},
+		// Nothing else in the extra project: not its lists, another dashboard or datasource, a name
+		// that only starts like a listed one, or a query through another datasource.
+		{"GET", ns + "/dashboards", http.StatusNotFound},
+		{"GET", ns + "/datasources", http.StatusNotFound},
+		{"GET", ns + "/dashboards/acm-node-rsrc-use", http.StatusNotFound},
+		{"GET", ns + "/dashboards/acm-clusters-overview-2", http.StatusNotFound},
+		{"GET", ns + "/dashboards/acm-clusters-overviewX", http.StatusNotFound},
+		{"GET", ns + "/datasources/other", http.StatusNotFound},
+		{"GET", ns + "/dashboards/rbac-query-proxy-datasource", http.StatusNotFound},
+		{"GET", ns + "/datasources/acm-clusters-overview", http.StatusNotFound},
+		{"GET", px + "/datasources/other/api/v1/query", http.StatusNotFound},
+		{"GET", px + "/datasources/rbac-query-proxy-datasource/federate", http.StatusNotFound},
+		{"GET", px + "/dashboards/acm-clusters-overview/datasources/rbac-query-proxy-datasource/api/v1/query", http.StatusNotFound},
+		// Still read only.
+		{"PUT", ns + "/dashboards/acm-clusters-overview", http.StatusMethodNotAllowed},
+		{"DELETE", ns + "/datasources/rbac-query-proxy-datasource", http.StatusMethodNotAllowed},
+		{"POST", ns + "/dashboards/acm-clusters-overview", http.StatusMethodNotAllowed},
+	} {
+		if got, _ := relay.Allowed(tc.method, tc.path, ""); got != tc.want {
+			t.Errorf("Allowed(%s %q) = %d, want %d", tc.method, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestAllowedExtraNamesAsWritten(t *testing.T) {
+	t.Parallel()
+	relay, err := New(Config{URL: "https://perses.example.svc:8080", Project: project, Extra: []ExtraProject{
+		{Project: "a.b", Dashboards: []string{"d.1"}, Datasources: []string{"s.1"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]int{
+		"/api/v1/projects/a.b/dashboards/d.1":  0,
+		"/api/v1/projects/aXb/dashboards/d.1":  http.StatusNotFound,
+		"/api/v1/projects/a.b/dashboards/dX1":  http.StatusNotFound,
+		"/api/v1/projects/a.b/datasources/sX1": http.StatusNotFound,
+	} {
+		if got, _ := relay.Allowed(http.MethodGet, path, ""); got != want {
+			t.Errorf("Allowed(GET %q) = %d, want %d", path, got, want)
+		}
+	}
+}
+
+func TestNewValidatesExtra(t *testing.T) {
+	t.Parallel()
+	ok := func(e ExtraProject) ExtraProject { return e }
+	for _, tc := range []struct {
+		name  string
+		extra []ExtraProject
+		ok    bool
+	}{
+		{"none", nil, true},
+		{"ACM's", []ExtraProject{acm}, true},
+		{"the main project again", []ExtraProject{{Project: project, Dashboards: []string{"d"}, Datasources: []string{"s"}}}, false},
+		{"a project twice", []ExtraProject{acm, ok(acm)}, false},
+		{"no dashboards", []ExtraProject{{Project: "p", Datasources: []string{"s"}}}, false},
+		{"no datasources", []ExtraProject{{Project: "p", Dashboards: []string{"d"}}}, false},
+		{"a dashboard twice", []ExtraProject{{Project: "p", Dashboards: []string{"d", "d"}, Datasources: []string{"s"}}}, false},
+		{"a project of two segments", []ExtraProject{{Project: "a/b", Dashboards: []string{"d"}, Datasources: []string{"s"}}}, false},
+		{"a dashboard with a pattern character", []ExtraProject{{Project: "p", Dashboards: []string{"d|.*"}, Datasources: []string{"s"}}}, false},
+		{"a dot segment for a datasource", []ExtraProject{{Project: "p", Dashboards: []string{"d"}, Datasources: []string{".."}}}, false},
+		{"an empty dashboard name", []ExtraProject{{Project: "p", Dashboards: []string{""}, Datasources: []string{"s"}}}, false},
+	} {
+		_, err := New(Config{URL: "https://perses.example.svc", Project: project, Extra: tc.extra})
+		if (err == nil) != tc.ok {
+			t.Errorf("%s: New() error = %v, want ok=%v", tc.name, err, tc.ok)
+		}
+	}
+}
+
 type upstreamCall struct {
 	method, path, query, body string
 	header                    http.Header

@@ -71,6 +71,7 @@ func run() error {
 		persesRelay, err := perses.New(perses.Config{
 			URL:        cfg.PersesURL,
 			Project:    cfg.PersesProject,
+			Extra:      persesExtra(cfg.PersesExtra),
 			CAFile:     cfg.PersesCAFile,
 			ServerName: cfg.PersesServerName,
 			Insecure:   cfg.PersesInsecure,
@@ -123,4 +124,17 @@ func run() error {
 	}
 	logger.Info("server stopped")
 	return nil
+}
+
+// persesExtra is the relay's view of the extra Perses projects: their dashboard and datasource names.
+func persesExtra(list []config.PersesExtraProject) []perses.ExtraProject {
+	out := make([]perses.ExtraProject, 0, len(list))
+	for _, p := range list {
+		e := perses.ExtraProject{Project: p.Project, Datasources: p.Datasources}
+		for _, d := range p.Dashboards {
+			e.Dashboards = append(e.Dashboards, d.Name)
+		}
+		out = append(out, e)
+	}
+	return out
 }

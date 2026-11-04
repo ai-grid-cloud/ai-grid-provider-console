@@ -58,8 +58,15 @@ replaces the pod, and creates nothing on the cluster. Pages whose RPCs the backe
 yet say "not available on this AI Grid backend".
 
 For the Monitoring page, set `PERSES_PROJECT` to the Perses project whose `dashboard-*` objects are
-the tabs (the relay reads only that project; without it Monitoring stays off). `make dev-cluster` then
-also forwards the hub's Perses
+the tabs (the relay reads only that project; without it Monitoring stays off). To add other projects'
+dashboards as tabs, as the chart's `console.perses.extraDashboards` does, set
+`PERSES_EXTRA_DASHBOARDS` to the same list as JSON, for example ACM observability's clusters overview:
+
+```bash
+export PERSES_EXTRA_DASHBOARDS='[{"project":"open-cluster-management-observability","dashboards":[{"name":"acm-clusters-overview"}],"datasources":["rbac-query-proxy-datasource"]}]'
+```
+
+With `PERSES_PROJECT` set, `make dev-cluster` also forwards the hub's Perses
 (`openshift-cluster-observability-operator/perses`, `PERSES_NAMESPACE`, `PERSES_SERVICE`) to
 `127.0.0.1:9445` (`PERSES_ADDRESS`, `hack/forward-perses.sh`) and points the BFF at it, verifying
 its certificate with the hub's service CA (`hack/service-ca.sh`). That forward grants nothing:
@@ -214,7 +221,7 @@ defaults to the in-cluster API server), `HUB_CA_FILE`, `BIND_ADDRESS` (default `
 `0.0.0.0` exposes the BFF without a proxy in front), `PORT`, `BACKEND_ADDRESS`,
 `BACKEND_CA_FILE`, `BACKEND_SERVER_NAME`, `BACKEND_INSECURE`, `BACKEND_TIMEOUT` (10s, at most 50s),
 `PERSES_URL`, `PERSES_CA_FILE`, `PERSES_SERVER_NAME`, `PERSES_INSECURE`, `PERSES_TIMEOUT`,
-`PERSES_PROJECT` (the Perses relay, `docs/plan/bff-api.md`),
+`PERSES_PROJECT`, `PERSES_EXTRA_DASHBOARDS` (the Perses relay, `docs/plan/bff-api.md`),
 `AUTH_TOKEN_HEADER`, `AUTH_USER_HEADER`, `AUTH_EMAIL_HEADER`, `AUTH_GROUPS_HEADER`,
 `GRID_CONSUMER_URL`, `MAP_TILE_URL`, `MAP_TILE_ATTRIBUTION`, `BILLING_URL`, `LOG_LEVEL`, `AUTH_TOKEN_PREFIX`,
 `FAKE_BACKEND` (the backend is

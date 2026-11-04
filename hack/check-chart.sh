@@ -151,6 +151,45 @@ got="$(model_hardware --set-json "console.models.hardware=${list}")"
   exit 1
 }
 
+# console.perses.extraDashboards renders PERSES_EXTRA_DASHBOARDS, only with console.perses.url.
+perses_extra() {
+  helm template console "${CHART}" -n ai-grid "$@" |
+    yq 'select(.kind == "Deployment") | .spec.template.spec.containers[] | select(.name == "bff")
+      | .env[] | select(.name == "PERSES_EXTRA_DASHBOARDS") | .value'
+}
+PERSES=(--set console.perses.url=https://perses.example.svc:8080 --set console.perses.project=ai-grid)
+ACM='[{"project":"open-cluster-management-observability","dashboards":[{"name":"acm-clusters-overview","title":"Clusters overview"},{"name":"acm-alerts-by-cluster"}],"datasources":["rbac-query-proxy-datasource"]}]'
+# Opt-in: the default list is empty, so no PERSES_EXTRA_DASHBOARDS.
+got="$(perses_extra "${PERSES[@]}")"
+[[ -z "${got}" ]] || { echo "check-chart: the default console.perses.extraDashboards sets PERSES_EXTRA_DASHBOARDS to '${got}'" >&2; exit 1; }
+got="$(perses_extra "${PERSES[@]}" --set-json "console.perses.extraDashboards=${ACM}")"
+[[ "$(yq -p=json -o=json -I=0 'sort_keys(..)' <<<"${got:-null}")" == "$(yq -p=json -o=json -I=0 'sort_keys(..)' <<<"${ACM}")" ]] || {
+  echo "check-chart: console.perses.extraDashboards renders PERSES_EXTRA_DASHBOARDS as '${got}'" >&2
+  exit 1
+}
+got="$(perses_extra --set-json "console.perses.extraDashboards=${ACM}")"
+[[ -z "${got}" ]] || { echo "check-chart: without console.perses.url, PERSES_EXTRA_DASHBOARDS is '${got}'" >&2; exit 1; }
+for bad in '[{"project":"..","dashboards":[{"name":"d"}],"datasources":["s"]}]' \
+  '[{"project":"p","dashboards":[{"name":"a/b"}],"datasources":["s"]}]' \
+  '[{"project":"p","dashboards":[{"name":"d","title":" x"}],"datasources":["s"]}]' \
+  '[{"project":"p","dashboards":[],"datasources":["s"]}]' \
+  '[{"project":"p","dashboards":[{"name":"d"}]}]' \
+  '[{"project":"p","dashboards":[{"name":"d"}],"datasources":["s"],"all":true}]'; do
+  refused "console.perses.extraDashboards=${bad}" "${PERSES[@]}" --set-json "console.perses.extraDashboards=${bad}"
+done
+# Titles the BFF refuses at start: a control character inside, a no-break space at either end.
+for title in 'a\tb' '\u00a0x' 'x\u00a0'; do
+  refused "console.perses.extraDashboards title \"${title}\"" "${PERSES[@]}" \
+    --set-json "console.perses.extraDashboards=[{\"project\":\"p\",\"dashboards\":[{\"name\":\"d\",\"title\":\"${title}\"}],\"datasources\":[\"s\"]}]"
+done
+# The main project again would stop the BFF from starting: the template refuses it.
+if out="$(helm template console "${CHART}" -n ai-grid --set console.perses.url=https://perses.example.svc:8080 \
+  --set console.perses.project=open-cluster-management-observability --set-json "console.perses.extraDashboards=${ACM}" 2>&1 >/dev/null)"; then
+  echo "check-chart: console.perses.extraDashboards naming console.perses.project renders" >&2
+  exit 1
+fi
+grep -q "is console.perses.project" <<<"${out}" || { echo "check-chart: the main project in extraDashboards fails, but not on its check: ${out}" >&2; exit 1; }
+
 # One line per object, keys sorted, Helm's labels dropped, in a stable order.
 canonical() {
   yq -o=json -I=0 'select(. != null and .kind != "Namespace")

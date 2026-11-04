@@ -13,7 +13,8 @@
       "fakeBackend": false,
       "monitoring": {
         "enabled": false,
-        "persesProject": ""
+        "persesProject": "",
+        "extraDashboards": []
       },
       "models": {
         "hardware": [

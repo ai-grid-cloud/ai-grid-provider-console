@@ -80,6 +80,34 @@ console:
     # every pod gets next to its ServiceAccount token and which issues the Cluster Observability
     # Operator's Perses certificate. Empty: the system roots.
     caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+    # Other projects' dashboards, shown as tabs after the project's dashboard-* tabs, in this order.
+    # Empty by default: turn them on per hub. The relay passes only the dashboards and datasources
+    # listed here, nothing else in those projects, not even their lists. The same rule as for
+    # project holds: only provider (cluster) admins may create or edit these PersesDashboards and
+    # PersesDatasources, because Perses sends the signed-in admin's hub token on to the
+    # datasources. Check that on the hub before you list a project. A project here must not be
+    # console.perses.project. A dashboard that isn't there, or that the admin may not read, gets no tab. Each entry:
+    #   project      the Perses project (Kubernetes namespace)
+    #   dashboards   the PersesDashboards to show: name, and an optional tab title (default: the
+    #                dashboard's display name)
+    #   datasources  the PersesDatasources in that project those dashboards query
+    # For example, four of ACM observability's dashboards. Their datasource is ACM's RBAC query
+    # proxy, which shows each admin only the clusters they may see. On ACM 2.17 hubs only cluster
+    # admins can write PersesDashboards and PersesDatasources in that namespace:
+    #   extraDashboards:
+    #     - project: open-cluster-management-observability
+    #       dashboards:
+    #         - name: acm-clusters-overview
+    #           title: Clusters overview
+    #         - name: acm-cluster-rsrc-use
+    #           title: Cluster resource use
+    #         - name: acm-optimization-overview
+    #           title: Cluster optimization
+    #         - name: acm-alerts-by-cluster
+    #           title: Alerts by cluster
+    #       datasources:
+    #         - rbac-query-proxy-datasource
+    extraDashboards: []
   # The Deploy model wizard (README.md, "Model hardware").
   models:
     # The wizard's Hardware choices, the first one selected. Selecting one fills in the model's

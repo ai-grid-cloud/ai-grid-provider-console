@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/backend/backendtest"
+	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/config"
 	"github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/perses"
 )
 
@@ -121,6 +122,30 @@ func TestConfigReportsMonitoring(t *testing.T) {
 	decodeData(t, serve(app, asUser(http.MethodGet, "/api/v1/config")), &got)
 	if !got.Monitoring.Enabled || got.Monitoring.PersesProject != persesProject {
 		t.Errorf("monitoring = %+v, want enabled with project ai-grid-monitoring", got.Monitoring)
+	}
+}
+
+func TestConfigReportsExtraDashboards(t *testing.T) {
+	t.Parallel()
+	relay, _ := persesUpstream(t)
+	cfg := testConfig(t)
+	cfg.PersesProject = persesProject
+	cfg.PersesExtra = []config.PersesExtraProject{{
+		Project:     "open-cluster-management-observability",
+		Dashboards:  []config.PersesExtraDashboard{{Name: "acm-clusters-overview", Title: "Clusters overview"}},
+		Datasources: []string{"rbac-query-proxy-datasource"},
+	}}
+	app := newTestApp(t, cfg, nil).WithPerses(relay)
+	var got ConsoleConfig
+	decodeData(t, serve(app, asUser(http.MethodGet, "/api/v1/config")), &got)
+	if len(got.Monitoring.ExtraDashboards) != 1 || got.Monitoring.ExtraDashboards[0].Dashboards[0].Title != "Clusters overview" {
+		t.Errorf("monitoring = %+v, want the extra project", got.Monitoring)
+	}
+	// Without a relay the page has no Perses, so it lists none.
+	off := newTestApp(t, cfg, nil)
+	decodeData(t, serve(off, asUser(http.MethodGet, "/api/v1/config")), &got)
+	if got.Monitoring.Enabled || len(got.Monitoring.ExtraDashboards) != 0 {
+		t.Errorf("monitoring off = %+v, want no extra dashboards", got.Monitoring)
 	}
 }
 

@@ -17,6 +17,12 @@
 // dashboard defines. The operator must make sure that only provider admins can write that
 // project's dashboards and datasources, and that the global datasources point only at the hub's
 // own Thanos and Loki.
+//
+// Other projects pass only by name (Config.Extra): the dashboards and datasources listed for each,
+// such as ACM observability's in open-cluster-management-observability, whose one datasource is
+// ACM's per-user RBAC query proxy. Nothing else in such a project passes, not even its lists, so a
+// dashboard or datasource someone adds there later is never relayed. The same rule holds for those
+// names: only provider admins may write them.
 package perses
 
 import (
@@ -59,6 +65,8 @@ type Config struct {
 	// Insecure allows plaintext to a non-loopback host. The caller's token travels with every
 	// request, so this is for development only.
 	Insecure bool
+	// Extra are other projects the relay reads, each only the dashboards and datasources it names.
+	Extra []ExtraProject
 	// Timeout bounds the exchange with Perses, from connecting to the last byte of its answer:
 	// past it the relay answers 504, or cuts an answer already started. A browser that stops
 	// reading is the server's write timeout's to cut. Zero means 30 seconds.
@@ -66,6 +74,14 @@ type Config struct {
 	// Logger gets what the proxy reports itself, such as an answer cut while it is copied; nil
 	// uses slog.Default.
 	Logger *slog.Logger
+}
+
+// ExtraProject is a Perses project the relay reads besides Config.Project: only the named
+// dashboards and datasources, and queries through those datasources. Neither list may be empty.
+type ExtraProject struct {
+	Project     string
+	Dashboards  []string
+	Datasources []string
 }
 
 // Relay is an http.Handler for the paths under Prefix.
@@ -91,8 +107,11 @@ func New(cfg Config) (*Relay, error) {
 	if cfg.Project == "" {
 		return nil, errors.New("a Perses project is required: the relay reads one project's dashboards and datasources, and no other")
 	}
-	if !projectName.MatchString(cfg.Project) || cfg.Project == "." || cfg.Project == ".." {
+	if !validName(cfg.Project) {
 		return nil, fmt.Errorf("perses project %q must be one path segment of letters, digits, '-', '_' and '.'", cfg.Project)
+	}
+	if err := validateExtra(cfg.Project, cfg.Extra); err != nil {
+		return nil, err
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	timeout := cfg.Timeout
@@ -118,7 +137,7 @@ func New(cfg Config) (*Relay, error) {
 		logger = slog.Default()
 	}
 	r := &Relay{target: target, timeout: timeout}
-	r.readPaths, r.queryPaths = allowlist(cfg.Project)
+	r.readPaths, r.queryPaths = allowlist(cfg.Project, cfg.Extra)
 	r.proxy = &httputil.ReverseProxy{
 		Rewrite:        r.rewrite,
 		Transport:      transport,
@@ -305,20 +324,70 @@ const name = `[^/]+`
 // which Kubernetes namespace names (the Cluster Observability Operator's Perses projects) fit.
 var projectName = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
-// allowlist returns the paths the relay passes for one project: readPaths, the Perses API reads
-// the dashboard components make, and queryPaths, reads through a datasource's proxy (the
-// Prometheus and Loki query APIs only). Both name the project's own dashboards and datasources and
-// the global datasources; a datasource a dashboard defines is not among them.
-func allowlist(project string) (readPaths, queryPaths *regexp.Regexp) {
+// validName reports whether s is one path segment the relay can name: letters, digits, '-', '_'
+// and '.', not "." or "..".
+func validName(s string) bool { return projectName.MatchString(s) && s != "." && s != ".." }
+
+// validateExtra checks Config.Extra: each project a valid name other than the main one and listed
+// once, each with at least one dashboard and one datasource, every name valid and listed once.
+func validateExtra(project string, extra []ExtraProject) error {
+	seen := map[string]bool{project: true}
+	for _, e := range extra {
+		if !validName(e.Project) {
+			return fmt.Errorf("extra perses project %q must be one path segment of letters, digits, '-', '_' and '.'", e.Project)
+		}
+		if seen[e.Project] {
+			return fmt.Errorf("extra perses project %q is the main project or listed twice", e.Project)
+		}
+		seen[e.Project] = true
+		for kind, names := range map[string][]string{"dashboards": e.Dashboards, "datasources": e.Datasources} {
+			if len(names) == 0 {
+				return fmt.Errorf("extra perses project %q lists no %s", e.Project, kind)
+			}
+			listed := map[string]bool{}
+			for _, n := range names {
+				if !validName(n) {
+					return fmt.Errorf("extra perses project %q: %s name %q must be one path segment of letters, digits, '-', '_' and '.'", e.Project, kind, n)
+				}
+				if listed[n] {
+					return fmt.Errorf("extra perses project %q lists %s %q twice", e.Project, kind, n)
+				}
+				listed[n] = true
+			}
+		}
+	}
+	return nil
+}
+
+// oneOf is a regexp group matching exactly one of names.
+func oneOf(names []string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = regexp.QuoteMeta(n)
+	}
+	return `(` + strings.Join(quoted, `|`) + `)`
+}
+
+// allowlist returns the paths the relay passes: readPaths, the Perses API reads the dashboard
+// components make, and queryPaths, reads through a datasource's proxy (the Prometheus and Loki
+// query APIs only). Both name the main project's own dashboards and datasources, the global
+// datasources, and in each extra project only the dashboards and datasources it lists (no lists of
+// that project); a datasource a dashboard defines is not among them.
+func allowlist(project string, extra []ExtraProject) (readPaths, queryPaths *regexp.Regexp) {
 	p := regexp.QuoteMeta(project)
-	readPaths = regexp.MustCompile(`^/api/v1/(` +
-		`projects/` + p + `/dashboards(/` + name + `)?` +
+	reads := `projects/` + p + `/dashboards(/` + name + `)?` +
 		`|projects/` + p + `/datasources(/` + name + `)?` +
-		`|globaldatasources(/` + name + `)?` +
-		`)$`)
-	queryPaths = regexp.MustCompile(`^/proxy/(` +
-		`projects/` + p + `/datasources/` + name +
-		`|globaldatasources/` + name +
+		`|globaldatasources(/` + name + `)?`
+	sources := `projects/` + p + `/datasources/` + name +
+		`|globaldatasources/` + name
+	for _, e := range extra {
+		ep := regexp.QuoteMeta(e.Project)
+		reads += `|projects/` + ep + `/dashboards/` + oneOf(e.Dashboards) +
+			`|projects/` + ep + `/datasources/` + oneOf(e.Datasources)
+		sources += `|projects/` + ep + `/datasources/` + oneOf(e.Datasources)
+	}
+	readPaths = regexp.MustCompile(`^/api/v1/(` + reads + `)$`)
+	queryPaths = regexp.MustCompile(`^/proxy/(` + sources +
 		`)/(` +
 		`api/v1/(query|query_range|query_exemplars|series|labels|label/` + name + `/values|metadata|parse_query|format_query)` +
 		`|loki/api/v1/(query|query_range|labels|label/` + name + `/values|series|index/stats|index/volume|index/volume_range|detected_labels|detected_fields|patterns)` +
