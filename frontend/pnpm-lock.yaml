@@ -24,7 +24,7 @@ importers:
         version: 2.3.0(@bufbuild/protobuf@2.16.0)
       '@connectrpc/connect-query':
         specifier: 2.3.1
-        version: 2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.0)(@tanstack/react-query@5.105.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+        version: 2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.2)(@tanstack/react-query@5.105.2(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@connectrpc/connect-web':
         specifier: 2.3.0
         version: 2.3.0(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))
@@ -60,7 +60,7 @@ importers:
         version: 6.7.0
       '@perses-dev/bar-chart-plugin':
         specifier: 0.15.0-beta.1
-        version: 0.15.0-beta.1(patch_hash=4fee1fb6a3e30699a42465eb09a1748d36bacf895af6cf0963428e3976fbd7b5)(b33f1405675777da7673e3f46500b8d3)
+        version: 0.15.0-beta.1(patch_hash=4fee1fb6a3e30699a42465eb09a1748d36bacf895af6cf0963428e3976fbd7b5)(f02a2677dfe11337ccbf6fc7071704e6)
       '@perses-dev/client':
         specifier: 0.56.0-beta.1
         version: 0.56.0-beta.1(react@19.3.1)
@@ -69,46 +69,46 @@ importers:
         version: 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@perses-dev/dashboards':
         specifier: 0.56.0-beta.1
-        version: 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
+        version: 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
       '@perses-dev/explore':
         specifier: 0.56.0-beta.1
-        version: 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
+        version: 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
       '@perses-dev/gauge-chart-plugin':
         specifier: 0.15.0-beta.1
-        version: 0.15.0-beta.1(b33f1405675777da7673e3f46500b8d3)
+        version: 0.15.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)
       '@perses-dev/loki-plugin':
         specifier: 0.8.0-beta.1
-        version: 0.8.0-beta.1(881e98f4d10e2c86ee8a52144216a2c5)
+        version: 0.8.0-beta.1(6d1859a8d6d3fb945f1ce733886902f3)
       '@perses-dev/markdown-plugin':
         specifier: 0.14.0-beta.1
-        version: 0.14.0-beta.1(c26fc18bba8625f3ed32b20835eee25d)
+        version: 0.14.0-beta.1(d00a45f2363970dcf1d6fdb4350abb74)
       '@perses-dev/pie-chart-plugin':
         specifier: 0.16.0-beta.1
-        version: 0.16.0-beta.1(b33f1405675777da7673e3f46500b8d3)
+        version: 0.16.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)
       '@perses-dev/plugin-system':
         specifier: 0.56.0-beta.1
-        version: 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+        version: 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/prometheus-plugin':
         specifier: 0.60.0-beta.1
-        version: 0.60.0-beta.1(06a968dc898b39c2c1f8656610819aef)
+        version: 0.60.0-beta.1(f597fa915bab9896ed8dfe2cf9a0e46b)
       '@perses-dev/spec':
         specifier: 0.3.0
         version: 0.3.0
       '@perses-dev/stat-chart-plugin':
         specifier: 0.16.0-beta.1
-        version: 0.16.0-beta.1(b33f1405675777da7673e3f46500b8d3)
+        version: 0.16.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)
       '@perses-dev/static-list-variable-plugin':
         specifier: 0.11.0-beta.1
-        version: 0.11.0-beta.1(52a85eccc1a5d1fd05be36c357429ec5)
+        version: 0.11.0-beta.1(6683de9fcbb5336bb7495330447d2654)
       '@perses-dev/table-plugin':
         specifier: 0.15.0-beta.1
-        version: 0.15.0-beta.1(05413bfb3420d21789845a390634c716)
+        version: 0.15.0-beta.1(cb27d78f4b447e9602055f97eec77ed9)
       '@perses-dev/timeseries-chart-plugin':
         specifier: 0.15.0-beta.1
-        version: 0.15.0-beta.1(2cc8e9823a98c7ff6ca7a825dca67aa6)
+        version: 0.15.0-beta.1(0a8cae172764802e5357dd2846cc2b75)
       '@tanstack/react-query':
-        specifier: 5.105.0
-        version: 5.105.0(@types/react@19.3.0)(react@19.3.1)
+        specifier: 5.105.2
+        version: 5.105.2(@types/react@19.3.0)(react@19.3.1)
       '@tanstack/react-table':
         specifier: 9.3.1
         version: 9.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -160,7 +160,7 @@ importers:
         version: 2.3.1(@bufbuild/protoc-gen-es@2.16.0(@bufbuild/protobuf@2.16.0))
       '@eslint/js':
         specifier: ^10.0.1
-        version: 10.0.1(eslint@10.13.0(jiti@2.4.2))
+        version: 10.0.1(eslint@10.14.0(jiti@2.4.2))
       '@playwright/test':
         specifier: 1.64.1
         version: 1.64.1
@@ -192,17 +192,17 @@ importers:
         specifier: ^5.2.0
         version: 5.2.0(vite@7.3.7(@types/node@22.20.5)(jiti@2.4.2)(yaml@2.9.1))
       eslint:
-        specifier: ^10.13.0
-        version: 10.13.0(jiti@2.4.2)
+        specifier: ^10.14.0
+        version: 10.14.0(jiti@2.4.2)
       eslint-config-prettier:
         specifier: ^10.1.8
-        version: 10.1.8(eslint@10.13.0(jiti@2.4.2))
+        version: 10.1.8(eslint@10.14.0(jiti@2.4.2))
       eslint-plugin-react-hooks:
         specifier: ^7.1.1
-        version: 7.1.1(eslint@10.13.0(jiti@2.4.2))
+        version: 7.1.1(eslint@10.14.0(jiti@2.4.2))
       eslint-plugin-react-refresh:
         specifier: ^0.5.7
-        version: 0.5.7(eslint@10.13.0(jiti@2.4.2))
+        version: 0.5.7(eslint@10.14.0(jiti@2.4.2))
       globals:
         specifier: ^16.5.0
         version: 16.5.0
@@ -217,7 +217,7 @@ importers:
         version: 5.9.3
       typescript-eslint:
         specifier: ^8.72.1
-        version: 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
+        version: 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
       vite:
         specifier: ^7.1.0
         version: 7.3.7(@types/node@22.20.5)(jiti@2.4.2)(yaml@2.9.1)
@@ -1666,8 +1666,8 @@ packages:
     resolution: {integrity: sha512-Wo1iKt2b9OT7d+YGhvEPD3DXvPv2etTusIMhMUoG7fbhmxcXCtIjJDEygy91Y2JFlwGyjqiBPRozme7UD8hoqg==}
     engines: {node: '>=12'}
 
-  '@tanstack/query-core@5.105.0':
-    resolution: {integrity: sha512-7p56vRmT/z4UJ6sctGIdl5WRUQyUv53IUpUwEKi2g97zMbO7zh8ZsCLffGAvCPBR4xD72e3VXsDyLwXHhoNTMQ==}
+  '@tanstack/query-core@5.105.2':
+    resolution: {integrity: sha512-cyZGOtI1ZZ79mm905PJ42ng43Mwbc9CeqB83XuJmj9ADj/C+dzUXcgMQucRQ8yZs7atHykMzqavAXXhjxAw50g==}
 
   '@tanstack/react-hotkeys@0.9.1':
     resolution: {integrity: sha512-/qdQUUVkYAHAWRGdFXqFgWpW/S+a6OzkvxWNWKLLDHQODJlO6EPBPa073CglaafBfzig58RK07T09ET+NnZhpg==}
@@ -1676,8 +1676,8 @@ packages:
       react: '>=16.8'
       react-dom: '>=16.8'
 
-  '@tanstack/react-query@5.105.0':
-    resolution: {integrity: sha512-y+hMuDERvgg6ay1da0V1a6ZC0ZONt7dELxSFkqRZuwm7p1TTZs0MoXrPlBRflIpRoYjvzQVYxycnLImpFLhWrw==}
+  '@tanstack/react-query@5.105.2':
+    resolution: {integrity: sha512-K7MMGdVIgsQ41o6TI0fXD75aRCDNBLEKP80FvhvuwFkgiC36+rd8/JI5BYufLpfbZ3/sFTcYnotWxJqDxV/9dQ==}
     peerDependencies:
       '@types/react': ^18 || ^19
       react: ^18 || ^19
@@ -2242,8 +2242,8 @@ packages:
     resolution: {integrity: sha512-tD40eHxA35h0PEIZNeIjkHoDR4YjjJp34biM0mDvplBe//mB+IHCqHDGV7pxF+7MklTvighcCPPZC7ynWyjdTA==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  eslint@10.13.0:
-    resolution: {integrity: sha512-UohDjD4zSzEwhf58M3O7vc/ycc8O1I7dNlhtD0WxE8Px8EHNJKtUwzBqrzeGhisRuv2ag4sAYswszCJRgKXYUg==}
+  eslint@10.14.0:
+    resolution: {integrity: sha512-T0pNsxkb9IKmtQjhpK3d7nWOpFv+YHuMbTJnSVMoQblF0onvXfErrtp4V1jHtsQPan7dKaGVD0q1WCXnzMF31A==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
     hasBin: true
     peerDependencies:
@@ -3247,9 +3247,6 @@ packages:
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
@@ -3509,18 +3506,18 @@ snapshots:
       style-mod: 4.1.4
       w3c-keyname: 2.2.8
 
-  '@connectrpc/connect-query-core@2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.0)':
+  '@connectrpc/connect-query-core@2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.2)':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
       '@connectrpc/connect': 2.3.0(@bufbuild/protobuf@2.16.0)
-      '@tanstack/query-core': 5.105.0
+      '@tanstack/query-core': 5.105.2
 
-  '@connectrpc/connect-query@2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.0)(@tanstack/react-query@5.105.0(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@connectrpc/connect-query@2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.2)(@tanstack/react-query@5.105.2(@types/react@19.3.0)(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
       '@bufbuild/protobuf': 2.16.0
       '@connectrpc/connect': 2.3.0(@bufbuild/protobuf@2.16.0)
-      '@connectrpc/connect-query-core': 2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.0)
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@connectrpc/connect-query-core': 2.3.1(@bufbuild/protobuf@2.16.0)(@connectrpc/connect@2.3.0(@bufbuild/protobuf@2.16.0))(@tanstack/query-core@5.105.2)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
     transitivePeerDependencies:
@@ -3782,9 +3779,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@eslint-community/eslint-utils@4.10.1(eslint@10.13.0(jiti@2.4.2))':
+  '@eslint-community/eslint-utils@4.10.1(eslint@10.14.0(jiti@2.4.2))':
     dependencies:
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       eslint-visitor-keys: 3.4.3
 
   '@eslint-community/regexpp@4.12.2': {}
@@ -3805,9 +3802,9 @@ snapshots:
     dependencies:
       '@types/json-schema': 7.0.15
 
-  '@eslint/js@10.0.1(eslint@10.13.0(jiti@2.4.2))':
+  '@eslint/js@10.0.1(eslint@10.14.0(jiti@2.4.2))':
     optionalDependencies:
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
 
   '@eslint/object-schema@3.0.5': {}
 
@@ -4183,13 +4180,13 @@ snapshots:
 
   '@patternfly/react-tokens@6.7.0': {}
 
-  '@perses-dev/bar-chart-plugin@0.15.0-beta.1(patch_hash=4fee1fb6a3e30699a42465eb09a1748d36bacf895af6cf0963428e3976fbd7b5)(b33f1405675777da7673e3f46500b8d3)':
+  '@perses-dev/bar-chart-plugin@0.15.0-beta.1(patch_hash=4fee1fb6a3e30699a42465eb09a1748d36bacf895af6cf0963428e3976fbd7b5)(f02a2677dfe11337ccbf6fc7071704e6)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4260,19 +4257,19 @@ snapshots:
       - moment-hijri
       - moment-jalaali
 
-  '@perses-dev/dashboards@0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)':
+  '@perses-dev/dashboards@0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)':
     dependencies:
       '@dnd-kit/dom': 0.4.0
       '@dnd-kit/react': 0.4.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@mui/material': 6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@perses-dev/client': 0.56.0-beta.1(react@19.3.1)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       '@snapgridjs/react': 0.10.0(@dnd-kit/abstract@0.4.0)(@dnd-kit/collision@0.4.0)(@dnd-kit/dom@0.4.0)(@dnd-kit/react@0.4.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tanstack/hotkeys': 0.8.0
       '@tanstack/react-hotkeys': 0.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       dompurify: 3.4.17
       immer: 11.2.9
       marked: 15.0.12
@@ -4319,14 +4316,14 @@ snapshots:
       - vue-tsc
       - webpack
 
-  '@perses-dev/explore@0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)':
+  '@perses-dev/explore@0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)':
     dependencies:
       '@mui/material': 6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@nexucis/fuzzy': 0.5.1
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/dashboards': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@perses-dev/dashboards': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       mdi-material-ui: 7.9.4(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
       qs: 6.16.1
       react: 19.3.1
@@ -4366,13 +4363,13 @@ snapshots:
       - vue-tsc
       - webpack
 
-  '@perses-dev/gauge-chart-plugin@0.15.0-beta.1(b33f1405675777da7673e3f46500b8d3)':
+  '@perses-dev/gauge-chart-plugin@0.15.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4384,18 +4381,18 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/loki-plugin@0.8.0-beta.1(881e98f4d10e2c86ee8a52144216a2c5)':
+  '@perses-dev/loki-plugin@0.8.0-beta.1(6d1859a8d6d3fb945f1ce733886902f3)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@grafana/lezer-logql': 0.2.9(@lezer/lr@1.4.11)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/dashboards': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/explore': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/dashboards': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/explore': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
       echarts: 6.1.0
@@ -4409,13 +4406,13 @@ snapshots:
     transitivePeerDependencies:
       - '@lezer/lr'
 
-  '@perses-dev/markdown-plugin@0.14.0-beta.1(c26fc18bba8625f3ed32b20835eee25d)':
+  '@perses-dev/markdown-plugin@0.14.0-beta.1(d00a45f2363970dcf1d6fdb4350abb74)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4428,13 +4425,13 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/pie-chart-plugin@0.16.0-beta.1(b33f1405675777da7673e3f46500b8d3)':
+  '@perses-dev/pie-chart-plugin@0.16.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4446,7 +4443,7 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/plugin-system@0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)':
+  '@perses-dev/plugin-system@0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
@@ -4456,7 +4453,7 @@ snapshots:
       '@perses-dev/client': 0.56.0-beta.1(react@19.3.1)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@perses-dev/spec': 0.3.0
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
       fast-uri: 3.1.9
@@ -4496,7 +4493,7 @@ snapshots:
       - vue-tsc
       - webpack
 
-  '@perses-dev/prometheus-plugin@0.60.0-beta.1(06a968dc898b39c2c1f8656610819aef)':
+  '@perses-dev/prometheus-plugin@0.60.0-beta.1(f597fa915bab9896ed8dfe2cf9a0e46b)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
@@ -4504,12 +4501,12 @@ snapshots:
       '@nexucis/fuzzy': 0.5.1
       '@perses-dev/client': 0.56.0-beta.1(react@19.3.1)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/dashboards': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/explore': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/dashboards': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/explore': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       '@prometheus-io/codemirror-promql': 0.315.1(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/lint@6.9.7)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@lezer/lr@1.4.11)
-      '@tanstack/react-query': 5.105.0(@types/react@19.3.0)(react@19.3.1)
+      '@tanstack/react-query': 5.105.2(@types/react@19.3.0)(react@19.3.1)
       color-hash: 2.0.2
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4540,13 +4537,13 @@ snapshots:
       mathjs: 15.2.0
       zod: 4.6.7
 
-  '@perses-dev/stat-chart-plugin@0.16.0-beta.1(b33f1405675777da7673e3f46500b8d3)':
+  '@perses-dev/stat-chart-plugin@0.16.0-beta.1(f02a2677dfe11337ccbf6fc7071704e6)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       chroma-js: 3.2.0
       date-fns: 4.4.0
@@ -4559,13 +4556,13 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/static-list-variable-plugin@0.11.0-beta.1(52a85eccc1a5d1fd05be36c357429ec5)':
+  '@perses-dev/static-list-variable-plugin@0.11.0-beta.1(6683de9fcbb5336bb7495330447d2654)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       color-hash: 2.0.2
       date-fns: 4.4.0
       date-fns-tz: 3.2.0(date-fns@4.4.0)
@@ -4576,14 +4573,14 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/table-plugin@0.15.0-beta.1(05413bfb3420d21789845a390634c716)':
+  '@perses-dev/table-plugin@0.15.0-beta.1(cb27d78f4b447e9602055f97eec77ed9)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/dashboards': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/dashboards': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       '@tanstack/react-table': 9.3.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       date-fns: 4.4.0
@@ -4595,14 +4592,14 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
       use-resize-observer: 10.0.0(react@19.3.1)
 
-  '@perses-dev/timeseries-chart-plugin@0.15.0-beta.1(2cc8e9823a98c7ff6ca7a825dca67aa6)':
+  '@perses-dev/timeseries-chart-plugin@0.15.0-beta.1(0a8cae172764802e5357dd2846cc2b75)':
     dependencies:
       '@emotion/react': 11.14.0(@types/react@19.3.0)(react@19.3.1)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1)
       '@hookform/resolvers': 5.9.2(ajv-formats@2.1.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.91.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
       '@perses-dev/components': 0.56.0-beta.1(patch_hash=089332f4006c231f705083adfcff50d03505c82633b40654fd222e0f9d47bbff)(@babel/runtime@7.29.10)(@codemirror/autocomplete@6.20.4)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.15)(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@mui/material@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@mui/system@6.5.0(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(react@19.3.1))(@types/react@19.3.0)(codemirror@6.0.2)(lodash@4.18.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@perses-dev/dashboards': 0.56.0-beta.1(d87d6e355870cd5d7a993b66381ad27c)
-      '@perses-dev/plugin-system': 0.56.0-beta.1(9ae40ba6b9113faa47f9459860f4b9dd)
+      '@perses-dev/dashboards': 0.56.0-beta.1(1c65b9d0921d6671a1a7a8d00b24bb57)
+      '@perses-dev/plugin-system': 0.56.0-beta.1(c5c83e0b119f7a7e0d9aa4d9a0879b69)
       '@perses-dev/spec': 0.3.0
       color-hash: 2.0.2
       d3-scale-chromatic: 3.1.0
@@ -4832,7 +4829,7 @@ snapshots:
     dependencies:
       remove-accents: 0.5.0
 
-  '@tanstack/query-core@5.105.0': {}
+  '@tanstack/query-core@5.105.2': {}
 
   '@tanstack/react-hotkeys@0.9.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
@@ -4841,9 +4838,9 @@ snapshots:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
-  '@tanstack/react-query@5.105.0(@types/react@19.3.0)(react@19.3.1)':
+  '@tanstack/react-query@5.105.2(@types/react@19.3.0)(react@19.3.1)':
     dependencies:
-      '@tanstack/query-core': 5.105.0
+      '@tanstack/query-core': 5.105.2
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
@@ -4985,15 +4982,15 @@ snapshots:
   '@types/trusted-types@2.0.7':
     optional: true
 
-  '@typescript-eslint/eslint-plugin@8.72.1(@typescript-eslint/parser@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3))(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.72.1(@typescript-eslint/parser@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3))(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.72.1
-      '@typescript-eslint/type-utils': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/type-utils': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.72.1
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       ignore: 7.0.12
       natural-compare: 1.4.0
       ts-api-utils: 2.5.0(typescript@5.9.3)
@@ -5001,14 +4998,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)':
+  '@typescript-eslint/parser@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.72.1
       '@typescript-eslint/types': 8.72.1
       '@typescript-eslint/typescript-estree': 8.72.1(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.72.1
       debug: 4.4.3
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -5031,13 +5028,13 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  '@typescript-eslint/type-utils@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)':
+  '@typescript-eslint/type-utils@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.72.1
       '@typescript-eslint/typescript-estree': 8.72.1(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/utils': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
       debug: 4.4.3
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -5060,13 +5057,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)':
+  '@typescript-eslint/utils@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)':
     dependencies:
-      '@eslint-community/eslint-utils': 4.10.1(eslint@10.13.0(jiti@2.4.2))
+      '@eslint-community/eslint-utils': 4.10.1(eslint@10.14.0(jiti@2.4.2))
       '@typescript-eslint/scope-manager': 8.72.1
       '@typescript-eslint/types': 8.72.1
       '@typescript-eslint/typescript-estree': 8.72.1(typescript@5.9.3)
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -5435,24 +5432,24 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
-  eslint-config-prettier@10.1.8(eslint@10.13.0(jiti@2.4.2)):
+  eslint-config-prettier@10.1.8(eslint@10.14.0(jiti@2.4.2)):
     dependencies:
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
 
-  eslint-plugin-react-hooks@7.1.1(eslint@10.13.0(jiti@2.4.2)):
+  eslint-plugin-react-hooks@7.1.1(eslint@10.14.0(jiti@2.4.2)):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/parser': 7.29.9
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
       hermes-parser: 0.25.1
-      zod: 3.25.76
-      zod-validation-error: 4.0.2(zod@3.25.76)
+      zod: 4.6.7
+      zod-validation-error: 4.0.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-react-refresh@0.5.7(eslint@10.13.0(jiti@2.4.2)):
+  eslint-plugin-react-refresh@0.5.7(eslint@10.14.0(jiti@2.4.2)):
     dependencies:
-      eslint: 10.13.0(jiti@2.4.2)
+      eslint: 10.14.0(jiti@2.4.2)
 
   eslint-scope@9.1.2:
     dependencies:
@@ -5465,9 +5462,9 @@ snapshots:
 
   eslint-visitor-keys@5.0.1: {}
 
-  eslint@10.13.0(jiti@2.4.2):
+  eslint@10.14.0(jiti@2.4.2):
     dependencies:
-      '@eslint-community/eslint-utils': 4.10.1(eslint@10.13.0(jiti@2.4.2))
+      '@eslint-community/eslint-utils': 4.10.1(eslint@10.14.0(jiti@2.4.2))
       '@eslint-community/regexpp': 4.12.2
       '@eslint/config-array': 0.23.5
       '@eslint/config-helpers': 0.7.0
@@ -6220,13 +6217,13 @@ snapshots:
 
   typed-function@4.2.2: {}
 
-  typescript-eslint@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3):
+  typescript-eslint@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.72.1(@typescript-eslint/parser@8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3))(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
-      '@typescript-eslint/parser': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.72.1(@typescript-eslint/parser@8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3))(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
       '@typescript-eslint/typescript-estree': 8.72.1(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.72.1(eslint@10.13.0(jiti@2.4.2))(typescript@5.9.3)
-      eslint: 10.13.0(jiti@2.4.2)
+      '@typescript-eslint/utils': 8.72.1(eslint@10.14.0(jiti@2.4.2))(typescript@5.9.3)
+      eslint: 10.14.0(jiti@2.4.2)
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
@@ -6393,11 +6390,9 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-validation-error@4.0.2(zod@3.25.76):
+  zod-validation-error@4.0.2(zod@4.6.7):
     dependencies:
-      zod: 3.25.76
-
-  zod@3.25.76: {}
+      zod: 4.6.7
 
   zod@4.6.7: {}
 
