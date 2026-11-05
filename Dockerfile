@@ -31,7 +31,7 @@ COPY --chown=1001:0 bff/ ./
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
     go build -ldflags "-s -w -X github.com/ai-grid-cloud/ai-grid-provider-console/bff/internal/api.Version=${CONSOLE_VERSION}" -o /tmp/out/bff ./cmd
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:1793579023@sha256:dfa0eb04abc59221544e74862432496add1f491f915c9b531880f91affc0e12c
+FROM registry.access.redhat.com/ubi9/ubi-minimal:1793862114@sha256:4b79c93106c14ad1c234907f83441ff0e4f8d24e78426a36e159098e9f7e6fa5
 WORKDIR /
 # Owned by root and world-readable, so OpenShift's arbitrary UID (group 0) can run and serve them.
 COPY --from=bff-builder --chown=0:0 /tmp/out/bff /bff
