@@ -169,7 +169,7 @@ export const ModelsPage: React.FC = () => {
                   const edit = canWrite ? () => navigate(`${modelPath(model)}/edit`) : undefined;
                   return (
                     <Tbody key={model.id} isExpanded={isExpanded}>
-                      <Tr isContentExpanded={isExpanded}>
+                      <Tr isContentExpanded={isExpanded} isControlRow>
                         {/* Every row expands: to each placed cluster's sync and deployment, to the
                           clusters its placement chose while none has reported, or to say it has none. */}
                         <Td
@@ -229,12 +229,11 @@ export const ModelsPage: React.FC = () => {
                         )}
                       </Tr>
                       <Tr isExpanded={isExpanded}>
-                        <Td />
-                        <Td colSpan={columns.length + (canWrite ? 1 : 0)}>
+                        <Td colSpan={columns.length + 1 + (canWrite ? 1 : 0)}>
                           <ExpandableRowContent>
                             {isExpanded &&
                               (model.clusters.length > 0 || model.selectedClusters.length > 0 ? (
-                                <ModelClustersTable model={model} clusters={clusters} isNested />
+                                <ModelClustersTable model={model} clusters={clusters} />
                               ) : (
                                 <NotPlaced model={model} onEdit={edit} />
                               ))}
