@@ -12,11 +12,10 @@ const ENROLLABLE = 'site4';
 test('adds an enrollable cluster to the AI Grid, keeps it after a reload, and removes it', async ({ page }) => {
   await page.goto('/clusters');
   const row = page.getByRole('row').filter({ has: page.getByRole('gridcell', { name: ENROLLABLE, exact: true }) });
-  await expect(row).toContainText('Not added');
+  await expect(row.locator('[data-label="AI Grid status"]')).toHaveText('—');
 
-  // The menu appears once /user has answered.
-  await page.getByRole('button', { name: `Actions for ${ENROLLABLE}` }).click();
-  await page.getByRole('menuitem', { name: 'Add to AI Grid' }).click();
+  // The add button appears once /user has answered.
+  await row.getByRole('button', { name: `Add ${ENROLLABLE} to AI Grid` }).click();
   // The location is prefilled from the cluster's label; the role has to be chosen.
   const add = page.getByRole('dialog', { name: `Add ${ENROLLABLE} to AI Grid?` });
   await expect(add.getByRole('textbox', { name: 'Location label' })).toHaveValue(ENROLLABLE);

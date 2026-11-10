@@ -45,13 +45,23 @@ const serviceWith = (clusters: GridCluster[]) => new MockConsoleService(undefine
 
 type User = ReturnType<typeof userEvent.setup>;
 
-/** Opens a row's actions menu and picks an item. */
+/** The add icon for a cluster outside AI Grid. */
+const addButton = (cluster: string) => screen.getByRole('button', { name: `Add ${cluster} to AI Grid` });
+
+/** The AI Grid status cell: a member's provisioning, or — outside AI Grid. */
+const aiGridStatus = (row: HTMLElement) => row.querySelector('[data-label="AI Grid status"]');
+
+/** Opens a member's actions menu and picks an item, or clicks Add for a cluster outside AI Grid. */
 const pick = async (user: User, cluster: string, item: string) => {
+  if (item === 'Add to AI Grid') {
+    await user.click(await screen.findByRole('button', { name: `Add ${cluster} to AI Grid` }));
+    return;
+  }
   await user.click(await screen.findByRole('button', { name: `Actions for ${cluster}` }));
   await user.click(screen.getByRole('menuitem', { name: item }));
 };
 
-/** Adds a cluster from its row menu as an inference cluster, keeping its location, and confirms. */
+/** Adds a cluster from its add button as an inference cluster, keeping its location, and confirms. */
 const add = async (user: User, cluster: string) => {
   await pick(user, cluster, 'Add to AI Grid');
   const modal = await screen.findByTestId('cluster-membership-modal');
@@ -89,8 +99,7 @@ it('lists live Hub states, includes AI Grid navigation and enrolls with a label-
   await user.click(screen.getByRole('textbox', { name: 'Filter clusters' }));
   await user.paste('cluster-c');
   expect(within(screen.getByTestId('clusters-table')).queryByText('cluster-a')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Actions for cluster-c' }));
-  expect(screen.getByRole('menuitem', { name: 'Add to AI Grid' })).not.toHaveAttribute('aria-disabled', 'true');
+  expect(addButton('cluster-c')).not.toHaveAttribute('aria-disabled', 'true');
 });
 
 it('removes a member from AI Grid after a confirmation', async () => {
@@ -113,7 +122,8 @@ it('removes a member from AI Grid after a confirmation', async () => {
   const removed = service.clusters.find((c) => c.name === 'cluster-a')!;
   expect(removed.labels).toEqual({ 'ai-grid/provisioned': 'true', location: 'site1' });
   const row = within(screen.getByTestId('clusters-table')).getByRole('link', { name: 'cluster-a' }).closest('tr')!;
-  expect(within(row).getByText('Not added')).toBeInTheDocument();
+  expect(aiGridStatus(row)).toHaveTextContent('—');
+  expect(row).not.toHaveTextContent('Not added');
 });
 
 it('does not say the hub is disconnected when removing local-cluster', async () => {
@@ -365,7 +375,8 @@ it('refresh reflects external membership changes on the Hub', async () => {
   await waitFor(() => expect(row()).toHaveTextContent('Provisioning'));
   service.clusters[1] = cluster('cluster-b', 'Ready', { location: 'site2' });
   await user.click(screen.getByRole('button', { name: 'Refresh' }));
-  await waitFor(() => expect(within(row()).getByText('Not added')).toBeInTheDocument());
+  await waitFor(() => expect(aiGridStatus(row())).toHaveTextContent('—'));
+  expect(row()).not.toHaveTextContent('Not added');
 });
 
 it('shows the role and location Add wrote while the list reloads', async () => {
@@ -494,9 +505,10 @@ it('shows the seeded clusters with region, location label, status and provisioni
   // Its region shows in the Region column; its ai-grid/site label isn't shown.
   expect(within(sydney).getByRole('cell', { name: 'asia-pacific' })).toBeVisible();
   expect(sydney).not.toHaveTextContent('sydney');
-  // Not a member: says so, with no provisioning and no role.
+  // Not a member: a dash in AI Grid status, with no provisioning and no role.
   expect(sydney).not.toHaveTextContent('provisioned');
-  expect(within(sydney).getByText('Not added')).toBeVisible();
+  expect(aiGridStatus(sydney)).toHaveTextContent('—');
+  expect(sydney).not.toHaveTextContent('Not added');
   expect(sydney).not.toHaveTextContent('Combined');
   expect(within(table).getAllByText('Provisioned')).toHaveLength(3);
   expect(within(table).getAllByText('Combined')).toHaveLength(3);
@@ -520,7 +532,8 @@ it('shows the role of each member, and warns about a member without one', async 
   expect(within(table).getByRole('row', { name: /^edge-1 / })).toHaveTextContent('Ingress');
   expect(within(table).getByRole('row', { name: /^gpu-1 / })).toHaveTextContent('Inference');
   const former = within(table).getByRole('row', { name: /^former / });
-  expect(former).toHaveTextContent('Not added');
+  expect(aiGridStatus(former)).toHaveTextContent('—');
+  expect(former).not.toHaveTextContent('Not added');
   expect(former).not.toHaveTextContent('Combined');
   const missing = screen.getByTestId('missing-role-no-role');
   expect(missing).toHaveTextContent('No role');
@@ -588,6 +601,11 @@ it('hides write actions until it knows the user is a provider admin', async () =
   // site4 is both the name and the location, so find its row rather than the text.
   expect(await screen.findByRole('row', { name: /^site4 / })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Add .+ to AI Grid$/ })).not.toBeInTheDocument();
+  const table = screen.getByTestId('clusters-table');
+  const [groupRow, columnRow] = within(table).getAllByRole('row').slice(0, 2);
+  expect(within(groupRow).getByRole('columnheader', { name: 'AI Grid' })).toHaveAttribute('colspan', '3');
+  expect(within(columnRow).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
 });
 
 it('shows the not-available state on a backend without the RPC', async () => {
@@ -652,7 +670,7 @@ it('shows the ACM state for an importing cluster', async () => {
   expect(await screen.findByText('Importing: Import of the managed cluster is in progress')).toBeInTheDocument();
 });
 
-it('offers Edit, then Remove from AI Grid, for a member and neither for another cluster', async () => {
+it('offers Edit, then Remove from AI Grid, for a member, and an add button for another cluster', async () => {
   const user = userEvent.setup();
   renderAt('/clusters', new MockConsoleService());
   await user.click(await screen.findByRole('button', { name: 'Actions for site1' }));
@@ -660,8 +678,12 @@ it('offers Edit, then Remove from AI Grid, for a member and neither for another 
   // Remove is destructive: last, after a divider.
   expect(within(screen.getByRole('menu')).getByRole('separator')).toBeInTheDocument();
   await user.keyboard('{Escape}');
-  await user.click(screen.getByRole('button', { name: 'Actions for site4' }));
-  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Add to AI Grid']);
+  // site4 is outside AI Grid: an add icon, with the menu's Add label as its tooltip.
+  const add = addButton('site4');
+  expect(screen.queryByRole('button', { name: 'Actions for site4' })).not.toBeInTheDocument();
+  await user.hover(add);
+  // jsdom gives the icon button no box, so Popper keeps the tooltip at opacity 0; the text is still there.
+  expect(await screen.findByRole('tooltip', { name: 'Add to AI Grid' })).toHaveTextContent('Add to AI Grid');
 });
 
 it('offers Add to AI Grid only for ready, offline or unknown clusters', async () => {
@@ -684,29 +706,27 @@ it('offers Add to AI Grid only for ready, offline or unknown clusters', async ()
   );
   await screen.findByTestId('clusters-table');
   const user = userEvent.setup();
-  const addItem = async (name: string) => {
-    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
-    const item = screen.getByRole('menuitem', { name: 'Add to AI Grid' });
-    return item;
-  };
   for (const name of ['is-ready', 'is-offline', 'is-unknown']) {
-    expect(await addItem(name)).not.toHaveAttribute('aria-disabled', 'true');
-    await user.keyboard('{Escape}');
+    expect(addButton(name)).not.toHaveAttribute('aria-disabled', 'true');
   }
   // The others say why they can't be added yet.
   for (const name of ['is-detaching', 'is-importfailed', 'is-pendingimport', 'is-importing']) {
-    const item = await addItem(name);
+    const item = addButton(name);
     expect(item).toHaveAttribute('aria-disabled', 'true');
     await user.hover(item);
-    expect(await screen.findByText(/after the hub imports it/)).toBeInTheDocument();
-    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('tooltip', { name: /after the hub imports it/ })).toHaveTextContent(
+      /after the hub imports it/,
+    );
+    await user.unhover(item);
   }
-  const notAccepted = await addItem('is-notaccepted');
+  const notAccepted = addButton('is-notaccepted');
   expect(notAccepted).toHaveAttribute('aria-disabled', 'true');
   await user.hover(notAccepted);
   expect(
-    await screen.findByText('The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.'),
-  ).toBeInTheDocument();
+    await screen.findByRole('tooltip', {
+      name: 'The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.',
+    }),
+  ).toHaveTextContent('The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.');
 });
 
 it("lists each cluster's GPU configuration and capacity, as provider admins asked", async () => {
@@ -761,12 +781,13 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
   const table = await screen.findByTestId('clusters-table');
   const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
   // Nested column headers (UX review): Cluster, AI Grid and GPUs, as on the details page.
+  // Actions is the last column of AI Grid, so that group spans its three data columns plus Actions.
   expect(
     within(groups)
       .getAllByRole('columnheader')
-      .map((h) => h.textContent)
-      .filter((t) => t !== 'Actions'),
+      .map((h) => h.textContent),
   ).toEqual(['Cluster', 'AI Grid', 'GPUs']);
+  expect(within(groups).getByRole('columnheader', { name: 'AI Grid' })).toHaveAttribute('colspan', '4');
   const headers = within(columns).getAllByRole('columnheader');
   expect(headers.map((h) => h.textContent)).toEqual([
     'Name',
@@ -776,10 +797,12 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
     'AI Grid Status',
     'Location label',
     'Role',
+    'Actions',
     'Capacity',
     'Configuration',
   ]);
   for (const header of headers) {
+    if (header.textContent === 'Actions') continue;
     expect(header).toHaveClass('pf-m-wrap');
   }
   // The two Status columns read Status on screen, under their groups; their sort buttons say which.
@@ -791,8 +814,8 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
   expect(within(table).queryByRole('columnheader', { name: 'Hub' })).not.toBeInTheDocument();
   // The OpenShift version is on the details page, leaving room for GPUs and Capacity.
   expect(within(table).queryByRole('columnheader', { name: 'OpenShift' })).not.toBeInTheDocument();
-  // The actions column stays in view: it sticks to the right edge of the scrolling table.
-  expect(within(groups).getByRole('columnheader', { name: 'Actions' })).toHaveClass('pf-v6-c-table__sticky-cell');
+  // Actions sits in the column row, after Role, and is not stuck to the right edge.
+  expect(within(columns).getByRole('columnheader', { name: 'Actions' })).not.toHaveClass('pf-v6-c-table__sticky-cell');
 });
 
 it('says when the search matches no cluster, and clears it from the table', async () => {
@@ -1046,7 +1069,7 @@ it('returns focus to the row’s menu button when the dialog it opened closes', 
   const modal = await screen.findByTestId('cluster-membership-modal');
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByTestId('cluster-membership-modal')).not.toBeInTheDocument());
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for site4' })).toHaveFocus());
+  await waitFor(() => expect(addButton('site4')).toHaveFocus());
 });
 
 it("shows each cluster's site and region apart, or what to fix", async () => {

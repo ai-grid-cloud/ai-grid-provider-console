@@ -49,9 +49,15 @@ export const removeText = {
     "If this cluster keeps copies of subscriptions after removal, don't delete them, uninstall MaaS, or delete their namespace on this cluster. MaaS would revoke their API keys on every cluster.",
 } as const;
 
+/** Add to AI Grid's label, on the details page's menu and as the list's add-button tooltip. */
+export const addText = {
+  action: 'Add to AI Grid',
+} as const;
+
 /**
  * The AI Grid actions a provider admin has on a cluster: for a member, Edit, then Remove
- * (destructive, last, after a divider); otherwise Add.
+ * (destructive, last, after a divider); otherwise Add. The list shows Add as an icon button
+ * instead of this menu.
  */
 export const membershipActions = (
   c: ClusterView,
@@ -72,7 +78,7 @@ export const membershipActions = (
     : [
         {
           key: 'add',
-          label: 'Add to AI Grid',
+          label: addText.action,
           disabledReason: cannotAddReason(c),
           onClick: () => onChange({ cluster: c, join: true }),
         },

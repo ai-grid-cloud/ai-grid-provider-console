@@ -87,7 +87,9 @@ a failed load.
   control), and its panel has `ModelStatusLabel`.
 - On the Clusters list, a status with a non-empty hub message is filled and opens that cluster's
   message as text in a dialog, including Ready. Without a message it stays outline and
-  noninteractive. AI Grid status stays outline. Refresh keeps the selected cluster's identity.
+  noninteractive. AI Grid status stays outline. A cluster outside AI Grid shows — in that column,
+  and its row action is an add icon whose tooltip says Add to AI Grid, or why it can't be added
+  yet. Refresh keeps the selected cluster's identity.
 - In Create subscription and its Add models picker, every model shows its status as the Models list
   does (`ModelStatusLabel`, from the latest poll; a model the subscription has saved shows its
   registration), and only Partially ready models with cluster reports open the shared
