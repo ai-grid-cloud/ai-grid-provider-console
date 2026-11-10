@@ -13,7 +13,7 @@ import {
 } from '@patternfly/react-core';
 import { ServiceError } from '../../api/ConsoleService';
 import { changedMessage, ClusterChangedError } from './ClusterChangedError';
-import type { ClusterView } from './clusterView';
+import { isPositionNotSet, mapPositionOf, type ClusterView } from './clusterView';
 import { editText, roleSet } from './editClusterText';
 import {
   canSetRole,
@@ -127,6 +127,8 @@ export const EditClusterModal: React.FC<Props> = ({ cluster, onConfirm, onClose 
               value={values.location}
               error={shown('location')}
               isDisabled={busy}
+              mapPosition={mapPositionOf(cluster)}
+              positionNotSet={isPositionNotSet(cluster)}
               onChange={(value) => setValues((v) => ({ ...v, location: value }))}
               onBlur={touch('location')}
             />

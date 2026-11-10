@@ -46,12 +46,13 @@ import { changeMembership, editCluster, editTarget, membershipTarget } from './c
 import { EditClusterModal } from './EditClusterModal';
 import { editText } from './editClusterText';
 import { MissingLabel } from './MissingLabel';
+import { PositionDocsLink } from './PositionDocsLink';
 import { ClusterRoleName } from './ClusterRolesHelp';
 import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
-import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
+import { isFromCloudRegion } from './site';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
@@ -115,11 +116,7 @@ const clusterItems = (c: ClusterView) => [
  * admin sets them.
  */
 const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
-  const how = (
-    <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
-      How to set a cluster&apos;s position
-    </a>
-  );
+  const how = <PositionDocsLink />;
   if (c.latitude === undefined || c.longitude === undefined) {
     return (
       <Stack>

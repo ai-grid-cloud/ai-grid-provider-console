@@ -16,6 +16,7 @@ import {
 import { createClient } from '@connectrpc/connect';
 import { Clusters } from '../api/connect/clients';
 import { notificationsKey, watchesKey } from '../notifications/storageKeys';
+import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { transportFor } from './connectClusters';
 import { renderAt } from './render';
 
@@ -282,7 +283,7 @@ it('asks for a location label and role before adding', async () => {
   const user = userEvent.setup();
   const service = serviceWith([
     cluster('no-location-member', 'Ready', { 'ai-grid/enabled': 'true' }),
-    cluster('no-location', 'Ready'),
+    { ...cluster('no-location', 'Ready'), latitude: 37.7749, longitude: -122.4194 },
     cluster('local-cluster', 'Ready'),
   ]);
   renderAt('/clusters', service);
@@ -300,15 +301,19 @@ it('asks for a location label and role before adding', async () => {
   expect(location).toHaveAttribute('aria-invalid', 'true');
   expect(role).toHaveAttribute('aria-invalid', 'true');
   expect(location).toHaveAccessibleDescription(/^Required\./);
+  expect(within(modal).queryByText('For example, us-east.')).not.toBeInTheDocument();
+  expect(within(modal).getByText('37.7749, -122.4194')).toBeVisible();
+  await user.click(within(modal).getByRole('button', { name: 'Copy map position' }));
+  expect(await navigator.clipboard.readText()).toBe('37.7749, -122.4194');
   expect(role).toHaveAccessibleDescription(/^Required\./);
   await user.click(location);
   await user.paste('us east');
   expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
   expect(service.clusters[1].labels).toEqual({});
-  // What the label is, and that models don't go by it, is in the field's help.
+  // What the label is, and where to take it from, is in the field's help.
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   expect(await screen.findByRole('dialog', { name: 'Location label' })).toHaveTextContent(
-    'Models are placed on clusters by name, not by this label.',
+    'A label that describes where the cluster is located. Use the map position set by the hub administrator to inform the location label.',
   );
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   // The Role field's help explains each role.
@@ -325,9 +330,13 @@ it('asks for a location label and role before adding', async () => {
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   // The hub itself defaults to the combined role.
   await pick(user, 'local-cluster', 'Add to AI Grid');
-  expect(
-    within(await screen.findByTestId('cluster-membership-modal')).getByRole('combobox', { name: 'Role' }),
-  ).toHaveValue('Combined');
+  const hub = await screen.findByTestId('cluster-membership-modal');
+  expect(within(hub).getByRole('combobox', { name: 'Role' })).toHaveValue('Combined');
+  // No coordinates and no position problem: the same "not set" state the details page shows.
+  expect(within(hub).getByText(/Map position is not set\./)).toBeVisible();
+  const how = within(hub).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
 });
 
 it('keeps an unenrolled cluster on patch failure and allows a retry', async () => {

@@ -526,7 +526,9 @@ it('says where the map puts the cluster, from its cloud region, with how to set 
   renderAt('/clusters/in-region', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent('40.42, -82.91 from the cloud region');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toHaveAttribute(
+  const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how).toHaveAttribute(
     'href',
     'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
   );

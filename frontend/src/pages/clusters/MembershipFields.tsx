@@ -1,6 +1,7 @@
 // The fields Add to AI Grid and Edit share, so both dialogs draw, validate and word a cluster's
 // location label and role the same way.
 import {
+  ClipboardCopy,
   FormGroup,
   FormGroupLabelHelp,
   FormHelperText,
@@ -13,6 +14,7 @@ import type { ClusterRole } from '../../api/clusters';
 import { ReadOnlyField } from '../../components/ReadOnlyField';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { ClusterRolesList } from './ClusterRolesHelp';
+import { PositionDocsLink } from './PositionDocsLink';
 import { clusterRoles } from './roles';
 
 type TextFieldProps = {
@@ -22,16 +24,31 @@ type TextFieldProps = {
   /** The error to show now: the caller decides when a field has been touched. */
   error?: string;
   isDisabled?: boolean;
+  /** The cluster's map position, "latitude, longitude", when the hub has one. */
+  mapPosition?: string;
+  /** The hub has not set a map position (details: "Not on the map: position not set"). */
+  positionNotSet?: boolean;
 };
 
 /** The `location` label: required, a label value. */
-export const LocationLabelField: React.FC<TextFieldProps> = ({ value, onChange, onBlur, error, isDisabled }) => (
+export const LocationLabelField: React.FC<TextFieldProps> = ({
+  value,
+  onChange,
+  onBlur,
+  error,
+  isDisabled,
+  mapPosition,
+  positionNotSet,
+}) => (
   <FormGroup
     label="Location label"
     fieldId="cluster-location"
     isRequired
     labelHelp={
-      <Popover headerContent="Location label" bodyContent="Models are placed on clusters by name, not by this label.">
+      <Popover
+        headerContent="Location label"
+        bodyContent="A label that describes where the cluster is located. Use the map position set by the hub administrator to inform the location label."
+      >
         <FormGroupLabelHelp aria-label="More info for the location label field" />
       </Popover>
     }
@@ -42,15 +59,30 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({ value, onChange, 
       isRequired
       isDisabled={isDisabled}
       validated={error ? 'error' : 'default'}
-      aria-describedby="cluster-location-help"
+      aria-describedby={error || mapPosition || positionNotSet ? 'cluster-location-help' : undefined}
       onChange={(_e, v) => onChange(v)}
       onBlur={onBlur}
     />
-    <FormHelperText>
-      <HelperText id="cluster-location-help">
-        <HelperTextItem variant={error ? 'error' : 'default'}>{error ?? 'For example, us-east.'}</HelperTextItem>
-      </HelperText>
-    </FormHelperText>
+    {(error || mapPosition || positionNotSet) && (
+      <FormHelperText>
+        <HelperText id="cluster-location-help">
+          {error && <HelperTextItem variant="error">{error}</HelperTextItem>}
+          {mapPosition && (
+            <HelperTextItem>
+              Map position is{' '}
+              <ClipboardCopy variant="inline-compact" copyAriaLabel="Copy map position">
+                {mapPosition}
+              </ClipboardCopy>
+            </HelperTextItem>
+          )}
+          {positionNotSet && (
+            <HelperTextItem>
+              Map position is not set. <PositionDocsLink trailing="." />
+            </HelperTextItem>
+          )}
+        </HelperText>
+      </FormHelperText>
+    )}
   </FormGroup>
 );
 

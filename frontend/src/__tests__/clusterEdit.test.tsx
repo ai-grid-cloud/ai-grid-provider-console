@@ -17,6 +17,7 @@ import {
 } from '../gen/ai_grid/v1/managed_cluster_type_pb';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/clusters/ClusterDetailsPage';
+import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { deferred, findVisible, renderAt } from './render';
 
 /** A ready cluster, an AI Grid member unless its labels say otherwise, at version 7. */
@@ -24,8 +25,15 @@ const managedCluster = (
   id: string,
   labels: Record<string, string>,
   annotations: Record<string, string> = {},
-): ManagedCluster =>
-  create(ManagedClusterSchema, {
+): ManagedCluster => {
+  const latitude = Number(annotations['ai-grid/latitude']);
+  const longitude = Number(annotations['ai-grid/longitude']);
+  const mapped =
+    annotations['ai-grid/latitude'] !== undefined &&
+    annotations['ai-grid/longitude'] !== undefined &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude);
+  return create(ManagedClusterSchema, {
     id,
     metadata: { name: id, labels, annotations, version: 7 },
     status: {
@@ -34,10 +42,12 @@ const managedCluster = (
       state: ManagedClusterState.READY,
       location: {
         siteName: annotations['ai-grid/site-name'] ?? '',
-        source: ManagedClusterLocationSource.NONE,
+        source: mapped ? ManagedClusterLocationSource.ANNOTATIONS : ManagedClusterLocationSource.NONE,
+        ...(mapped ? { latitude, longitude } : {}),
       },
     },
   });
+};
 
 /** A member with a role, a label the console doesn't own, and annotations Edit never sends. */
 const paris = () =>
@@ -164,7 +174,9 @@ it('links an AI Grid cluster without a position to how a hub admin sets it, not 
   renderAt('/clusters/bare-1', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent('Not on the map: position not set');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toHaveAttribute(
+  const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how).toHaveAttribute(
     'href',
     'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
   );
@@ -182,7 +194,11 @@ it('shows the role of a cluster that has one read-only, with why, and only the l
   expect(within(dialog).queryByRole('combobox', { name: 'Role' })).not.toBeInTheDocument();
   expect(within(dialog).getByRole('button', { name: 'More info for the role field' })).toBeVisible();
   expect(field(dialog, 'Location label')).toHaveValue('eu-west');
-  // No site name or position: they stay read-only in the console.
+  expect(within(dialog).queryByText('For example, us-east.')).not.toBeInTheDocument();
+  expect(within(dialog).getByText('48.8566, 2.3522')).toBeVisible();
+  await user.click(within(dialog).getByRole('button', { name: 'Copy map position' }));
+  expect(await navigator.clipboard.readText()).toBe('48.8566, 2.3522');
+  // No site name or position fields: they stay read-only in the console.
   expect(within(dialog).queryByRole('textbox', { name: /Site name|Latitude|Longitude/ })).not.toBeInTheDocument();
   expect(within(dialog).queryByTestId('cluster-role-change')).not.toBeInTheDocument();
   expect(save(dialog)).toBeDisabled();
@@ -325,6 +341,17 @@ it('announces what Save will install: the alert is a polite live region, and fol
   // The same region, so the new role's text is announced as a change.
   expect(within(dialog).getByTestId('cluster-role-change')).toBe(change);
   expect(change).toHaveTextContent('Saving sets the role to Inference.');
+});
+
+it('says the map position is not set when the details page would', async () => {
+  const user = userEvent.setup();
+  renderList([noRole()]);
+  const dialog = await openEdit(user, 'no-role');
+  expect(within(dialog).getByText(/Map position is not set\./)).toBeVisible();
+  const how = within(dialog).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  expect(within(dialog).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 
 it('asks for a role before saving a location label on a cluster without one', async () => {
