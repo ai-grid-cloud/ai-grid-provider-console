@@ -318,11 +318,14 @@ it('asks for a location label and role before adding', async () => {
   await user.paste('us east');
   expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
   expect(service.clusters[1].labels).toEqual({});
-  // What the label is, and where to take it from, is in the field's help.
+  // What the label is for, and that it isn't the map position, is in the field's help (UXD microcopy review).
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
-  expect(await screen.findByRole('dialog', { name: 'Location label' })).toHaveTextContent(
-    'A label that describes where the cluster is located. Use the map position set by the hub administrator to inform the location label.',
+  const locationHelp = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(locationHelp).toHaveTextContent(
+    "Add a label to describe where the cluster is located. This does not impact the cluster's position on the AI Grid map, which is set by your hub administrator or inherited from the cloud region.",
   );
+  // The popover has no heading.
+  expect(within(locationHelp).queryByRole('heading')).not.toBeInTheDocument();
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   // The Role field's help explains each role.
   await user.click(within(modal).getByRole('button', { name: 'More info for the role field' }));

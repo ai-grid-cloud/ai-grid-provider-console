@@ -46,8 +46,8 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({
     isRequired
     labelHelp={
       <Popover
-        headerContent="Location label"
-        bodyContent="A label that describes where the cluster is located. Use the map position set by the hub administrator to inform the location label."
+        aria-label="Location label"
+        bodyContent="Add a label to describe where the cluster is located. This does not impact the cluster's position on the AI Grid map, which is set by your hub administrator or inherited from the cloud region."
       >
         <FormGroupLabelHelp aria-label="More info for the location label field" />
       </Popover>
