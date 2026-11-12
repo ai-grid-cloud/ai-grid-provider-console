@@ -39,7 +39,7 @@ import { StatusLabel } from '../../components/StatusLabel';
 import { SubtleText } from '../../components/SubtleText';
 import { NoResultsState } from '../../components/states/NoResultsState';
 import { modelPath } from '../models/modelUtils';
-import { LOCATION_DOCS_URL } from '../clusters/site';
+import { PositionHelp } from '../clusters/PositionHelp';
 import { GridFleetMap } from './GridFleetMap';
 import type { TileLayerConfig } from './tiles';
 import './grid-fleet.css';
@@ -427,10 +427,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
           title={`${notOnMap.length} ${notOnMap.length === 1 ? 'cluster' : 'clusters'} not shown`}
           data-testid="clusters-not-on-map"
         >
-          Clusters are excluded from the map when their positions are missing or invalid.{' '}
-          <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
-            How to set a cluster&apos;s position
-          </a>
+          Clusters are excluded from the map when their positions are missing or invalid. <PositionHelp />
         </Alert>
       )}
     </Stack>

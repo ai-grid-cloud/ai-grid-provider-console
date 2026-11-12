@@ -46,13 +46,13 @@ import { changeMembership, editCluster, editTarget, membershipTarget } from './c
 import { EditClusterModal } from './EditClusterModal';
 import { editText } from './editClusterText';
 import { MissingLabel } from '../../components/MissingLabel';
-import { PositionDocsLink } from './PositionDocsLink';
 import { ClusterRoleName } from './ClusterRolesHelp';
 import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
 import { isFromCloudRegion } from './site';
+import { PositionHelp } from './PositionHelp';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
@@ -116,11 +116,11 @@ const clusterItems = (c: ClusterView) => [
 
 /**
  * Where the map puts the cluster and from what: the hub admin's annotations, or the cloud region
- * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Without annotations it links to how a hub
- * admin sets them.
+ * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Where the position isn't from annotations, a help
+ * icon says how a hub admin sets them.
  */
 const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
-  const how = <PositionDocsLink />;
+  const how = <PositionHelp />;
   if (c.latitude === undefined || c.longitude === undefined) {
     return (
       <Stack>

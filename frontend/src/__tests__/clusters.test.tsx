@@ -16,7 +16,6 @@ import {
 import { createClient } from '@connectrpc/connect';
 import { Clusters } from '../api/connect/clients';
 import { notificationsKey, watchesKey } from '../notifications/storageKeys';
-import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { transportFor } from './connectClusters';
 import { renderAt } from './render';
 
@@ -343,9 +342,9 @@ it('asks for a location label and role before adding', async () => {
   expect(within(hub).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress and inference');
   // No coordinates and no position problem: the same "not set" state the details page shows.
   expect(within(hub).getByText(/Map position is not set\./)).toBeVisible();
-  const how = within(hub).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
-  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  const how = within(hub).getByRole('button', { name: "More about a cluster's map position" });
+  await user.click(how);
+  expect(await screen.findByText(/The map places a cluster from two annotations/)).toBeVisible();
 });
 
 it('keeps an unenrolled cluster on patch failure and allows a retry', async () => {

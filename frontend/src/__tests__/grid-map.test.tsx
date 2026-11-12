@@ -391,7 +391,8 @@ it("drops the Back trail when a link moves the drawer to something the trail was
   expect(screen.getByRole('button', { name: 'Clusters' })).toBeVisible();
 });
 
-it("counts the members that aren't on the map, whatever the reason, and links to how to place them", async () => {
+it("counts the members that aren't on the map, whatever the reason, and explains how to place them", async () => {
+  const user = userEvent.setup();
   const service = new MockConsoleService();
   const [first, second, third] = service.clusters;
   service.clusters = [
@@ -415,5 +416,9 @@ it("counts the members that aren't on the map, whatever the reason, and links to
   const note = await screen.findByTestId('clusters-not-on-map');
   expect(within(note).getByRole('heading', { name: /2 clusters not shown/ })).toBeVisible();
   expect(note).toHaveTextContent('Clusters are excluded from the map when their positions are missing or invalid.');
-  expect(within(note).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  await user.click(within(note).getByRole('button', { name: "More about a cluster's map position" }));
+  const help = await screen.findByText(/The map places a cluster from two annotations/);
+  expect(help).toHaveTextContent('ai-grid/latitude');
+  expect(help).toHaveTextContent('ai-grid/longitude');
+  expect(help).toHaveTextContent('decimal degrees');
 });

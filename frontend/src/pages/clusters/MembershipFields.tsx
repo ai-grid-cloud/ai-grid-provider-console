@@ -14,7 +14,7 @@ import type { ClusterRole } from '../../api/clusters';
 import { ReadOnlyField } from '../../components/ReadOnlyField';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { ClusterRolesList } from './ClusterRolesHelp';
-import { PositionDocsLink } from './PositionDocsLink';
+import { PositionHelp } from './PositionHelp';
 import { clusterRoles } from './roles';
 
 type TextFieldProps = {
@@ -77,7 +77,7 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({
           )}
           {positionNotSet && (
             <HelperTextItem>
-              Map position is not set. <PositionDocsLink trailing="." />
+              Map position is not set. <PositionHelp />
             </HelperTextItem>
           )}
         </HelperText>

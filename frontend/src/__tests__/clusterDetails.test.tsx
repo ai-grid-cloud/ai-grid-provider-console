@@ -508,6 +508,7 @@ it('says when the hub has no such cluster', async () => {
 });
 
 it('says where the map puts the cluster, from its cloud region, with how to set it', async () => {
+  const user = userEvent.setup();
   const transport = fakeClients({
     clusters: {
       get: async () => ({
@@ -529,12 +530,11 @@ it('says where the map puts the cluster, from its cloud region, with how to set 
   renderAt('/clusters/in-region', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent('40.42, -82.91 from the cloud region');
-  const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
-  expect(how).toHaveAttribute(
-    'href',
-    'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
-  );
+  await user.click(within(position).getByRole('button', { name: "More about a cluster's map position" }));
+  const help = await screen.findByText(/The map places a cluster from two annotations/);
+  expect(help).toHaveTextContent('ai-grid/latitude');
+  expect(help).toHaveTextContent('ai-grid/longitude');
+  expect(help).toHaveTextContent('decimal degrees');
   // The cloud region is the Region, not a site.
   expect(screen.queryByTestId('cluster-site')).not.toBeInTheDocument();
   expect(screen.getByText('us-east-2')).toBeVisible();
