@@ -305,18 +305,22 @@ it('asks for a location label and role before adding', async () => {
   expect(location).toBeRequired();
   expect(location).toHaveAttribute('aria-invalid', 'true');
   expect(role).toHaveAttribute('aria-invalid', 'true');
-  expect(location).toHaveAccessibleDescription(/^Required : error status;/);
+  // The format rule is always shown, before the error, so a value like the map position isn't typed in first;
+  // the map position is plain text, nothing to copy into the field.
+  expect(location).toHaveAccessibleDescription(
+    /^Must start and end with a letter or number\. .* Up to 63 characters\. Required : error status; Map position is 37\.7749, -122\.4194\.$/,
+  );
   expect(within(modal).queryByText('For example, us-east.')).not.toBeInTheDocument();
-  expect(within(modal).getByText('37.7749, -122.4194')).toBeVisible();
-  await user.click(within(modal).getByRole('button', { name: 'Copy map position' }));
-  expect(await navigator.clipboard.readText()).toBe('37.7749, -122.4194');
+  expect(within(modal).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
   // The role keeps its helper, and the error follows it.
   expect(role).toHaveAccessibleDescription(
     /^Select the role this cluster will perform in the AI Grid\. .* Required : error status;$/,
   );
   await user.click(location);
   await user.paste('us east');
-  expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
+  // The rule itself is the error, said once.
+  expect(location).toHaveAccessibleDescription(/^Must start and end with a letter or number\. .* error status;/);
+  expect(within(modal).getAllByText(/^Must start and end with a letter or number/)).toHaveLength(1);
   expect(service.clusters[1].labels).toEqual({});
   // What the label is for, and that it isn't the map position, is in the field's help (UXD microcopy review).
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));

@@ -1,7 +1,6 @@
 // The fields Add to AI Grid and Edit share, so both dialogs draw, validate and word a cluster's
 // location label and role the same way.
 import {
-  ClipboardCopy,
   FormGroup,
   FormGroupLabelHelp,
   FormHelperText,
@@ -14,6 +13,7 @@ import type { ClusterRole } from '../../api/clusters';
 import { ReadOnlyField } from '../../components/ReadOnlyField';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { ClusterRolesList } from './ClusterRolesHelp';
+import { locationRule } from './gridSettings';
 import { PositionHelp } from './PositionHelp';
 import { clusterRoles } from './roles';
 
@@ -59,30 +59,24 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({
       isRequired
       isDisabled={isDisabled}
       validated={error ? 'error' : 'default'}
-      aria-describedby={error || mapPosition || positionNotSet ? 'cluster-location-help' : undefined}
+      aria-describedby="cluster-location-help"
       onChange={(_e, v) => onChange(v)}
       onBlur={onBlur}
     />
-    {(error || mapPosition || positionNotSet) && (
-      <FormHelperText>
-        <HelperText id="cluster-location-help">
-          {error && <HelperTextItem variant="error">{error}</HelperTextItem>}
-          {mapPosition && (
-            <HelperTextItem>
-              Map position is{' '}
-              <ClipboardCopy variant="inline-compact" copyAriaLabel="Copy map position">
-                {mapPosition}
-              </ClipboardCopy>
-            </HelperTextItem>
-          )}
-          {positionNotSet && (
-            <HelperTextItem>
-              Map position is not set. <PositionHelp />
-            </HelperTextItem>
-          )}
-        </HelperText>
-      </FormHelperText>
-    )}
+    {/* The rule stays visible, so a value like the map position isn't typed in first; a value that breaks it turns
+        it into the error, and any other error follows it. The map position is plain text: it isn't a label value. */}
+    <FormHelperText>
+      <HelperText id="cluster-location-help">
+        <HelperTextItem variant={error === locationRule ? 'error' : 'default'}>{locationRule}</HelperTextItem>
+        {error && error !== locationRule && <HelperTextItem variant="error">{error}</HelperTextItem>}
+        {mapPosition && <HelperTextItem>Map position is {mapPosition}.</HelperTextItem>}
+        {positionNotSet && (
+          <HelperTextItem>
+            Map position is not set. <PositionHelp />
+          </HelperTextItem>
+        )}
+      </HelperText>
+    </FormHelperText>
   </FormGroup>
 );
 

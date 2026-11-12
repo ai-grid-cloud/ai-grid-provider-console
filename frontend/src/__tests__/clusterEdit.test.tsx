@@ -195,9 +195,11 @@ it('shows the role of a cluster that has one read-only, with why, and only the l
   expect(within(dialog).getByRole('button', { name: 'More info for the role field' })).toBeVisible();
   expect(field(dialog, 'Location label')).toHaveValue('eu-west');
   expect(within(dialog).queryByText('For example, us-east.')).not.toBeInTheDocument();
-  expect(within(dialog).getByText('48.8566, 2.3522')).toBeVisible();
-  await user.click(within(dialog).getByRole('button', { name: 'Copy map position' }));
-  expect(await navigator.clipboard.readText()).toBe('48.8566, 2.3522');
+  expect(within(dialog).getByText('Map position is 48.8566, 2.3522.')).toBeVisible();
+  expect(within(dialog).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
+  expect(field(dialog, 'Location label')).toHaveAccessibleDescription(
+    /^Must start and end with a letter or number\. .* Up to 63 characters\. Map position is 48\.8566, 2\.3522\.$/,
+  );
   // No site name or position fields: they stay read-only in the console.
   expect(within(dialog).queryByRole('textbox', { name: /Site name|Latitude|Longitude/ })).not.toBeInTheDocument();
   expect(within(dialog).queryByTestId('cluster-role-change')).not.toBeInTheDocument();

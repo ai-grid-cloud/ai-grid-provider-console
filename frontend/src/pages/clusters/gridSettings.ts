@@ -9,12 +9,14 @@ import { roleOf } from './roles';
 // A Kubernetes label value: what the hub accepts for `location`.
 const labelValue = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
 
+/** What a location label may hold: the field's helper, and its error when the value breaks it. */
+export const locationRule =
+  'Must start and end with a letter or number. Valid characters include letters, numbers, hyphens (-), underscores (_), and periods (.). Up to 63 characters.';
+
 /** What is wrong with a location label, trimmed, as Add and Edit check it; undefined when the hub accepts it. */
 export const locationError = (location: string) => {
   if (!location) return 'Required';
-  if (!labelValue.test(location)) {
-    return 'Must start and end with a letter or number. Valid characters include letters, numbers, hyphens (-), underscores (_), and periods (.). Up to 63 characters.';
-  }
+  if (!labelValue.test(location)) return locationRule;
   return undefined;
 };
 
