@@ -51,7 +51,8 @@ import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
-import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
+import { isFromCloudRegion } from './site';
+import { PositionHelp } from './PositionHelp';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
@@ -115,15 +116,11 @@ const clusterItems = (c: ClusterView) => [
 
 /**
  * Where the map puts the cluster and from what: the hub admin's annotations, or the cloud region
- * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Without annotations it links to how a hub
- * admin sets them.
+ * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Where the position isn't from annotations, a help
+ * icon says how a hub admin sets them.
  */
 const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
-  const how = (
-    <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
-      How to set a cluster&apos;s position
-    </a>
-  );
+  const how = <PositionHelp />;
   if (c.latitude === undefined || c.longitude === undefined) {
     return (
       <Stack>

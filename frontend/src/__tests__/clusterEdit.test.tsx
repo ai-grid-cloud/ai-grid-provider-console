@@ -148,7 +148,7 @@ it('offers Edit for AI Grid clusters on the cluster page, before Remove from AI 
   expect(await screen.findByRole('dialog', { name: 'Edit AI Grid cluster' })).toBeVisible();
 });
 
-it('offers no Edit for a cluster outside AI Grid, and the page still links to how a hub admin places it', async () => {
+it('offers no Edit for a cluster outside AI Grid, and the page still explains how a hub admin places it', async () => {
   const user = userEvent.setup();
   const { transport } = clustersOf([managedCluster('outside-1', { location: 'eu-west' })]);
   renderAt('/clusters/outside-1', new MockConsoleService(), transport);
@@ -156,19 +156,22 @@ it('offers no Edit for a cluster outside AI Grid, and the page still links to ho
   expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Add to AI Grid']);
   await user.keyboard('{Escape}');
   const position = screen.getByTestId('cluster-map-position');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  expect(within(position).getByRole('button', { name: "More about a cluster's map position" })).toBeVisible();
 });
 
-it('links an AI Grid cluster without a position to how a hub admin sets it, not to Edit', async () => {
+it('explains to a hub admin how to set the position of an AI Grid cluster without one, not offering Edit', async () => {
+  const user = userEvent.setup();
   const { transport } = clustersOf([noRole('bare-1')]);
   renderAt('/clusters/bare-1', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent('Not on the map: position not set');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toHaveAttribute(
-    'href',
-    'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
-  );
-  expect(within(position).queryByRole('button')).not.toBeInTheDocument();
+  await user.click(within(position).getByRole('button', { name: "More about a cluster's map position" }));
+  const help = await screen.findByText(/The map places a cluster from two annotations/);
+  expect(help).toHaveTextContent('ai-grid/latitude');
+  expect(help).toHaveTextContent('ai-grid/longitude');
+  expect(help).toHaveTextContent('decimal degrees');
+  // The help icon is the only control: Edit lives in the actions menu, not on the position.
+  expect(within(position).getAllByRole('button')).toHaveLength(1);
 });
 
 it('shows the role of a cluster that has one read-only, with why, and only the location label to edit', async () => {
