@@ -370,7 +370,7 @@ describe('administrator subscription flows', () => {
     }
     await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
     await user.click(screen.getByTestId('confirm-add-models'));
-    expect(screen.getByTestId('create-subscription-button')).toBeDisabled();
+    expect(screen.getByTestId('create-subscription-button')).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByTestId('add-token-limit-0'));
     await user.click(screen.getByTestId('save-rate-limits'));
     await user.click(screen.getByTestId('create-subscription-button'));
@@ -1145,7 +1145,9 @@ it.each(['view', 'edit'])('loads the other subscription when the name in /subscr
 it('hints that a new model needs a token limit, and labels the limit fields', async () => {
   const user = userEvent.setup();
   renderAt('/subscriptions/create', seeded());
-  expect(await screen.findByText(/^Give groups of an organization's users access to models/)).toBeVisible();
+  expect(
+    await screen.findByText(/^Configure models available with this subscription, token limits for each one/),
+  ).toBeVisible();
   await user.click(await screen.findByTestId('add-models-button'));
   await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
   await user.click(screen.getByTestId('confirm-add-models'));
@@ -1160,6 +1162,24 @@ it('hints that a new model needs a token limit, and labels the limit fields', as
   expect(screen.getByRole('spinbutton', { name: 'Tokens' })).toHaveValue(1000);
   expect(screen.getByRole('spinbutton', { name: 'Per' })).toHaveValue(1);
   expect(screen.getByRole('button', { name: 'Add token limit' })).toBeVisible();
+});
+
+it('says on the disabled Create subscription button which models still need a token limit', async () => {
+  const user = userEvent.setup();
+  renderAt('/subscriptions/create', seeded());
+  await user.click(await screen.findByTestId('add-models-button'));
+  await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
+  await user.click(screen.getByTestId('confirm-add-models'));
+  // Aria-disabled, as DeleteModal's button, so it takes focus and shows why from the keyboard too.
+  const create = screen.getByRole('button', { name: 'Create subscription' });
+  expect(create).toHaveAttribute('aria-disabled', 'true');
+  await user.hover(create);
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a token limit to Granite 3.3 8B Instruct.');
+  await user.unhover(create);
+  // With the limit saved, the button no longer gives that reason.
+  await user.click(screen.getByTestId('add-token-limit-0'));
+  await user.click(screen.getByTestId('save-rate-limits'));
+  expect(screen.getByRole('button', { name: 'Create subscription' })).not.toHaveAttribute('aria-disabled', 'true');
 });
 
 it('says straight away that a subscription saved without an organization needs one', async () => {

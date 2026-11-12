@@ -25,7 +25,7 @@ describe('settingsOf', () => {
 describe('settingsErrors', () => {
   it('requires a role and a location label that is a label value', () => {
     expect(settingsErrors({ role: 'ingress', location: 'eu-west' })).toEqual({});
-    expect(settingsErrors({ role: '', location: '' })).toEqual({ role: 'Required.', location: 'Required.' });
+    expect(settingsErrors({ role: '', location: '' })).toEqual({ role: 'Required', location: 'Required' });
     expect(settingsErrors({ role: 'ingress', location: '-eu' }).location).toMatch(/^Must start and end with a letter/);
   });
 });

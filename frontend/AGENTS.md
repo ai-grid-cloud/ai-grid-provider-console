@@ -82,14 +82,21 @@ a failed load.
   `ModelStatusModal`, and an Availability label with more to say is filled and opens its dialog; the
   other words stay outline. A model's page keeps an outline Status label; its alert explains the
   status. A model's Status tooltip explains its word from the clusters that aren't Ready
-  (`stateTooltipOf`), never the phase's message, which can disagree; Ready has none. The AI Grid
+  (`stateTooltipOf`), never the phase's message, which can disagree; Ready has none. The
+  Availability dialog for Unavailable, on the list and the model page alike, has the backend's
+  reason as its alert's body (`status.maas_message`: no placed cluster runs the model, or it
+  serves a name other than its id), and the design's copy when there is none (`availabilityOf`);
+  never the phase's message. The other Availability words keep the design's copy. The AI Grid
   page shows the same word: a model's card has the label without a tooltip (a card is one
   control), and its panel has `ModelStatusLabel`.
 - On the Clusters list, a status with a non-empty hub message is filled and opens that cluster's
   message as text in a dialog, including Ready. Without a message it stays outline and
-  noninteractive. AI Grid status stays outline. A cluster outside AI Grid shows — in that column,
-  and its row action is an add icon whose tooltip says Add to AI Grid, or why it can't be added
-  yet. Refresh keeps the selected cluster's identity.
+  noninteractive. A cluster whose agent reports it unavailable (the backend's `OFFLINE`, which ACM
+  calls Offline; for example, its API server is down) is _Unavailable_, in the warning tone: it may
+  still serve. A cluster the hub can't reach (the backend's `UNKNOWN`) is _Unknown_. Its tooltip, and its dialog above the
+  hub's message, say what that means (`unavailableText`, `clusterInfo.ts`). AI Grid status stays outline. A cluster
+  outside AI Grid shows — in that column, and its row action is an add icon whose tooltip says Add to AI Grid, or why
+  it can't be added yet. Refresh keeps the selected cluster's identity.
 - In Create subscription and its Add models picker, every model shows its status as the Models list
   does (`ModelStatusLabel`, from the latest poll; a model the subscription has saved shows its
   registration), and only Partially ready models with cluster reports open the shared
@@ -111,7 +118,11 @@ a failed load.
 
 - Field errors show after the field is touched; the server's field errors map to their fields.
 - A failed save is an inline danger alert, "Unable to &lt;verb&gt; &lt;object&gt;".
-- Buttons: primary (or danger), then Cancel as a link.
+- Buttons: primary (or danger), then Cancel as a link. A button blocked by something its own
+  form doesn't say as a field error is aria-disabled with the reason in its tooltip (Create
+  subscription with a model that has no token limit). In a form's `ActionGroup`, give the `Tooltip`
+  the button by `triggerRef`: a tooltip wrapped around it adds an element that breaks the group's
+  layout.
 - A big create is a `Wizard` with `ConsoleWizardFooter`; a small one a `Form` with an `ActionGroup`.
 - Every delete, and Remove from AI Grid, asks for the object's name typed in (`DeleteModal`).
 - After an action succeeds, a success toast: navigate with `state: { notice }` (`NoticeToast`). An
@@ -160,9 +171,11 @@ odh-dashboard as the reference product. The terms come from [GLOSSARY.md](../GLO
    - each label names the data it shows: _Site_ is the `ai-grid/site-name` annotation, _Site ID_
      the `ai-grid/site` label, _Region_ the cloud region claim, _Location label_ the `location`
      label;
-   - the roles _Ingress_, _Inference_ and _Combined_;
+   - the roles _Ingress_, _Inference_ and _Ingress and inference_ (the value stays `combined`);
    - _hub_ (lowercase), _provider admin_, and _your hub administrator_ for whoever grants access;
-   - _AI Grid_, never "the grid", "grid" or "fleet".
+   - _AI Grid_, never "the grid", "grid" or "fleet". Running sentences say "the AI Grid" ("To add
+     clusters to the AI Grid, ..."); labels and action names have no article ("Add to AI Grid",
+     "AI Grid cluster", "AI Grid status").
 5. **A help icon, not a longer label.** Wherever a term could confuse an admin (a role, a count, a
    status), put its explanation in a help popover (`HelpPopover`, or a `FormGroup`'s `labelHelp`)
    beside it. A cluster's role always has one, wherever it is shown or chosen.
@@ -171,7 +184,8 @@ odh-dashboard as the reference product. The terms come from [GLOSSARY.md](../GLO
    - _Add_ and _Remove_ put an existing thing into or out of a container ("Add to AI Grid", "Add
      models", "Add domain").
    - _Deploy_ is for models only.
-   - _Edit_, never Change or Modify. _Select_, never Choose.
+   - _Edit_, never Change or Modify, in action labels; body text may say "make changes". _Select_,
+     never Choose.
    - _Log in_ and _Log out_, never sign in or out.
    - _View details_ in row menus.
 7. **Error titles are "Unable to &lt;verb&gt; &lt;object&gt;"**: "Unable to load clusters", "Unable
@@ -181,8 +195,9 @@ odh-dashboard as the reference product. The terms come from [GLOSSARY.md](../GLO
    &lt;goal&gt;, &lt;action&gt;."
 9. **A filter that matches nothing** shows "No results found", "Adjust your filters and try
    again." and Clear all filters, on every list.
-10. **No access** is "Access permissions needed", with a body that ends "To &lt;goal&gt;, ask your
-    hub administrator ...".
+10. **No access** is titled "No access", with the body "You don't have permission to view
+    &lt;objects&gt;. To request permission, contact your hub administrator.", then "Message
+    returned:" and the server's message, each its own paragraph.
 11. **Not found** is "&lt;Object&gt; not found", one sentence, then "Go to &lt;list&gt;".
 12. **Success toasts are "&lt;Object&gt; &lt;past participle&gt;"**: "Organization acme-robotics
     created", "Model Granite 8B saved to Git", "Cluster local-cluster added to AI Grid". No
@@ -194,15 +209,18 @@ odh-dashboard as the reference product. The terms come from [GLOSSARY.md](../GLO
     - the title is "&lt;Verb&gt; &lt;object&gt;?";
     - the danger button repeats the verb, and Cancel is a link;
     - the body states the consequence in three lines or fewer, with no "Are you sure";
-    - a destructive action asks for "Type &lt;name&gt; to confirm:".
+    - a delete asks for "Type &lt;name&gt; to confirm deletion:"; Remove from AI Grid, which
+      deletes nothing, asks for "Type &lt;name&gt; to confirm:". While a delete can't go ahead (a
+      model that subscriptions use), the dialog leaves the typed name out and says why.
 14. **Helper text says what to enter or what constraint applies.** It doesn't repeat the label or
     explain what the field is. Write examples as "For example, us-east."
 15. **Field errors are one imperative sentence that ends with a period and says how to fix the
-    input**: "Required.", "Enter a number from 1 to 99.", "Select at least one cluster.". The same
-    constraint gets the same words everywhere, and a limit names its value.
+    input**: "Enter a number from 1 to 99.", "Select at least one cluster.". The one fragment is
+    "Required", with no period. The same constraint gets the same words everywhere, and a limit
+    names its value.
 16. **No internal jargon.** Don't write label keys (`ai-grid/enabled`), Kubernetes kinds (Policy,
     ManifestWork, MaaSModelRef), "controller", "pods", "KEDA", "ACM Search", "git mode", "CEL",
-    "telemetry" or "Thanos". Name what the admin sees or acts on. Keep the names an admin types or
+    "telemetry" (except in what an Unavailable cluster means, as UXD wrote it) or "Thanos". Name what the admin sees or acts on. Keep the names an admin types or
     selects: vLLM, MIG, OIDC, JWKS, Secret, `hf://`.
 17. **Tooltips are short and add something the label doesn't.** A status tooltip gives the reason,
     and a full sentence ends with a period.

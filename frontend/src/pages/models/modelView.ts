@@ -170,6 +170,11 @@ export type ModelView = {
    * failed on an ingress cluster, or Argo CD couldn't sync it there.
    */
   maasFailed: boolean;
+  /**
+   * Why the backend reads the model as Unavailable in MaaS (status.maas_message): no placed cluster
+   * runs it, or its deployment serves a name other than its id. Undefined for every other word.
+   */
+  maasMessage?: string;
   /** The rollout in one word (status.state): what the Status column shows. */
   state: StateWord;
   /** Each ingress cluster's MaaS status; empty while no cluster has reported the model. */
@@ -317,6 +322,7 @@ export const toModelView = (model: Model): ModelView => {
     })),
     maas: maasWordOf(status?.maas),
     maasFailed: status?.maas === ModelMaasState.FAILED,
+    maasMessage: nonEmpty(status?.maasMessage),
     // A backend that doesn't report a state yet leaves only the phase: Saved to Git while it says so.
     state:
       stateWordOf(status?.state) ??

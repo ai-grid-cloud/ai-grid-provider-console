@@ -44,7 +44,7 @@ const openEdit = async (page: Page, cluster: string) => {
   // The menu appears once /user has answered.
   await page.getByRole('button', { name: `Actions for ${cluster}` }).click();
   await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
-  return page.getByRole('dialog', { name: `Edit ${cluster}` });
+  return page.getByRole('dialog', { name: 'Edit AI Grid cluster' });
 };
 
 const rowOf = (page: Page, cluster: string) =>

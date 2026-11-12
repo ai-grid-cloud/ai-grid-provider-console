@@ -185,7 +185,7 @@ export const requireImageWithoutNvidia = (
   ctx: z.RefinementCtx,
 ) => {
   if (typeof value.runtimeImage === 'string' && !value.runtimeImage.trim() && value.accelerator !== 'nvidia.com/gpu') {
-    ctx.addIssue({ code: 'custom', path: ['runtimeImage'], message: 'Required.' });
+    ctx.addIssue({ code: 'custom', path: ['runtimeImage'], message: 'Required' });
   }
 };
 

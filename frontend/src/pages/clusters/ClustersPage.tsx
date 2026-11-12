@@ -33,10 +33,10 @@ import { changeMembership, editCluster, editTarget, membershipTarget } from './c
 import { MembershipModal } from './MembershipModal';
 import { EditClusterModal } from './EditClusterModal';
 import { editText } from './editClusterText';
-import { MissingLabel } from './MissingLabel';
+import { MissingLabel } from '../../components/MissingLabel';
 import { ClusterSite } from './ClusterSite';
 import { AddClusterButton } from './AddClusterButton';
-import { gpuCount, membershipActions, statusReason } from './clusterInfo';
+import { gpuCount, hubMessage, membershipActions, statusReason, unavailableText } from './clusterInfo';
 import { capacityText, configurationText, gpuCountText, gpuSharing } from './gpuText';
 import { ClusterRolesList } from './ClusterRolesHelp';
 import { roleOf } from './roles';
@@ -122,7 +122,15 @@ const columns: Column[] = [
  */
 const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
   { label: 'Cluster', span: 4 },
-  { label: 'AI Grid', span: 3 },
+  {
+    label: 'AI Grid',
+    span: 3,
+    info: {
+      ariaLabel: 'About AI Grid',
+      popover: 'AI Grid coordinates model deployment and request routing across multiple clusters.',
+      popoverProps: { headerContent: 'AI Grid' },
+    },
+  },
   {
     label: 'GPUs',
     span: 2,
@@ -159,11 +167,15 @@ const gpuConfigurations = (c: ClusterView) =>
 /** The GPUs to sort by: the inventory's, else the capacity's, -1 when the hub reports neither. */
 const gpuTotal = (c: ClusterView) => c.gpus?.total ?? gpuCount(c) ?? -1;
 
-/** "4 nodes, 32 GPUs" from the inventory; without one, the capacity's count; nothing without GPUs. */
+/**
+ * "4 nodes, 32 GPUs" from the inventory; without one, the capacity's count; "No GPUs" when the
+ * capacity has none, and "Not reported" without a capacity, as the details page words the two.
+ */
 const gpuCapacity = (c: ClusterView) => {
   if (c.gpus) return capacityText(c.gpus);
   const n = gpuCount(c);
-  return n ? gpuCountText(n) : EMPTY_VALUE;
+  if (n === undefined) return 'Not reported';
+  return n ? gpuCountText(n) : 'No GPUs';
 };
 
 /** A member's provisioning, or nothing for a cluster outside AI Grid (sorts first). */
@@ -267,7 +279,7 @@ export const ClustersPage: React.FC = () => {
             </Button>
           }
         >
-          To add a cluster to AI Grid, first import it into the hub.
+          To add clusters to the AI Grid, first import them using Red Hat Advanced Cluster Management for Kubernetes.
         </EmptyListState>
       );
     }
@@ -396,7 +408,7 @@ export const ClustersPage: React.FC = () => {
     <>
       <PageStateSection
         title="Clusters"
-        description="Add clusters to AI Grid and check their provisioning status."
+        description="Add OpenShift clusters to the AI Grid, which connects them into a unified network to serve models and route traffic across locations. Assign each cluster a role to control whether they receive incoming requests or serve models."
         loaded={loaded}
         error={error}
         onRetry={reload}
@@ -417,7 +429,8 @@ export const ClustersPage: React.FC = () => {
           <ModalBody>
             <Stack hasGutter>
               <StatusLabel isCompact status={statusCluster.status} />
-              <p>{statusReason(statusCluster)}</p>
+              {statusCluster.status === 'Unavailable' && <p>{unavailableText}</p>}
+              <p>{hubMessage(statusCluster)}</p>
             </Stack>
           </ModalBody>
         </Modal>

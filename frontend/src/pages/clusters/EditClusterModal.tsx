@@ -96,12 +96,20 @@ export const EditClusterModal: React.FC<Props> = ({ cluster, onConfirm, onClose 
       aria-labelledby="cluster-edit-modal-title"
       data-testid="cluster-edit-modal"
     >
-      <ModalHeader labelId="cluster-edit-modal-title" title={editText.title(cluster.name)} />
+      <ModalHeader
+        labelId="cluster-edit-modal-title"
+        title={editText.title}
+        description={
+          <>
+            Edit the AI Grid configuration of the <strong>{cluster.name}</strong> cluster.
+          </>
+        }
+      />
       <ModalBody>
         <Stack hasGutter>
           <Form id="cluster-edit-form" onSubmit={(e) => e.preventDefault()}>
             {fixedRole ? (
-              <ReadOnlyRoleField role={fixedRole} reason={editText.roleFixed} />
+              <ReadOnlyRoleField role={fixedRole} />
             ) : (
               <RoleField
                 value={values.role}

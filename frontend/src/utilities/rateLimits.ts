@@ -130,7 +130,7 @@ export const rateLimitsSchema = z.array(rateLimitSchema).min(1, 'Add at least on
 
 export const getCountError = (limit: RateLimit): string | undefined => {
   if (Number.isNaN(limit.count)) {
-    return 'Required.';
+    return 'Required';
   }
   const result = rateLimitSchema.shape.count.safeParse(limit.count);
   return result.success ? undefined : result.error.issues[0].message;
@@ -138,7 +138,7 @@ export const getCountError = (limit: RateLimit): string | undefined => {
 
 export const getTimeError = (limit: RateLimit): string | undefined => {
   if (Number.isNaN(limit.time)) {
-    return 'Required.';
+    return 'Required';
   }
   const result = rateLimitSchema.shape.time.safeParse(limit.time);
   return result.success ? undefined : result.error.issues[0].message;

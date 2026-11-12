@@ -22,6 +22,16 @@ export type OidcConfig = {
 
 export type IdentityProvider = { title: string; description: string; enabled: true; config: OidcConfig };
 
+/**
+ * What the pages say for a Tenant without spec.identity_provider. The backend projects only the
+ * identity provider it created (its own organization attribute), so an organization whose provider
+ * was set up in Keycloak directly arrives without one too: the words state what AI Grid knows, and
+ * the consequence only unless Keycloak has one.
+ */
+export const NO_IDENTITY_PROVIDER = 'No identity provider configured in AI Grid';
+export const NO_IDENTITY_PROVIDER_REASON =
+  "Unless an identity provider was set up directly in Keycloak, this organization's users cannot log in.";
+
 /** The form's values. `identityProvider` is optional: an organization can be created without one. */
 export type OrganizationInput = { name: string; domains: string[]; identityProvider?: IdentityProvider };
 
@@ -99,14 +109,19 @@ const identityProviderOf = ({
   },
 });
 
-/** What Tenants/Create sends: the name, the domains and the identity provider, when the form has one. */
-export const tenantOf = ({
-  name,
+/** A Tenant's spec: the domains and the identity provider, each when there is one to send. */
+export const tenantSpecOf = ({
   domains,
   identityProvider,
-}: OrganizationInput): MessageInitShape<typeof TenantSchema> => ({
-  metadata: { name },
-  spec: { domains, ...(identityProvider ? { identityProvider: identityProviderOf(identityProvider) } : {}) },
+}: Partial<Omit<OrganizationInput, 'name'>>): NonNullable<MessageInitShape<typeof TenantSchema>['spec']> => ({
+  ...(domains ? { domains } : {}),
+  ...(identityProvider ? { identityProvider: identityProviderOf(identityProvider) } : {}),
+});
+
+/** What Tenants/Create sends: the name, the domains and the identity provider, when the form has one. */
+export const tenantOf = (input: OrganizationInput): MessageInitShape<typeof TenantSchema> => ({
+  metadata: { name: input.name },
+  spec: tenantSpecOf(input),
 });
 
 /**

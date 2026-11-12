@@ -131,7 +131,7 @@ it('keeps its pins through a re-render with the same clusters, and redraws when 
   expect(pin.isTooltipOpen()).toBe(true);
   expect(screen.getByText(`${members[0].siteName} · ${members[0].name}`)).toBeInTheDocument();
   // A changed status is a change the pins show.
-  rerender(<GridFleetMap clusters={members.map((c, i) => (i ? c : { ...c, status: 'Offline' }))} {...props} />);
+  rerender(<GridFleetMap clusters={members.map((c, i) => (i ? c : { ...c, status: 'Unavailable' }))} {...props} />);
   expect(pinsDrawn(marker)).toBe(2 * drawn);
 });
 
@@ -154,7 +154,7 @@ it('gives clusters at one position one pin, which names each and lists them to c
   const here = { latitude: 40.42, longitude: -82.91, siteName: undefined, site: undefined, region: 'us-east-2' };
   render(
     <GridFleetMap
-      clusters={[{ ...a, ...here }, { ...b, ...here, status: 'Offline' }, c]}
+      clusters={[{ ...a, ...here }, { ...b, ...here, status: 'Unavailable' }, c]}
       selected={null}
       onSelect={onSelect}
       tiles={tiles}
@@ -164,7 +164,7 @@ it('gives clusters at one position one pin, which names each and lists them to c
   const shared = marker.mock.results.find((r) => (r.value as L.CircleMarker).getLatLng().lat === 40.42)!
     .value as L.CircleMarker;
   // The worst status of the two colours the pin.
-  expect(shared.options.color).toBe('var(--pf-t--global--icon--color--status--danger--default)');
+  expect(shared.options.color).toBe('var(--pf-t--global--icon--color--status--warning--default)');
   act(() => {
     shared.openTooltip();
   });
@@ -175,7 +175,7 @@ it('gives clusters at one position one pin, which names each and lists them to c
   const list = await screen.findByRole('list', { name: '2 clusters here' });
   // The popup lists the clusters, so the tooltip that summarises them steps aside.
   expect(shared.isTooltipOpen()).toBe(false);
-  await userEvent.setup().click(within(list).getByRole('button', { name: `us-east-2 · ${b.name} · Offline` }));
+  await userEvent.setup().click(within(list).getByRole('button', { name: `us-east-2 · ${b.name} · Unavailable` }));
   expect(onSelect).toHaveBeenCalledWith(b.name);
 });
 
@@ -220,6 +220,8 @@ it('leaves one label when the clusters refresh with a shared pin’s list open',
     shared.openPopup();
   });
   // New data with the same selection redraws the pins; only the new shared pin's label is shown.
-  rerender(<GridFleetMap clusters={clusters.map((x, i) => (i === 2 ? { ...x, status: 'Offline' } : x))} {...props} />);
+  rerender(
+    <GridFleetMap clusters={clusters.map((x, i) => (i === 2 ? { ...x, status: 'Unavailable' } : x))} {...props} />,
+  );
   expect(container.querySelectorAll('.leaflet-tooltip')).toHaveLength(1);
 });

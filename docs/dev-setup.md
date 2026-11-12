@@ -27,7 +27,11 @@ hub: adding or removing clusters, and organization changes, are real changes to 
 - For the chart and the image: `helm` and `yq` (mikefarah v4) for `make chart-check`; docker or
   podman for `make image`; docker, `kind`, `kubectl` and `openssl` for `make chart-test`
 - To run against a real hub or deploy (not for `make dev-fake`): `oc login` to an ACM hub. The
-  BFF asks that hub whether you may patch `ManagedClusters` (`isProviderAdmin`), using your token.
+  BFF asks that hub whether you may `post` to `/ai-grid/provider-console` (`isProviderAdmin`),
+  using your token; `oc auth can-i post /ai-grid/provider-console` answers the same. A
+  cluster-admin may; anyone else needs ClusterRole `ai-grid-provider-admin`
+  (`oc adm policy add-cluster-role-to-user ai-grid-provider-admin <you>`; the chart's README,
+  "Provider admins").
 
 ## Run against a real hub
 
@@ -57,7 +61,7 @@ and a free local port. The forward listens on one loopback address only, reconne
 replaces the pod, and creates nothing on the cluster. Pages whose RPCs the backend doesn't serve
 yet say "not available on this AI Grid backend".
 
-For the Monitoring page, set `PERSES_PROJECT` to the Perses project whose `dashboard-*` objects are
+For the Monitoring page, set `PERSES_PROJECT` to the Perses project whose `dashboard-*-admin` objects are
 the tabs (the relay reads only that project; without it Monitoring stays off). `make dev-cluster` then
 also forwards the hub's Perses
 (`openshift-cluster-observability-operator/perses`, `PERSES_NAMESPACE`, `PERSES_SERVICE`) to
@@ -300,7 +304,10 @@ which keeps the backend off its built-in default credentials. Use an `https://` 
 the cluster offers one, since the admin password travels with every call; on the dev hub
 that is the Keycloak Route in `grid-sso`, as its Service is plain HTTP. Creating the
 `OAuthClient` needs cluster-admin.
-`make undeploy` removes everything but the namespace.
+`make undeploy` removes everything but the namespace. The chart also creates ClusterRole
+`ai-grid-provider-admin`, which decides who may use the console, and binds it to nobody:
+cluster-admins may use the console, everyone else needs a binding (the chart's README,
+"Provider admins").
 
 To call the deployed API from a script, send your token as a bearer token; the proxy
 validates it with a TokenReview and forwards it:

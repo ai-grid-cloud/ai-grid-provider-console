@@ -101,13 +101,23 @@ const roleHelp = (
   </Popover>
 );
 
-/** A role the dialog shows but doesn't change, with why under it. */
-export const ReadOnlyRoleField: React.FC<{ role: ClusterRole; reason: string }> = ({ role, reason }) => (
+/**
+ * Why neither dialog changes a role a cluster has: the hub doesn't fully remove what the old role
+ * installed (GLOSSARY.md, "Role"; editClusterText.ts). Under a read-only role, and in Add above an
+ * editable one.
+ */
+export const roleFixedText = "A cluster's role cannot be changed once it has been added to the AI Grid.";
+
+/**
+ * A role the dialog shows but doesn't change, with why under it: Edit's for an AI Grid cluster, and
+ * Add's for a cluster that kept its role when it was removed.
+ */
+export const ReadOnlyRoleField: React.FC<{ role: ClusterRole }> = ({ role }) => (
   <ReadOnlyField
     label="Role"
     fieldId="cluster-role"
     value={clusterRoles.find((r) => r.value === role)?.label ?? role}
-    reason={reason}
+    reason={roleFixedText}
     labelHelp={roleHelp}
   />
 );
@@ -127,11 +137,14 @@ export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, e
       onChange={(v) => onChange(v as ClusterRole)}
       onBlur={onBlur}
     />
+    {/* The helper stays when the field shows an error, and the error follows it. */}
     <FormHelperText>
       <HelperText id="cluster-role-help">
-        <HelperTextItem variant={error ? 'error' : 'default'}>
-          {error ?? 'Determines which AI Grid components the hub installs on the cluster.'}
+        <HelperTextItem>
+          Select the role this cluster will perform in the AI Grid. Components needed to perform the assigned role will
+          be installed on the cluster.
         </HelperTextItem>
+        {error && <HelperTextItem variant="error">{error}</HelperTextItem>}
       </HelperText>
     </FormHelperText>
   </FormGroup>

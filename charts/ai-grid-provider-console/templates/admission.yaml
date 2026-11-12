@@ -8,8 +8,8 @@
 # The policy should be in force before the ClusterRole grants patch. Argo CD applies it first (sync
 # wave -1). Helm applies kinds it doesn't know, such as this one, last, so turning
 # backend.clusterWrites on with helm leaves the backend unrestricted for the moments until the
-# policy loads; anyone who reaches the backend through the console already may patch
-# ManagedClusters (isProviderAdmin).
+# policy loads; anyone who reaches the backend through the console is a provider admin
+# (isProviderAdmin), whom the console lets make these changes anyway.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:

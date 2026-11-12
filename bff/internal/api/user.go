@@ -15,10 +15,12 @@ type User struct {
 	Email    string   `json:"email,omitempty"`
 	Groups   []string `json:"groups"`
 	// IsProviderAdmin tells the UI whether to offer provider-admin actions. It
-	// comes from the hub's own answer to "may this user patch ManagedClusters?",
-	// asked with the caller's token, so it reflects the user's RBAC and nothing
-	// the console decides. The same check gates every other API call
-	// (requireProviderAdmin), because the backend authorizes nothing yet.
+	// comes from the hub's own answer to "may this user post to
+	// /ai-grid/provider-console?" (the ai-grid-provider-admin ClusterRole, or
+	// cluster-admin), asked with the caller's token, so it reflects the user's
+	// RBAC and nothing the console decides. The same check gates every other API
+	// call and both relays (requireProviderAdmin), because the backend
+	// authorizes nothing yet.
 	IsProviderAdmin bool `json:"isProviderAdmin"`
 }
 

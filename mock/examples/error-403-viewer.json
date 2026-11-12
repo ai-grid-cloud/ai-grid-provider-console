@@ -4,6 +4,6 @@
   "user": "viewer",
   "status": 403,
   "body": {
-    "message": "this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one"
+    "message": "this console is only for provider admins, users the hub's ai-grid-provider-admin role allows, and the hub says you are not one"
   }
 }

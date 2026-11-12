@@ -2,8 +2,18 @@ import type { ClusterView } from './clusterView';
 import { editText } from './editClusterText';
 import type { MembershipChange } from './MembershipModal';
 
-/** The Connection tooltip: the ACM state behind Unknown, then the backend's message. */
-export const statusReason = (c: ClusterView) => [c.state, c.statusMessage].filter(Boolean).join(': ') || undefined;
+/**
+ * What Unavailable means, in the console's words: the hub's own message for the state varies, so
+ * the status tooltip and dialog lead with this.
+ */
+export const unavailableText =
+  "The cluster's API server cannot be reached. Telemetry and console updates are unavailable, and the system is unable to confirm whether the cluster is running.";
+
+/** The hub's side of the status: the ACM state behind Unknown, then the backend's message. */
+export const hubMessage = (c: ClusterView) => [c.state, c.statusMessage].filter(Boolean).join(': ') || undefined;
+
+/** The status tooltip: what Unavailable means, or the hub's message for any other status. */
+export const statusReason = (c: ClusterView) => (c.status === 'Unavailable' ? unavailableText : hubMessage(c));
 
 /** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */
 export const cannotAddReason = (c: ClusterView) => {

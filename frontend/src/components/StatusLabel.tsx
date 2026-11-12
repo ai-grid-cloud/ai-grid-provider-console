@@ -3,7 +3,7 @@ import { Label, Tooltip } from '@patternfly/react-core';
 import { statusLabelProps } from '../utilities/status';
 
 type Props = {
-  /** The status word, shown as is: Ready, Offline, Failed, Degraded, ... */
+  /** The status word, shown as is: Ready, Unavailable, Failed, Degraded, ... */
   status: string;
   /** A short reason, shown in a tooltip on the label. */
   reason?: string;

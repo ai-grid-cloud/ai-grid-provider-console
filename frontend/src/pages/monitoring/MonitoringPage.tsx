@@ -46,8 +46,8 @@ const PersesMonitoring: React.FC<{ service: ConsoleService; project: string }> =
     if (!selected) {
       return (
         <EmptyListState title="No dashboards" icon={CubesIcon}>
-          To show a dashboard here, add a Perses dashboard whose name starts with <code>dashboard-</code> to the{' '}
-          {project} project.
+          To show a dashboard here, add a Perses dashboard whose name starts with <code>dashboard-</code> and ends with{' '}
+          <code>-admin</code> to the {project} project.
         </EmptyListState>
       );
     }

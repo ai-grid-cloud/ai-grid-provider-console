@@ -98,8 +98,8 @@ export const SubscriptionsList: React.FC = () => {
             )
           }
         >
-          Subscriptions define token limits for model access. Create a subscription to control usage for each user
-          group.
+          To grant users access to models in the AI Grid, create a subscription. Subscriptions control which models
+          their members can access, and enforce token limits for each one.
         </EmptyListState>
       );
     }
@@ -146,7 +146,7 @@ export const SubscriptionsList: React.FC = () => {
     <>
       <PageStateSection
         title="Subscriptions"
-        description="Manage which organizations' groups can use which models, and their token limits."
+        description="Manage subscriptions for user groups. Subscriptions control which models their members can access, and enforce token limits for each one."
         loaded={loaded}
         error={error}
         onRetry={refresh}

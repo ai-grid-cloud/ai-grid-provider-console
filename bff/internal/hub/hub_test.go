@@ -71,15 +71,21 @@ func TestCanISendsTokenAndAttributes(t *testing.T) {
 	if f.gotAuth != "Bearer sha256~abc" {
 		t.Errorf("Authorization = %q", f.gotAuth)
 	}
-	if f.gotBody.Kind != "SelfSubjectAccessReview" || f.gotBody.Spec.ResourceAttributes != ProviderAdminCheck {
+	if f.gotBody.Kind != "SelfSubjectAccessReview" || f.gotBody.Spec.NonResourceAttributes != ProviderAdminCheck {
 		t.Errorf("body = %+v", f.gotBody)
 	}
 }
 
-// TestProviderAdminCheckIsPatchOnManagedClusters pins the question itself, as
+// TestProviderAdminCheckIsPostOnTheConsolesPath pins the question itself, as
 // the hub receives it: comparing against ProviderAdminCheck alone would pass
 // whatever the constant says, and the provider-admin gate is this question.
-func TestProviderAdminCheckIsPatchOnManagedClusters(t *testing.T) {
+// It must name a right that the console's own ClusterRole grants and that
+// common roles don't: ACM binds patch on ManagedClusters to every
+// authenticated user (open-cluster-management:hypershift-addon:agent), and
+// OpenShift's cluster-reader may get every non-resource URL, hence post. It
+// is a non-resource URL, with no resourceAttributes beside it, so that
+// `oc auth can-i post /ai-grid/provider-console` asks the same question.
+func TestProviderAdminCheckIsPostOnTheConsolesPath(t *testing.T) {
 	t.Parallel()
 	f := &fakeHub{t: t, allowed: true}
 	if _, err := newClient(t, f).CanI(t.Context(), "tok", ProviderAdminCheck); err != nil {
@@ -91,10 +97,9 @@ func TestProviderAdminCheckIsPatchOnManagedClusters(t *testing.T) {
 	want := map[string]any{
 		"apiVersion": "authorization.k8s.io/v1",
 		"kind":       "SelfSubjectAccessReview",
-		"spec": map[string]any{"resourceAttributes": map[string]any{
-			"group":    "cluster.open-cluster-management.io",
-			"resource": "managedclusters",
-			"verb":     "patch",
+		"spec": map[string]any{"nonResourceAttributes": map[string]any{
+			"path": "/ai-grid/provider-console",
+			"verb": "post",
 		}},
 	}
 	got := map[string]any{}

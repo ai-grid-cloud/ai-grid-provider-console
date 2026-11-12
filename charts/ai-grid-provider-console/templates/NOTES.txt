@@ -29,3 +29,9 @@ manages, its bootstrap/60-console.sh creates them. To see what is missing:
 {{- if .Values.route.enabled }}
   kubectl -n {{ $ns }} get route {{ $name }} -o jsonpath='{.spec.host}'
 {{- end }}
+{{- if not (or .Values.providerAdmins.groups .Values.providerAdmins.users) }}
+
+This chart binds no provider admins (providerAdmins is empty); cluster-admins have access. Bind others with
+providerAdmins.groups and providerAdmins.users, or with
+oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group> (README.md, "Provider admins").
+{{- end }}

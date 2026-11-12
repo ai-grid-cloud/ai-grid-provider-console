@@ -10,7 +10,8 @@ one of three faces of the product, alongside the organization administrator's an
 
 **AI Grid**:
 A set of OpenShift clusters in different locations, serving models as one logical service
-behind a shared gateway.
+behind a shared gateway. The name stays "AI Grid" (capital G). Running sentences say "the AI Grid";
+labels and action names have no article ("Add to AI Grid", "AI Grid cluster").
 _Avoid_: the grid, fleet, mesh
 
 **Provider admin**:
@@ -47,8 +48,11 @@ _Avoid_: location (alone)
 
 **Cluster**:
 An OpenShift cluster managed by the hub. Not every cluster is part of the grid. Models are
-deployed to clusters, chosen by name.
-_Avoid_: ManagedCluster, GridCluster, managed cluster, node, location
+deployed to clusters, chosen by name. Its status is Ready, Unavailable or Unknown: Unavailable when
+the cluster's agent reports it unavailable (the backend's `OFFLINE`, which ACM's console calls
+Offline; for example, its API server is down), though it may still be serving. A cluster the hub
+can't reach (no current report from its agent, the backend's `UNKNOWN`) is Unknown.
+_Avoid_: ManagedCluster, GridCluster, managed cluster, node, location; Offline (for the status)
 
 **Grid member**:
 A cluster that has been enrolled in the grid and provisioned for it. The distinction matters:
@@ -59,15 +63,16 @@ _Avoid_: enrolled cluster, participating cluster, active cluster
 **Role**:
 What a Grid member does in AI Grid, from its `ai-grid/role` label. There are three. MaaS and
 KServe are the tools the roles use; they are not the roles' names.
-- **Ingress** (`ingress`): receives requests from organizations' users through MaaS and routes
-  them to inference clusters.
-- **Inference** (`inference`): serves models with KServe. Requests reach it through an ingress
-  cluster.
-- **Combined** (`combined`): does both: receives requests through MaaS and serves models.
+- **Ingress** (`ingress`): the cluster receives requests via Models-as-a-Service and routes those
+  requests to inference clusters.
+- **Inference** (`inference`): the cluster serves models via KServe and receives requests through
+  an ingress cluster.
+- **Ingress and inference** (`combined`): the cluster receives requests via Models-as-a-Service and
+  serves models via KServe. The label was Combined; the value stays `combined`.
 
-A provider admin sets a cluster's role with Add to AI Grid, or with Edit while the cluster has
-none. The console doesn't change a role a cluster has: the hub doesn't yet fully remove what the
-old role installed.
+A provider admin sets a cluster's role with Add to AI Grid or Edit, while the cluster has none.
+The console doesn't change a role a cluster has: the hub doesn't yet fully remove what the old role
+installed. Remove keeps the role, so Add shows it read-only, as Edit does.
 
 _Avoid_: MaaS cluster, MaaS (ingress), gateway cluster, serving cluster
 

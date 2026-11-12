@@ -59,7 +59,7 @@ dev-cluster: ## Against the hub of your oc login: the deployed console's backend
 	@BACKEND_ADDRESS=$(BACKEND_ADDRESS) hack/forward-backend.sh --check
 	@trap 'kill 0' INT TERM; \
 	if [ -z "$$PERSES_URL" ] && [ -z "$$PERSES_PROJECT" ]; then \
-		echo "==> Monitoring off: set PERSES_PROJECT to the Perses project whose dashboard- objects are the tabs"; \
+		echo "==> Monitoring off: set PERSES_PROJECT to the Perses project whose dashboard-*-admin objects are the tabs"; \
 	elif [ -z "$$PERSES_URL" ] && PERSES_ADDRESS=$(PERSES_ADDRESS) PERSES_NAMESPACE=$(PERSES_NAMESPACE) PERSES_SERVICE=$(PERSES_SERVICE) hack/forward-perses.sh --check && \
 		ca=$${PERSES_CA_FILE:-$$(hack/service-ca.sh $(PERSES_NAMESPACE))}; then \
 		$(MAKE) -s dev-forward-perses & \

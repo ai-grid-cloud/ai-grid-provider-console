@@ -64,7 +64,7 @@ export const call = async <T>(fn: () => Promise<T>) => {
   }
 };
 
-const availableCondition = { Ready: 'True', Offline: 'False', Unknown: '' } as const;
+const availableCondition = { Ready: 'True', Unavailable: 'False', Unknown: '' } as const;
 
 /** The backend's lifecycle state for the mock's status and the ACM state behind its Unknown. */
 const stateOf = (c: GridCluster): ManagedClusterState => {
@@ -82,7 +82,7 @@ const stateOf = (c: GridCluster): ManagedClusterState => {
   }
   return {
     Ready: ManagedClusterState.READY,
-    Offline: ManagedClusterState.OFFLINE,
+    Unavailable: ManagedClusterState.OFFLINE,
     Unknown: ManagedClusterState.UNKNOWN,
   }[c.status];
 };

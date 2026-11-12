@@ -118,7 +118,7 @@ type User = ReturnType<typeof userEvent.setup>;
 const openEdit = async (user: User, cluster: string) => {
   await user.click(await screen.findByRole('button', { name: `Actions for ${cluster}` }));
   await user.click(await findVisible('menuitem', 'Edit'));
-  return screen.findByRole('dialog', { name: `Edit ${cluster}` });
+  return screen.findByRole('dialog', { name: 'Edit AI Grid cluster' });
 };
 
 const field = (dialog: HTMLElement, name: string) => within(dialog).getByRole('textbox', { name });
@@ -135,7 +135,8 @@ const enter = async (user: User, dialog: HTMLElement, name: string, value: strin
 
 const selectRole = async (user: User, dialog: HTMLElement, role: string) => {
   await user.click(within(dialog).getByRole('combobox', { name: 'Role' }));
-  await user.click(await findVisible('option', new RegExp(`^${role}`)));
+  // An option is named by its label and then its description, which starts "The cluster".
+  await user.click(await findVisible('option', new RegExp(`^${role} ?The cluster`)));
 };
 
 const renderList = (clusters: ManagedCluster[]) => {
@@ -144,8 +145,7 @@ const renderList = (clusters: ManagedCluster[]) => {
   return backend;
 };
 
-const ROLE_FIXED =
-  "Changing the role of a cluster in AI Grid isn't supported: the hub doesn't fully remove what the old role installed.";
+const ROLE_FIXED = "A cluster's role cannot be changed once it has been added to the AI Grid.";
 const SETTLES = 'The cluster shows Provisioning until the installation finishes.';
 
 it('offers Edit for AI Grid clusters on the cluster page, before Remove from AI Grid', async () => {
@@ -155,7 +155,7 @@ it('offers Edit for AI Grid clusters on the cluster page, before Remove from AI 
   await user.click(await screen.findByRole('button', { name: 'Actions for paris-1' }));
   expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Edit', 'Remove from AI Grid']);
   await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
-  expect(await screen.findByRole('dialog', { name: 'Edit paris-1' })).toBeVisible();
+  expect(await screen.findByRole('dialog', { name: 'Edit AI Grid cluster' })).toBeVisible();
 });
 
 it('offers no Edit for a cluster outside AI Grid, and the page still links to how a hub admin places it', async () => {
@@ -211,7 +211,7 @@ it('saves a location-only edit as the labels as read with the location changed, 
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
   expect(await screen.findByText('Changes to cluster paris-1 saved')).toBeVisible();
-  expect(screen.queryByRole('dialog', { name: 'Edit paris-1' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Edit AI Grid cluster' })).not.toBeInTheDocument();
   expect(requests).toHaveLength(1);
   const [req] = requests;
   expect(req.updateMask?.paths).toEqual(['metadata.labels']);
@@ -258,7 +258,7 @@ it('checks the location label as Add does', async () => {
   const { requests } = renderList([paris()]);
   const dialog = await openEdit(user, 'paris-1');
   await enter(user, dialog, 'Location label', '');
-  expect(within(dialog).getByText('Required.')).toBeVisible();
+  expect(within(dialog).getByText('Required')).toBeVisible();
   await enter(user, dialog, 'Location label', 'eu west');
   expect(
     within(dialog).getByText(
@@ -281,9 +281,9 @@ it.each([
     'Saving sets the role to Inference. The hub then installs KServe model serving, the provider gateway, and the GPU operators on this cluster.',
   ],
   [
-    'Combined',
+    'Ingress and inference',
     'combined',
-    'Saving sets the role to Combined. The hub then installs MaaS, the consumer gateway, the MaaS portal, the database replica, KServe model serving, the provider gateway, and the GPU operators on this cluster.',
+    'Saving sets the role to Ingress and inference. The hub then installs MaaS, the consumer gateway, the MaaS portal, the database replica, KServe model serving, the provider gateway, and the GPU operators on this cluster.',
   ],
 ])(
   'sets %s on a cluster without a role, says what the hub will install, and asks for no name',
@@ -360,7 +360,7 @@ it('asks for a role before saving a location label on a cluster without one', as
   const dialog = await openEdit(user, 'no-role');
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
-  expect(within(dialog).getByText('Required.')).toBeVisible();
+  expect(within(dialog).getByText('Required')).toBeVisible();
   expect(requests).toHaveLength(0);
 });
 
@@ -501,13 +501,13 @@ it('edits from the cluster page and shows the result there', async () => {
   renderAt('/clusters/no-role', new MockConsoleService(), transport);
   await user.click(await screen.findByRole('button', { name: 'Actions for no-role' }));
   await user.click(await findVisible('menuitem', 'Edit'));
-  const dialog = await screen.findByRole('dialog', { name: 'Edit no-role' });
-  await selectRole(user, dialog, 'Combined');
+  const dialog = await screen.findByRole('dialog', { name: 'Edit AI Grid cluster' });
+  await selectRole(user, dialog, 'Ingress and inference');
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
   expect(await screen.findByText('Changes to cluster no-role saved')).toBeVisible();
   expect(requests[0].updateMask?.paths).toEqual(['metadata.labels']);
   const aiGrid = screen.getByLabelText('AI Grid membership');
   expect(aiGrid).toHaveTextContent('eu-central');
-  expect(aiGrid).toHaveTextContent('Combined');
+  expect(aiGrid).toHaveTextContent('Ingress and inference');
 });

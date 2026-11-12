@@ -3,9 +3,13 @@ import { fieldErrorsOf, modelFieldsSchema, validators } from '.';
 import { z } from './zod';
 import { getCountError, getTimeDigitError, getTimeError, type RateLimit } from '../utilities/rateLimits';
 
-/** zod's own English, in its 4.x and 3.x wording; none of it should reach a user. */
+/**
+ * zod's own English, in its 4.x and 3.x wording; none of it should reach a user. Not zod 3's bare
+ * "Required": that is also the console's own field error for a missing value (frontend/AGENTS.md,
+ * Wording), and zod 4, which the console uses, never says it.
+ */
 const zodDefault =
-  /^(Invalid input|Invalid string|Invalid (url|email|URL|option|element|key|literal|enum)|Invalid$|Too (big|small)|Unrecognized key|Expected |Required$|(String|Number|Array) must)/;
+  /^(Invalid input|Invalid string|Invalid (url|email|URL|option|element|key|literal|enum)|Invalid$|Too (big|small)|Unrecognized key|Expected |(String|Number|Array) must)/;
 
 const messages = (schema: z.ZodType, input: unknown) => {
   const result = schema.safeParse(input);
@@ -28,8 +32,8 @@ describe("the console's wording for zod issues", () => {
 
   // One schema without a message per issue code, and the sentence the user sees.
   it.each<[string, z.ZodType, unknown, string]>([
-    ['a missing value', z.object({ a: z.string() }), {}, 'Required.'],
-    ['a null value', z.object({ a: z.number() }), { a: null }, 'Required.'],
+    ['a missing value', z.object({ a: z.string() }), {}, 'Required'],
+    ['a null value', z.object({ a: z.number() }), { a: null }, 'Required'],
     ['text expected', z.string(), 1, 'Enter text.'],
     ['a number expected', z.number(), 'x', 'Enter a number.'],
     ['not a number', z.number(), Number.NaN, 'Enter a number.'],
@@ -39,7 +43,7 @@ describe("the console's wording for zod issues", () => {
     ['fields expected', z.object({}), [], 'Enter a set of fields.'],
     ['fields expected in a record', z.record(z.string(), z.string()), [], 'Enter a set of fields.'],
     ['a field that must be absent', z.object({ a: z.never().optional() }), { a: 'x' }, 'Remove this field.'],
-    ['an empty string', z.string().min(1), '', 'Required.'],
+    ['an empty string', z.string().min(1), '', 'Required'],
     ['too short', z.string().min(3), 'ab', 'Enter at least 3 characters.'],
     ['too long', z.string().max(63), 'a'.repeat(64), 'Enter at most 63 characters.'],
     ['a wrong length', z.string().length(2), 'abc', 'Enter exactly 2 characters.'],

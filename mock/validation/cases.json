@@ -957,7 +957,7 @@
         "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "displayName": "Required."
+        "displayName": "Required"
       }
     },
     {
@@ -967,15 +967,15 @@
         "name": "widget"
       },
       "fieldErrors": {
-        "displayName": "Required.",
-        "modelUri": "Required.",
-        "runtimeImage": "Required.",
-        "replicas": "Required.",
-        "cpu": "Required.",
-        "memory": "Required.",
-        "acceleratorCount": "Required.",
-        "runtimeArgs": "Required.",
-        "locations": "Required."
+        "displayName": "Required",
+        "modelUri": "Required",
+        "runtimeImage": "Required",
+        "replicas": "Required",
+        "cpu": "Required",
+        "memory": "Required",
+        "acceleratorCount": "Required",
+        "runtimeArgs": "Required",
+        "locations": "Required"
       }
     },
     {
@@ -1015,7 +1015,7 @@
         "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "runtimeImage": "Required."
+        "runtimeImage": "Required"
       }
     },
     {
@@ -1035,7 +1035,7 @@
         "locations": ["site1", "site2"]
       },
       "fieldErrors": {
-        "runtimeImage": "Required."
+        "runtimeImage": "Required"
       }
     },
     {

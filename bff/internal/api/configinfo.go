@@ -17,7 +17,7 @@ type ConsoleConfig struct {
 	// shows its fake-backend banner, and no login proxy runs.
 	FakeBackend bool `json:"fakeBackend"`
 	// Monitoring says whether /perses/api reaches a Perses server, and the one project it
-	// reads, whose dashboard- objects are the Monitoring tabs (always set when enabled).
+	// reads, whose dashboard-*-admin objects are the Monitoring tabs (always set when enabled).
 	Monitoring MonitoringConfig `json:"monitoring"`
 	// Models holds the Deploy model wizard's settings.
 	Models ModelsConfig `json:"models"`

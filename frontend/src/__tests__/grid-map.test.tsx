@@ -18,6 +18,7 @@ import { modelsOf } from './connectModels';
 import { renderAt } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/grid/AiGridPage';
+import '../pages/clusters/ClusterDetailsPage';
 import '../pages/monitoring/MonitoringPage';
 import { TestApp } from './TestApp';
 
@@ -75,13 +76,13 @@ it('opens the drawer on the cluster or model a link names', async () => {
 
 it('filters the drawer and map by availability while retaining inventory summaries', async () => {
   const service = new MockConsoleService();
-  service.clusters[1] = { ...service.clusters[1], status: 'Offline' };
+  service.clusters[1] = { ...service.clusters[1], status: 'Unavailable' };
   const user = userEvent.setup();
   renderAt('/ai-grid', service);
   await screen.findByRole('button', { name: 'View site2 details' });
   await user.click(
     within(screen.getByRole('group', { name: 'Filter cluster availability' })).getByRole('button', {
-      name: 'Offline',
+      name: 'Unavailable',
     }),
   );
   expect(screen.getByRole('button', { name: 'View site2 details' })).toBeVisible();
@@ -291,10 +292,10 @@ it('says no clusters match and clears the search and filter', async () => {
 
 it('names the page like every other page, with no status chips over the map', async () => {
   const service = new MockConsoleService();
-  service.clusters[1] = { ...service.clusters[1], status: 'Offline' };
+  service.clusters[1] = { ...service.clusters[1], status: 'Unavailable' };
   renderAt('/ai-grid', service);
   expect(await screen.findByRole('heading', { name: 'AI Grid', level: 1 })).toBeVisible();
-  expect(screen.queryByText('site2: Offline')).not.toBeInTheDocument();
+  expect(screen.queryByText('site2: Unavailable')).not.toBeInTheDocument();
 });
 
 it('does not call a failed model available for subscriptions', async () => {
@@ -334,6 +335,28 @@ it('keeps the URL in step with the drawer, and clears it when the drawer closes'
   expect(search).toBe('');
 });
 
+it("links to the selected cluster's details page, as the Clusters list does", async () => {
+  const user = userEvent.setup();
+  renderAt('/ai-grid', new MockConsoleService());
+  await user.click(await screen.findByRole('button', { name: 'View site3 details' }));
+  expect(screen.getByRole('link', { name: 'View cluster details' })).toHaveAttribute('href', '/clusters/site3');
+  await user.click(screen.getByRole('button', { name: 'Clusters' }));
+  await user.click(screen.getByRole('button', { name: 'View site2 details' }));
+  await user.click(screen.getByRole('link', { name: 'View cluster details' }));
+  expect(await screen.findByRole('heading', { level: 1, name: 'site2' })).toBeVisible();
+});
+
+it.each([
+  ['clusters', 'The total number of OpenShift clusters in the AI Grid.'],
+  ['sites', 'The number of different sites or cloud regions where clusters in the AI Grid are located.'],
+  ['models', 'The total number of models in the AI Grid.'],
+])('says what the %s count counts in a help popover', async (card, help) => {
+  const user = userEvent.setup();
+  renderAt('/ai-grid', new MockConsoleService());
+  await user.click(await screen.findByRole('button', { name: `More about the ${card} count` }));
+  expect(await screen.findByText(help)).toBeVisible();
+});
+
 it('closes the drawer when the AI Grid nav link drops the cluster from the URL', async () => {
   const user = userEvent.setup();
   renderAt('/ai-grid?cluster=site2', new MockConsoleService());
@@ -368,7 +391,7 @@ it("drops the Back trail when a link moves the drawer to something the trail was
   expect(screen.getByRole('button', { name: 'Clusters' })).toBeVisible();
 });
 
-it("counts the members that aren't on the map, by why, and links to how to place them", async () => {
+it("counts the members that aren't on the map, whatever the reason, and links to how to place them", async () => {
   const service = new MockConsoleService();
   const [first, second, third] = service.clusters;
   service.clusters = [
@@ -388,7 +411,9 @@ it("counts the members that aren't on the map, by why, and links to how to place
     },
   }).transport;
   renderAt('/ai-grid', service, transport);
-  const note = await screen.findByText(/are not on the map/);
-  expect(note).toHaveTextContent('2 clusters are not on the map: 1 without a position and 1 with an invalid position.');
+  // One inline alert for both reasons: the drawer names each cluster's problem.
+  const note = await screen.findByTestId('clusters-not-on-map');
+  expect(within(note).getByRole('heading', { name: /2 clusters not shown/ })).toBeVisible();
+  expect(note).toHaveTextContent('Clusters are excluded from the map when their positions are missing or invalid.');
   expect(within(note).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
 });

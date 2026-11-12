@@ -56,13 +56,13 @@ const lengthMessage = (
 export const consoleErrorMap: z.core.$ZodErrorMap = (issue) => {
   switch (issue.code) {
     case 'invalid_type':
-      if (issue.input == null && issue.expected !== 'never') return 'Required.';
+      if (issue.input == null && issue.expected !== 'never') return 'Required';
       return typeMessages[issue.expected] ?? 'Enter a valid value.';
     case 'too_small':
       switch (issue.origin) {
         case 'string':
           // A string of at least one character is simply required.
-          if (!issue.exact && Number(issue.minimum) <= 1) return 'Required.';
+          if (!issue.exact && Number(issue.minimum) <= 1) return 'Required';
           return lengthMessage(issue.minimum, issue.exact, 'least', 'character', 'characters');
         case 'array':
         case 'set':

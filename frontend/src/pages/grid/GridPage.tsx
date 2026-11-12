@@ -3,7 +3,7 @@
 // a LoadError. The map's clusters come from AiGridPage (Clusters/List over Connect). A backend
 // without the RPC (501) gets the console's not-available page, as Models and Subscriptions do.
 import { useState } from 'react';
-import { Flex, Stack } from '@patternfly/react-core';
+import { Divider, Flex, Stack } from '@patternfly/react-core';
 import { Link } from 'react-router-dom';
 import { ServiceError } from '../../api/ConsoleService';
 import { useModelList } from '../models/useModels';
@@ -53,15 +53,25 @@ export const GridPage: React.FC<Props> = ({ map }) => {
   const modelsError = modelsLoadError && modelsErrorOf(modelsLoadError);
   const updatedAt = map.updatedAt ? new Date(map.updatedAt).toISOString() : undefined;
 
-  // One toolbar row: when the data was read, refresh, and the Monitoring page.
+  // One toolbar row: when the data was read with its Refresh beside it, as one group, then a
+  // divider and the Monitoring page. The plain button's own padding spaces it from the time, and
+  // with the group's smaller spacer sets the divider as far from the icon as from the link. The
+  // divider keeps the icon from reading as part of the link.
   const toolbar = (
     <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsMd' }}>
-      {updatedAt && (
-        <SubtleText>
-          Updated <RelativeTime time={updatedAt} />
-        </SubtleText>
-      )}
-      <RefreshButton onRefresh={() => void refresh()} isRefreshing={!map.loaded || refreshing} />
+      <Flex
+        alignItems={{ default: 'alignItemsCenter' }}
+        spaceItems={{ default: 'spaceItemsNone' }}
+        spacer={{ default: 'spacerXs' }}
+      >
+        {updatedAt && (
+          <SubtleText>
+            Updated <RelativeTime time={updatedAt} />
+          </SubtleText>
+        )}
+        <RefreshButton onRefresh={() => void refresh()} isRefreshing={!map.loaded || refreshing} />
+      </Flex>
+      <Divider orientation={{ default: 'vertical' }} />
       <Link to="/monitoring">View monitoring</Link>
     </Flex>
   );
@@ -71,7 +81,7 @@ export const GridPage: React.FC<Props> = ({ map }) => {
   return (
     <PageStateSection
       title="AI Grid"
-      description="View AI Grid clusters on a map and the models they serve."
+      description="The AI Grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
       headerAction={toolbar}
       loaded={map.loaded}
       error={map.error}

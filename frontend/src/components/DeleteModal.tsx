@@ -35,6 +35,10 @@ type Props = {
   errorTitle?: string;
   /** Why Delete can't be used now; set, it disables Delete and shows this in a tooltip. */
   disabledReason?: string;
+  /** The words after the typed name: "to confirm deletion:" for a delete. */
+  confirmText?: string;
+  /** Leaves out the typed name, for a delete that can't go ahead (disabledReason says why). */
+  hideTypedName?: boolean;
 };
 
 /** A delete confirmation that needs the resource's name typed in. */
@@ -51,6 +55,8 @@ export const DeleteModal: React.FC<Props> = ({
   testId,
   errorTitle,
   disabledReason,
+  confirmText = 'to confirm deletion:',
+  hideTypedName = false,
 }) => {
   const [value, setValue] = useState('');
   const deleteNameSanitized = useMemo(() => deleteName.trim().replace(/\s+/g, ' '), [deleteName]);
@@ -62,30 +68,32 @@ export const DeleteModal: React.FC<Props> = ({
       <ModalBody>
         <Stack hasGutter>
           <StackItem>{children}</StackItem>
-          <StackItem>
-            <Flex
-              direction={{ default: 'column' }}
-              flexWrap={{ default: 'nowrap' }}
-              spaceItems={{ default: 'spaceItemsSm' }}
-            >
-              <FlexItem id="delete-modal-prompt">
-                Type <strong>{deleteNameSanitized}</strong> to confirm:
-              </FlexItem>
-              <TextInput
-                id="delete-modal-input"
-                data-testid="delete-modal-input"
-                // Named by the prompt above it, so a screen reader says what to type.
-                aria-labelledby="delete-modal-prompt"
-                value={value}
-                onChange={(_event, newValue) => setValue(newValue)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && confirmed && !deleting && !disabledReason) {
-                    onDelete();
-                  }
-                }}
-              />
-            </Flex>
-          </StackItem>
+          {!hideTypedName && (
+            <StackItem>
+              <Flex
+                direction={{ default: 'column' }}
+                flexWrap={{ default: 'nowrap' }}
+                spaceItems={{ default: 'spaceItemsSm' }}
+              >
+                <FlexItem id="delete-modal-prompt">
+                  Type <strong>{deleteNameSanitized}</strong> {confirmText}
+                </FlexItem>
+                <TextInput
+                  id="delete-modal-input"
+                  data-testid="delete-modal-input"
+                  // Named by the prompt above it, so a screen reader says what to type.
+                  aria-labelledby="delete-modal-prompt"
+                  value={value}
+                  onChange={(_event, newValue) => setValue(newValue)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && confirmed && !deleting && !disabledReason) {
+                      onDelete();
+                    }
+                  }}
+                />
+              </Flex>
+            </StackItem>
+          )}
           {error && (
             <StackItem>
               <Alert

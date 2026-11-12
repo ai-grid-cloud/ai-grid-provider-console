@@ -20,15 +20,19 @@ export const OrganizationWizardPage: React.FC = () => {
   if (id !== undefined && data?.id === id && fresh && !error && kept?.id !== id) setKept(data);
   const organization = kept?.id === id ? kept : undefined;
   const name = organization?.name ?? id;
-  const title = id ? `Edit ${name}` : 'Create organization';
+  const title = id ? 'Edit organization' : 'Create organization';
 
   return (
     <PageStateSection
       title={title}
       description={
-        id
-          ? "Edit the organization's domains and OIDC identity provider."
-          : 'Configure organization details and an OIDC identity provider.'
+        id ? (
+          <>
+            Make changes to the configuration of the <strong>{name}</strong> organization.
+          </>
+        ) : (
+          'Configure organization details and an OIDC identity provider.'
+        )
       }
       breadcrumb={
         <Breadcrumb>
@@ -40,7 +44,7 @@ export const OrganizationWizardPage: React.FC = () => {
               <Link to={`/organizations/${encodeURIComponent(id)}`}>{name}</Link>
             </BreadcrumbItem>
           )}
-          <BreadcrumbItem isActive>{id ? 'Edit' : title}</BreadcrumbItem>
+          <BreadcrumbItem isActive>{title}</BreadcrumbItem>
         </Breadcrumb>
       }
       loaded={id === undefined || !!organization || (loaded && fresh && !!error)}

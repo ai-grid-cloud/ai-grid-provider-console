@@ -223,9 +223,14 @@ describe('page states', () => {
 
   it('says a 403 is no access, with the reason', () => {
     renderLoadError(new ServiceError(403, 'widgets are for admins'));
-    expect(screen.getByRole('heading', { level: 2, name: 'Access permissions needed' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 2, name: 'No access' })).toBeVisible();
+    expect(screen.getByText('Message returned:')).toBeVisible();
     expect(screen.getByText('widgets are for admins')).toBeVisible();
-    expect(screen.getByText('To view widget, ask your hub administrator for access.')).toBeVisible();
+    expect(
+      screen.getByText(
+        "You don't have permission to view widget. To request permission, contact your hub administrator.",
+      ),
+    ).toBeVisible();
   });
 
   it('shows nothing for an ended session', () => {

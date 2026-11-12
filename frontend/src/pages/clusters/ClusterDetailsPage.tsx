@@ -30,7 +30,7 @@ import { useConsoleSession } from '../../context/useConsoleSession';
 import { useBackgroundWrites } from '../../notifications/useBackgroundWrites';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { formatCores, formatGiB } from '../../utilities/quantity';
-import { gpuCount, membershipActions } from './clusterInfo';
+import { gpuCount, membershipActions, unavailableText } from './clusterInfo';
 import {
   capacityText,
   configurationText,
@@ -45,7 +45,7 @@ import { MembershipModal } from './MembershipModal';
 import { changeMembership, editCluster, editTarget, membershipTarget } from './changeMembership';
 import { EditClusterModal } from './EditClusterModal';
 import { editText } from './editClusterText';
-import { MissingLabel } from './MissingLabel';
+import { MissingLabel } from '../../components/MissingLabel';
 import { PositionDocsLink } from './PositionDocsLink';
 import { ClusterRoleName } from './ClusterRolesHelp';
 import { roleOf } from './roles';
@@ -83,10 +83,14 @@ const aiGridItems = (c: ClusterView) => {
   ];
 };
 
-/** The status tooltip: "Hub connection: Importing. <the hub's message>", either part when it is all there is. */
+/**
+ * The status tooltip: "Hub connection: Importing. <the hub's message>", either part when it is all
+ * there is; for Unavailable, what that means first.
+ */
 const hubConnection = (c: ClusterView) => {
   const detail = [c.state && `${c.state}.`, c.statusMessage].filter(Boolean).join(' ');
-  return detail ? `Hub connection: ${detail}` : undefined;
+  const connection = detail ? `Hub connection: ${detail}` : undefined;
+  return c.status === 'Unavailable' ? [unavailableText, connection].filter(Boolean).join(' ') : connection;
 };
 
 /**
@@ -407,7 +411,7 @@ export const ClusterDetailsPage: React.FC = () => {
         <GridItem md={6}>
           <Section
             title="AI Grid"
-            help="When a cluster is added to AI Grid, the hub installs the components its role needs. The status is Provisioned when that setup is complete."
+            help="The AI Grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
           >
             <DetailsList items={aiGridItems(cluster)} aria-label="AI Grid membership" />
           </Section>

@@ -1,7 +1,7 @@
 // A cluster's site, as the backend's status.location gives it (site_name).
 import { EMPTY_VALUE } from '../../utilities/format';
 import type { ClusterView } from './clusterView';
-import { MissingLabel } from './MissingLabel';
+import { MissingLabel } from '../../components/MissingLabel';
 
 type Located = Pick<ClusterView, 'siteName' | 'locationProblem'>;
 

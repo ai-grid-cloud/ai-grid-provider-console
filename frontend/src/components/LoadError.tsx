@@ -28,7 +28,7 @@ type Props = {
  * - 404 on a page for one object: NotFoundState, with a link back to its list.
  * - 501: NotAvailableState. The backend doesn't implement the RPC yet, an expected state while the
  *   backend and the console are developed in parallel.
- * - 403: the no-access state, with the server's message.
+ * - 403: the no-access state, No access, then the server's message.
  * - Anything else: ErrorState, "Unable to load <object>", the server's message, and Retry.
  *
  * When the last answer is still on screen, a failed reload is a StaleDataAlert instead
@@ -47,9 +47,10 @@ export const LoadError: React.FC<Props> = ({ subject, object, error, onRetry, no
   }
   if (error instanceof ServiceError && error.status === 403) {
     return (
-      <FullPageState inPage title="Access permissions needed">
+      <FullPageState inPage title="No access">
+        <p>You don&apos;t have permission to view {what}. To request permission, contact your hub administrator.</p>
+        <p>Message returned:</p>
         <p>{error.message}</p>
-        <p>To view {what}, ask your hub administrator for access.</p>
       </FullPageState>
     );
   }

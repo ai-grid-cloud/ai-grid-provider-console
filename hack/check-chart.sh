@@ -6,6 +6,8 @@
 #   - kube-auth-proxy passes the caller's token to the BFF and puts none in its responses;
 #   - in git mode, the backend may get and list the catalog's Argo CD Applications in
 #     openshift-gitops, and without a Git URL the chart grants no such Role;
+#   - ClusterRole ai-grid-provider-admin grants exactly the BFF's provider-admin right, and the
+#     chart binds it only to the groups and users in providerAdmins;
 #   - with its default values, it renders the same objects as manifests/base, apart from the
 #     Namespace (Helm installs into one: --create-namespace) and Helm's own labels. The chart is the
 #     install path; manifests/base is kept for hack/undeploy.sh's fallback and the takeover test
@@ -78,6 +80,41 @@ want='["openshift-gitops",[{"apiGroups":["argoproj.io"],"resources":["applicatio
 }
 got="$(catalog_rules)"
 [[ -z "${got}" ]] || { echo "check-chart: without backend.git.url the chart renders a catalog status Role: ${got}" >&2; exit 1; }
+# Provider admins: ClusterRole ai-grid-provider-admin grants exactly the right the BFF asks the hub
+# about (ProviderAdminCheck in bff/internal/hub/hub.go), and the chart binds it only to the groups
+# and users providerAdmins lists.
+provider_admin() { # provider_admin <kind> helm-template-args...: the object's name, rules or role, and subjects
+  local kind=$1 obj
+  shift
+  obj="$(helm template console "${CHART}" -n ai-grid "$@" |
+    yq "select(.kind == \"${kind}\" and (.metadata.name == \"ai-grid-provider-admin\" or .metadata.name == \"ai-grid-provider-admins\"))")"
+  [[ -z "${obj}" ]] ||
+    yq -o=json -I=0 '[.metadata.name, .metadata.labels."app.kubernetes.io/name", .rules // .roleRef, .subjects // []]' <<<"${obj}"
+}
+got="$(provider_admin ClusterRole)"
+want='["ai-grid-provider-admin","ai-grid-provider-console",[{"nonResourceURLs":["/ai-grid/provider-console"],"verbs":["post"]}],[]]'
+[[ "${got}" == "${want}" ]] || { echo "check-chart: ClusterRole ai-grid-provider-admin is '${got}', want '${want}'" >&2; exit 1; }
+for args in "" "--set-json providerAdmins.groups=[] --set-json providerAdmins.users=[]"; do
+  # shellcheck disable=SC2086 # args is a list of words
+  got="$(provider_admin ClusterRoleBinding ${args})"
+  [[ -z "${got}" ]] || { echo "check-chart: '${args:-the defaults}' render a provider-admin binding: ${got}" >&2; exit 1; }
+done
+role_ref='{"apiGroup":"rbac.authorization.k8s.io","kind":"ClusterRole","name":"ai-grid-provider-admin"}'
+group() { echo "{\"apiGroup\":\"rbac.authorization.k8s.io\",\"kind\":\"Group\",\"name\":\"$1\"}"; }
+user() { echo "{\"apiGroup\":\"rbac.authorization.k8s.io\",\"kind\":\"User\",\"name\":\"$1\"}"; }
+for case in \
+  "--set-json providerAdmins.groups=[\"ai-grid-admins\",\"sre\"]|[$(group ai-grid-admins),$(group sre)]" \
+  "--set-json providerAdmins.users=[\"alice\"]|[$(user alice)]" \
+  "--set-json providerAdmins.groups=[\"ai-grid-admins\"] --set-json providerAdmins.users=[\"alice\",\"123\"]|[$(group ai-grid-admins),$(user alice),$(user 123)]"; do
+  args="${case%%|*}"
+  want="[\"ai-grid-provider-admins\",\"ai-grid-provider-console\",${role_ref},${case#*|}]"
+  # shellcheck disable=SC2086 # args is a list of words
+  got="$(provider_admin ClusterRoleBinding ${args})"
+  [[ "${got}" == "${want}" ]] || { echo "check-chart: ${args} renders binding '${got}', want '${want}'" >&2; exit 1; }
+done
+refused "providerAdmins.group (misspelled)" --set-json 'providerAdmins.group=["ai-grid-admins"]'
+refused "an empty provider-admin group" --set-json 'providerAdmins.groups=[""]'
+
 for url in https://github.com/example/catalog.git https://git.example.com:8443/team/repo@archive.git; do
   helm template console "${CHART}" -n ai-grid --set-string "backend.git.url=${url}" >/dev/null || {
     echo "check-chart: backend.git.url=${url} doesn't render; values.schema.json must accept it" >&2

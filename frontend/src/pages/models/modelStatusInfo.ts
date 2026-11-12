@@ -116,7 +116,8 @@ export const stateRank = (state: StateWord): number => stateOrder.indexOf(state)
 
 /**
  * The Availability column for one ModelMaasState: a label, the short reason under it, and the
- * dialog's heading, body and links. The copy is the design's examples; the dialog also shows MaaS's
+ * dialog's heading, body and links. The copy is the design's examples, except Unavailable's body,
+ * which is the backend's reason when it sent one (availabilityOf); the dialog also shows MaaS's
  * own message for each ingress cluster, because MaaS has more pending reasons than this copy names.
  */
 export type AvailabilityView = {
@@ -137,14 +138,14 @@ const availabilityViews: Record<MaaSWord, AvailabilityView> = {
     label: 'Pending',
     subtext: 'Awaiting subscription',
     heading: 'Pending MaaS governance',
-    body: 'Consumers can’t access this model yet. To enable access, set up a subscription.',
+    body: 'No users can access this model. To grant users access, add this model to a subscription.',
     subscriptionsLink: true,
   },
   'Awaiting subscription and backend': {
     label: 'Pending',
     subtext: 'Awaiting subscription and backend',
     heading: 'Awaiting subscription and backend',
-    body: 'Consumers can’t access this model yet. To enable access, set up a subscription. The model must also be ready on its clusters; its status shows where it isn’t.',
+    body: 'No users can access this model. To grant users access, add this model to a subscription, and make sure it has the Ready status.',
     subscriptionsLink: true,
     modelsLink: true,
   },
@@ -152,7 +153,7 @@ const availabilityViews: Record<MaaSWord, AvailabilityView> = {
     label: 'Pending',
     subtext: 'Configuring routing',
     heading: 'Configuring routing',
-    body: 'The route for this model is being configured.',
+    body: 'The route for this model is being configured for one or more clusters.',
   },
   Unavailable: {
     label: 'Unavailable',
@@ -171,6 +172,16 @@ const availabilityViews: Record<MaaSWord, AvailabilityView> = {
   Unknown: { label: 'Unknown' },
 };
 
-/** The Availability column for the model's MaaS state; undefined while no ingress cluster reports. */
-export const availabilityOf = (model: Pick<ModelView, 'maas'>): AvailabilityView | undefined =>
-  model.maas ? availabilityViews[model.maas] : undefined;
+/**
+ * The Availability column for the model's MaaS state; undefined while no ingress cluster reports.
+ * The backend reads MaaS's Available as Unavailable when no placed cluster runs the model or its
+ * deployment serves a name other than its id, while each ingress cluster's MaaS message may still
+ * say Available; it says why in status.maas_message, which is Unavailable's body when set. The
+ * design's body stays without one. Never the phase's message (status.message), the cluster summary,
+ * which can open with "Ready on" for a model no one can call (stateTooltipOf).
+ */
+export const availabilityOf = (model: Pick<ModelView, 'maas' | 'maasMessage'>): AvailabilityView | undefined => {
+  if (!model.maas) return undefined;
+  const view = availabilityViews[model.maas];
+  return model.maas === 'Unavailable' && model.maasMessage ? { ...view, body: model.maasMessage } : view;
+};

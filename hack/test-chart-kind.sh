@@ -8,12 +8,15 @@
 #      hack/deploy.sh does it (hack/chart-takeover.sh);
 #   2. helm install: the pod is ready, the proxy refuses a caller without a token, accepts a
 #      ServiceAccount token (TokenReview) and drops the identity headers a caller forges, the BFF answers isProviderAdmin from the cluster's access
-#      review, and Clusters/List over the relay lists ManagedClusters through the backend; no
+#      review (patch on ManagedClusters and a cluster reader's get on every non-resource URL are
+#      not enough, ClusterRole ai-grid-provider-admin is),
+#      and Clusters/List over the relay lists ManagedClusters through the backend; no
 #      response, the proxy's own included, carries the caller's token; the
 #      backend may get and list the catalog's Argo CD Applications in openshift-gitops and no
 #      more; only the proxy listens off loopback;
-#   3. helm upgrade with backend.clusterWrites: the backend may label ManagedClusters ai-grid/*, and
-#      the admission policy refuses its other changes;
+#   3. helm upgrade with backend.clusterWrites and providerAdmins.users: the chart's binding makes
+#      the tester a provider admin, the backend may label ManagedClusters ai-grid/*, and the
+#      admission policy refuses its other changes;
 #   4. helm uninstall removes the cluster-scoped objects and the Role in openshift-gitops, and
 #      keeps the IdP secret namespace and the Secrets in it.
 # Not covered: OpenShift's OAuth login in a browser, the service CA and the Route's router.
@@ -41,9 +44,13 @@ PORT="${LOCAL_PORT:-18443}"
 # 2026-10-28 from opendatahub-io/kube-auth-proxy 099df59, on ubi9/ubi-minimal release 1793050346,
 # whose ca-certificates distrusts eMudhra, CVE-2026-114406). busybox runs netstat for step 2.
 BACKEND_PIN="$(cat "${ROOT}/.backend-api-version")"
-BACKEND_IMAGE="${BACKEND_IMAGE:-ghcr.io/ai-grid-cloud/ai-grid-provider-backend:sha-6ce678741f6d8f55a6335ae916524e8118b9ed71@sha256:64600866d1635b9d42e0cc9a16ba29513091e86463135bf94b2097e9729398f3}"
+BACKEND_IMAGE="${BACKEND_IMAGE:-ghcr.io/ai-grid-cloud/ai-grid-provider-backend:sha-cd03b7fab706e4e4836eac98f9dd0935ab85e734@sha256:17c591fc78c9acdd2fd99756c3c8f7ee3c9ee8b76958787681df8856ae509763}"
 PROXY_IMAGE="${PROXY_IMAGE:-quay.io/opendatahub/odh-kube-auth-proxy@sha256:5dc37f1a1e30927abe2dffbbfcb5a31ed8692cf498fb2684cca1b747b98b00a0}"
-BUSYBOX_IMAGE=docker.io/library/busybox:1.36@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+# The linux/amd64 manifest of busybox:1.36, not the multi-platform index (73aaf090...). With Docker's
+# containerd image store (the default on Docker 29, ubuntu-26.04 runners) an index pulled for one
+# platform is still exported whole, and kind's `ctr import --all-platforms` then fails on the
+# platforms that were never pulled ("content digest sha256:71b0cbca...: not found", busybox's arm/v5).
+BUSYBOX_IMAGE=docker.io/library/busybox@sha256:b7f3d86d6e84fc17718c48bcde1450807faa2d56704205c697b4bd5df7b9e29f
 ROUTE_CRD=https://raw.githubusercontent.com/openshift/api/a9b3f04dd8db4c20aacca607afeff8ddbc25d863/route/v1/zz_generated.crd-manifests/routes.crd.yaml
 CLUSTER_CRD=https://raw.githubusercontent.com/open-cluster-management-io/api/7b34437afbd76433695b6eb2d17735cd1de25df9/cluster/v1/0000_00_clusters.open-cluster-management.io_managedclusters.crd.yaml
 
@@ -110,7 +117,8 @@ if [[ -z "${created}" ]]; then
   helm --kube-context "${CTX}" uninstall console -n "${NS}" --ignore-not-found --wait >/dev/null
   k delete namespace "${NS}" ai-grid-idp-secrets --ignore-not-found --wait >/dev/null
   k delete managedcluster site-a --ignore-not-found >/dev/null
-  k delete clusterrolebinding,clusterrole tester-managedclusters --ignore-not-found >/dev/null
+  k delete clusterrolebinding,clusterrole tester-managedclusters tester-cluster-reader --ignore-not-found >/dev/null
+  k delete clusterrolebinding tester-provider-admin --ignore-not-found >/dev/null
   k -n default delete serviceaccount tester --ignore-not-found >/dev/null
 fi
 
@@ -119,8 +127,7 @@ step "images: the console from this checkout, ${BACKEND_IMAGE}, ${PROXY_IMAGE}"
 docker build -q -t localhost/ai-grid-provider-console:kind --build-arg CONSOLE_VERSION=kind "${ROOT}" >/dev/null
 retry docker pull -q --platform linux/amd64 "${BACKEND_IMAGE}" >/dev/null
 retry docker pull -q --platform linux/amd64 "${PROXY_IMAGE}" >/dev/null
-# The node's own platform: the debug container runs natively.
-retry docker pull -q "${BUSYBOX_IMAGE}" >/dev/null
+retry docker pull -q --platform linux/amd64 "${BUSYBOX_IMAGE}" >/dev/null
 docker tag "${BACKEND_IMAGE}" localhost/ai-grid-backend:kind
 docker tag "${PROXY_IMAGE}" localhost/kube-auth-proxy:kind
 docker tag "${BUSYBOX_IMAGE}" localhost/busybox:kind
@@ -297,6 +304,17 @@ expect 302 "a token the cluster rejects goes to sign-in" -H "Authorization: Bear
 connect=(-X POST -H "Content-Type: application/json" -H "Connect-Protocol-Version: 1" -d '{"name":"kind"}')
 expect 401 "a Connect call without a login is 401, not a redirect" "${connect[@]}" "${u}/ai_grid.v1.AiGrid/Ping"
 k -n default create serviceaccount tester --dry-run=client -o yaml | k apply -f - >/dev/null
+TESTER=system:serviceaccount:default:tester
+# tester_can <yes|no> <verb> <non-resource URL>: waits up to 10s for RBAC to answer the tester's
+# can-i so, as a binding that just changed takes a moment to reach the authorizer.
+tester_can() {
+  local want=$1 verb=$2 url=$3
+  for _ in $(seq 1 10); do
+    [[ "$(k auth can-i "${verb}" "${url}" --as="${TESTER}" 2>/dev/null || true)" == "${want}" ]] && return 0
+    sleep 1
+  done
+  return 1
+}
 TOKEN="$(k -n default create token tester)"
 auth=(-H "Authorization: Bearer ${TOKEN}")
 expect 200 "a ServiceAccount token signs in" "${auth[@]}" "${u}/api/v1/user"
@@ -311,17 +329,40 @@ expect 200 "identity headers a caller sends are dropped" "${auth[@]}" \
 expect 403 "a non-admin may not list clusters" "${auth[@]}" "${u}/api/v1/clusters"
 expect 403 "a non-admin's Connect call stops at the BFF" "${auth[@]}" "${connect[@]}" "${u}/ai_grid.v1.AiGrid/Ping"
 grep -q '"code":"permission_denied"' "${TMP}/body" || fail "the relay's 403 is no Connect error: $(cat "${TMP}/body")"
+# ACM's open-cluster-management:hypershift-addon:agent ClusterRoleBinding lets every authenticated
+# user of a hub patch ManagedClusters, so that right must not make anyone a provider admin.
 k create clusterrole tester-managedclusters --verb=patch \
   --resource=managedclusters.cluster.open-cluster-management.io --dry-run=client -o yaml | k apply -f - >/dev/null
 k create clusterrolebinding tester-managedclusters --clusterrole=tester-managedclusters \
   --serviceaccount=default:tester --dry-run=client -o yaml | k apply -f - >/dev/null
+expect 200 "with patch on ManagedClusters only, the caller signs in" "${auth[@]}" "${u}/api/v1/user"
+grep -q '"isProviderAdmin":false' "${TMP}/body" || fail "patch on ManagedClusters made a provider admin: $(cat "${TMP}/body")"
+expect 403 "with patch on ManagedClusters only, Connect calls stop at the BFF" "${auth[@]}" "${connect[@]}" "${u}/ai_grid.v1.AiGrid/Ping"
+# OpenShift's cluster-reader may get every non-resource URL (its
+# system:openshift:aggregate-to-cluster-reader rule), so the check asks for post. kind has no
+# cluster-reader; tester-cluster-reader stands in with that rule.
+k create clusterrole tester-cluster-reader --verb=get --non-resource-url='*' \
+  --dry-run=client -o yaml | k apply -f - >/dev/null
+k create clusterrolebinding tester-cluster-reader --clusterrole=tester-cluster-reader \
+  --serviceaccount=default:tester --dry-run=client -o yaml | k apply -f - >/dev/null
+tester_can yes get /ai-grid/provider-console || fail "bound to tester-cluster-reader, the tester may not get /ai-grid/provider-console"
+[[ "$(k auth can-i post /ai-grid/provider-console --as="${TESTER}" 2>/dev/null || true)" == no ]] ||
+  fail "a cluster reader may post to /ai-grid/provider-console"
+expect 200 "as a cluster reader, the caller signs in" "${auth[@]}" "${u}/api/v1/user"
+grep -q '"isProviderAdmin":false' "${TMP}/body" || fail "a cluster reader is a provider admin: $(cat "${TMP}/body")"
+expect 403 "a cluster reader may not list clusters" "${auth[@]}" "${u}/api/v1/clusters"
+expect 403 "a cluster reader's Connect calls stop at the BFF" "${auth[@]}" "${connect[@]}" "${u}/ai_grid.v1.AiGrid/Ping"
+# The chart's ClusterRole, bound the way README.md says (oc adm policy add-cluster-role-to-user).
+k create clusterrolebinding tester-provider-admin --clusterrole=ai-grid-provider-admin \
+  --serviceaccount=default:tester --dry-run=client -o yaml | k apply -f - >/dev/null
+tester_can yes post /ai-grid/provider-console || fail "bound to ai-grid-provider-admin, the tester may not post to /ai-grid/provider-console"
 k apply -f - >/dev/null <<'YAML'
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata: { name: site-a, labels: { location: us-east } }
 spec: { hubAcceptsClient: true }
 YAML
-expect 200 "with patch on ManagedClusters the caller is a provider admin" "${auth[@]}" "${u}/api/v1/user"
+expect 200 "bound to ClusterRole ai-grid-provider-admin, the caller is a provider admin" "${auth[@]}" "${u}/api/v1/user"
 grep -q '"isProviderAdmin":true' "${TMP}/body" || fail "isProviderAdmin should be true: $(cat "${TMP}/body")"
 # What the Clusters pages call: Clusters/List over the relay.
 list=(-X POST -H "Content-Type: application/json" -H "Connect-Protocol-Version: 1" -d '{}')
@@ -392,10 +433,16 @@ open="$(grep -v -e '^127\.0\.0\.1:' -e '^::1:' <<<"${listeners}" || true)"
 [[ "$(sed -E 's/.*:([0-9]+)$/\1/' <<<"${open}" | sort -u)" == 8443 ]] || fail "only :8443 may listen off loopback, got: ${open}"
 pass "only the proxy's :8443 listens off loopback"
 
-step "3. helm upgrade with backend.clusterWrites"
+step "3. helm upgrade with backend.clusterWrites and providerAdmins"
+# The question the BFF asks the hub (ProviderAdminCheck, bff/internal/hub/hub.go), now answered by
+# the chart's own ClusterRoleBinding instead of the one made by hand above.
+k delete clusterrolebinding tester-provider-admin >/dev/null
+tester_can no post /ai-grid/provider-console || fail "without a binding the tester is still a provider admin"
 helm --kube-context "${CTX}" upgrade console "${CHART}" -n "${NS}" "${VALUES[@]}" \
-  --set backend.clusterWrites=true >/dev/null
+  --set backend.clusterWrites=true --set-json "providerAdmins.users=[\"${TESTER}\"]" >/dev/null
 rollout
+tester_can yes post /ai-grid/provider-console || fail "providerAdmins.users does not make the tester a provider admin"
+pass "providerAdmins.users binds ClusterRole ai-grid-provider-admin"
 loaded=
 for _ in $(seq 1 30); do # the policy takes a moment to load
   if ! k label managedcluster site-a policy-probe=1 --as="${SA}" --dry-run=server >/dev/null 2>&1; then

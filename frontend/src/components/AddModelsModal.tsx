@@ -132,8 +132,7 @@ export const AddModelsModal: React.FC<Props> = ({
           <ModalBody>
             <Stack hasGutter>
               <StackItem>
-                Select the models that users in this subscription&apos;s groups can use. You can set token limits after
-                adding them.
+                Select models to make available to members of this subscription, then set token limits for each one.
               </StackItem>
               <StackItem>
                 <SearchInput

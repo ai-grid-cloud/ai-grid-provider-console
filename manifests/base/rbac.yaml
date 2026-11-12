@@ -47,3 +47,18 @@ subjects:
   - kind: ServiceAccount
     name: ai-grid-provider-console
     namespace: ai-grid
+---
+# Who may use the console: the BFF asks the hub whether the caller may post to
+# the non-resource URL /ai-grid/provider-console. This ClusterRole grants it, and
+# so does any role with a `*` nonResourceURLs rule for `post` (or every verb),
+# such as cluster-admin. Nobody is bound here; bind provider admins with
+# `oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group>`, and
+# check one with `oc auth can-i post /ai-grid/provider-console --as=<user>`. The
+# chart's templates/provider-admin.yaml says more.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ai-grid-provider-admin
+rules:
+  - nonResourceURLs: ["/ai-grid/provider-console"]
+    verbs: ["post"]

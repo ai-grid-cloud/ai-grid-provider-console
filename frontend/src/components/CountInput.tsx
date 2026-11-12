@@ -53,7 +53,7 @@ export const CountInput: React.FC<Props> = ({
       onPlus={() => step(1)}
       onChange={(event: React.FormEvent<HTMLInputElement>) => {
         // On blur NumberInput rewrites the input to Number(text), turning an empty field into 0.
-        // Put back what the user left, so an emptied field stays empty and says "Required.".
+        // Put back what the user left, so an emptied field stays empty and says "Required".
         if (event.type === 'blur') {
           event.currentTarget.value = value;
           return;

@@ -15,7 +15,8 @@ import { ToolbarSearch } from '../../components/ToolbarSearch';
 import { TableEmptyRow } from '../../components/TableEmptyRow';
 import { useConsoleSession } from '../../context/useConsoleSession';
 import { EMPTY_VALUE } from '../../utilities/format';
-import type { OrganizationView } from './organizationView';
+import { MissingLabel } from '../../components/MissingLabel';
+import { NO_IDENTITY_PROVIDER, NO_IDENTITY_PROVIDER_REASON, type OrganizationView } from './organizationView';
 import { useDeleteOrganization } from './useDeleteOrganization';
 import { useOrganizationList } from './useOrganizations';
 
@@ -117,7 +118,14 @@ export const OrganizationListPage: React.FC = () => {
                         {o.domains[0] ?? EMPTY_VALUE}
                       </Td>
                       <Td dataLabel="Identity provider" modifier="breakWord">
-                        {o.identityProvider ? o.identityProvider.title || 'OIDC (no title)' : EMPTY_VALUE}
+                        {o.identityProvider ? (
+                          o.identityProvider.title || 'OIDC (no title)'
+                        ) : (
+                          // As a cluster without a role: a setting the organization may not work without.
+                          <MissingLabel testId={`missing-idp-${o.name}`} reason={NO_IDENTITY_PROVIDER_REASON}>
+                            {NO_IDENTITY_PROVIDER}
+                          </MissingLabel>
+                        )}
                       </Td>
                       {canWrite && (
                         <Td isActionCell>

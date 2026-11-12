@@ -1,0 +1,51 @@
+# Who may use the console. The BFF lets a caller in only when the hub answers yes to a
+# SelfSubjectAccessReview, asked with the caller's own token, for `post` on the non-resource URL
+# /ai-grid/provider-console (ProviderAdminCheck in bff/internal/hub/hub.go). No server serves that
+# path: the right exists only for this question. This ClusterRole grants it, and so does any role
+# with a `*` nonResourceURLs rule for `post` (or every verb), such as cluster-admin. The verb is
+# `post`, not `get`, because OpenShift's cluster-reader may get every non-resource URL. Check a
+# user with `oc auth can-i post /ai-grid/provider-console --as=<user> [--as-group=<group>]`
+# (`oc adm policy who-can` can't evaluate non-resource URLs). It replaces `patch` on
+# ManagedClusters, which ACM's open-cluster-management:hypershift-addon:agent ClusterRoleBinding
+# gives every authenticated user.
+#
+# The chart binds nobody by default. Bind provider admins, OpenShift users or groups on the hub
+# (not an organization's identity provider groups), with the providerAdmins values or with
+# `oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group>` (README.md,
+# "Provider admins"). The name is fixed, like the other names of this one-per-hub chart, so that
+# command and ai-grid-env-setup can name it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ai-grid-provider-admin
+  labels:
+    {{- include "console.labels" . | nindent 4 }}
+rules:
+  - nonResourceURLs: ["/ai-grid/provider-console"]
+    verbs: ["post"]
+{{- with .Values.providerAdmins }}
+{{- if or .groups .users }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ai-grid-provider-admins
+  labels:
+    {{- include "console.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ai-grid-provider-admin
+subjects:
+  {{- range .groups }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ . | quote }}
+  {{- end }}
+  {{- range .users }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: {{ . | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -6,7 +6,7 @@ so a schema written without a single message still reads well:
 
 | Issue                                                      | Message                                                                   |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
-| A missing or null value, or an empty string with `.min(1)` | Required.                                                                 |
+| A missing or null value, or an empty string with `.min(1)` | Required                                                                  |
 | Wrong type                                                 | Enter text. / Enter a number. / Enter a whole number. / Enter a list. / … |
 | String length                                              | Enter at least 3 characters. / Enter at most 63 characters.               |
 | List length                                                | Enter at least 1 item. / Enter at most 64 items.                          |

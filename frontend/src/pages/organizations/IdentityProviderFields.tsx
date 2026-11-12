@@ -2,6 +2,7 @@
 // Adapted from OSAC IdpGeneralStep.tsx and IdpConfigurationStep.tsx at 8cb0a227e45cc9b17421b6e79ce493ed370ebd5d.
 import { useState } from 'react';
 import {
+  Alert,
   Checkbox,
   FormGroup,
   FormHelperText,
@@ -16,7 +17,7 @@ import { fieldErrorsOf, identityProviderSchema } from '../../validation';
 
 type TextKey = Exclude<keyof OidcConfig, 'clientSecretSecret' | 'validateSignature'>;
 
-type Field = { key: TextKey; label: string; required?: boolean; help?: string };
+type Field = { key: TextKey; label: string; required?: boolean; help?: React.ReactNode };
 
 const connectionFields: Field[] = [
   { key: 'clientId', label: 'Client ID', required: true },
@@ -27,17 +28,41 @@ const endpointFields: Field[] = [
   { key: 'authorizationUrl', label: 'Authorization URL', required: true },
   { key: 'tokenUrl', label: 'Token URL', required: true },
   { key: 'userInfoUrl', label: 'User info URL' },
-  { key: 'jwksUrl', label: 'JWKS URL', help: 'Required while Validate signature is on.' },
+  {
+    key: 'jwksUrl',
+    label: 'JSON Web Key Set (JWKS) URL',
+    help: (
+      <>
+        This field is required when <strong>Validate signature</strong> is on.
+      </>
+    ),
+  },
   { key: 'logoutUrl', label: 'Logout URL' },
 ];
 
 const SECRET_PATH = 'config.clientSecretSecret.name';
+
+/**
+ * The issuer's help once the organization has an identity provider. Keycloak links a user who
+ * logged in to the provider by the user ID it sends, not by its issuer, so the backend refuses a
+ * new issuer once any user has logged in (FailedPrecondition); a wrong issuer lets nobody log in,
+ * so it can still be corrected. After that, the ways out are those the backend's refusal names:
+ * remove the users' links to the provider in Keycloak, which keeps the organization, or create a
+ * new one.
+ */
+const SAVED_ISSUER_HELP =
+  "The issuer can be edited only until a user logs in through this identity provider. After that, to use a different issuer, remove the users' links to this identity provider in Keycloak, or create a new organization.";
 
 type Props = {
   value: IdentityProvider;
   onChange: (provider: IdentityProvider) => void;
   /** The server's messages, keyed by path under identityProvider; shown whether or not the field was touched. */
   serverErrors?: Record<string, string>;
+  /**
+   * Editing an organization that has an identity provider: its stored issuer. The issuer's help
+   * says when it can change, and a warning stays under it while the form holds another one.
+   */
+  savedIssuer?: string;
   /** While the form saves, so nothing changes under the request. */
   isDisabled?: boolean;
 };
@@ -56,7 +81,13 @@ const Help: React.FC<{ error?: string; children?: React.ReactNode }> = ({ error,
  * An organization's OIDC identity provider: who it is, how the console connects (client and
  * issuer), and the provider's endpoints. Renders form fields only; the caller supplies the Form.
  */
-export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serverErrors = {}, isDisabled }) => {
+export const IdentityProviderFields: React.FC<Props> = ({
+  value,
+  onChange,
+  serverErrors = {},
+  savedIssuer,
+  isDisabled,
+}) => {
   const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const errors = fieldErrorsOf(identityProviderSchema, value);
   const error = (path: string): string | undefined =>
@@ -79,14 +110,16 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
           onBlur={() => touch(path)}
           onChange={(_event, text) => setConfig({ [field.key]: text })}
         />
-        <Help error={error(path)}>{field.help}</Help>
+        <Help error={error(path)}>
+          {field.key === 'issuer' && savedIssuer !== undefined ? SAVED_ISSUER_HELP : field.help}
+        </Help>
       </FormGroup>
     );
   };
 
   return (
     <>
-      <FormGroup label="Title" fieldId="idp-title">
+      <FormGroup label="Identity provider name" fieldId="idp-title">
         <TextInput
           id="idp-title"
           value={value.title}
@@ -115,9 +148,19 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
             onBlur={() => touch(SECRET_PATH)}
             onChange={(_event, name) => setConfig({ clientSecretSecret: { name } })}
           />
-          <Help error={error(SECRET_PATH)}>The name of the Secret that holds the OIDC client secret.</Help>
+          <Help error={error(SECRET_PATH)}>
+            The name of the Secret that holds the OpenID Connect (OIDC) client secret.
+          </Help>
         </FormGroup>
         {textField(connectionFields[1])}
+        {savedIssuer !== undefined && value.config.issuer.trim() !== savedIssuer && (
+          <Alert
+            variant="warning"
+            isInline
+            isPlain
+            title="A new issuer is saved only if no user has logged in through this identity provider"
+          />
+        )}
         <FormGroup label="Default scopes" fieldId="idp-defaultScopes">
           <TextInput
             id="idp-defaultScopes"
@@ -127,12 +170,12 @@ export const IdentityProviderFields: React.FC<Props> = ({ value, onChange, serve
             onBlur={() => touch('config.defaultScopes')}
             onChange={(_event, defaultScopes) => setConfig({ defaultScopes })}
           />
-          <Help error={error('config.defaultScopes')}>Space-separated, for example openid profile email.</Help>
+          <Help error={error('config.defaultScopes')}>Separate scopes using spaces.</Help>
         </FormGroup>
         <Checkbox
           id="idp-validate-signature"
           label="Validate signature"
-          description="Verify token signatures with the provider's JWKS keys."
+          description="Verify token signatures with the provider's JSON Web Key Set (JWKS) keys."
           isChecked={value.config.validateSignature}
           isDisabled={isDisabled}
           onChange={(_event, validateSignature) => setConfig({ validateSignature })}

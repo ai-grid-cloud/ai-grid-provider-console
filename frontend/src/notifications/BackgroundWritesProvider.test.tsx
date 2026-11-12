@@ -1347,7 +1347,9 @@ describe('a cluster watch', () => {
     await pass(0);
     expect(screen.getByText('Changes to cluster site-b saved')).toBeInTheDocument();
     expect(
-      screen.getByText("The hub is installing what its Combined role needs. You'll be notified when it's provisioned."),
+      screen.getByText(
+        "The hub is installing what its Ingress and inference role needs. You'll be notified when it's provisioned.",
+      ),
     ).toBeInTheDocument();
     expect(clusterWatches(storage)).toMatchObject([{ op: 'update', stage: 'ready' }]);
     state.cluster = siteB(true, 'Compliant');

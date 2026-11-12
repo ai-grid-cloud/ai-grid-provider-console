@@ -85,9 +85,10 @@ func (r *recorder) values() []string {
 	return slices.Clone(r.got)
 }
 
-func startHub(t *testing.T, f *fakeHub) *hub.Client {
+// startHub serves h as the hub API server and returns a client for it.
+func startHub(t *testing.T, h http.Handler) *hub.Client {
 	t.Helper()
-	srv := httptest.NewServer(f)
+	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	c, err := hub.New(hub.Config{URL: srv.URL})
 	if err != nil {
@@ -257,7 +258,7 @@ func TestUserFromProxyHeaders(t *testing.T) {
 	rec = serve(newTestAppWithHub(t, cfg, nil, &fakeHub{allowed: false}), asUser(http.MethodGet, "/api/v1/user"))
 	decodeData(t, rec, &u)
 	if u.IsProviderAdmin {
-		t.Fatal("the hub denied patch on managedclusters; alice is not a provider admin")
+		t.Fatal("the hub denied the provider-admin check; alice is not a provider admin")
 	}
 
 	rec = serve(newTestAppWithHub(t, cfg, nil, &fakeHub{status: http.StatusUnauthorized}), asUser(http.MethodGet, "/api/v1/user"))
@@ -288,7 +289,7 @@ func TestOnlyProviderAdminsReachTheAPI(t *testing.T) {
 		if rec.Body.Len() == 0 {
 			continue // HEAD: no body
 		}
-		if got := decodeError(t, rec).Error.Message; got != "this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one" {
+		if got := decodeError(t, rec).Error.Message; got != "this console is only for provider admins, users the hub's ai-grid-provider-admin role allows, and the hub says you are not one" {
 			t.Fatalf("%s %s by a non-admin: message %q", req.Method, req.URL.Path, got)
 		}
 	}

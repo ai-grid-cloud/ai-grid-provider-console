@@ -17,12 +17,14 @@ import {
   HelperTextItem,
   NumberInput,
   TextInput,
+  Tooltip,
 } from '@patternfly/react-core';
 import { create, toJson, type MessageInitShape } from '@bufbuild/protobuf';
 import { z } from '../../../validation/zod';
 import { describeError } from '../../../api/connect/errors';
 import { SYSTEM_AUTHENTICATED_GROUP } from '../../../api/types';
 import { AddModelsModal } from '../../../components/AddModelsModal';
+import { listOf } from '../../../notifications/writeText';
 import { K8sNameDescriptionField } from '../../../components/K8sNameDescriptionField/K8sNameDescriptionField';
 import { isK8sNameDescriptionDataValid } from '../../../components/K8sNameDescriptionField/nameField';
 import { useK8sNameDescriptionFieldData } from '../../../components/K8sNameDescriptionField/useK8sNameDescriptionFieldData';
@@ -96,7 +98,7 @@ const MAX_ID_LENGTH = 56;
 
 const subscriptionFormSchema = z.object({
   priority: z
-    .number({ error: 'Required.' })
+    .number({ error: 'Required' })
     .int('Enter a whole number.')
     .min(MIN_PRIORITY, PRIORITY_RANGE)
     .max(MAX_PRIORITY, PRIORITY_RANGE),
@@ -383,6 +385,16 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
     };
   });
 
+  // The token limits are the one requirement the form states only in the models table, so the
+  // submit button names the models that still lack one, as a disabled delete or row action says why
+  // (DeleteModal, SimpleMenuActions).
+  const modelsWithoutLimits = rows.filter((r) => !r.unlimited && r.tokenRateLimits.length === 0).map((r) => r.title);
+  const submitBlockedReason =
+    !isSubmitting && modelsWithoutLimits.length > 0
+      ? `Add a token limit to ${listOf(modelsWithoutLimits)}.`
+      : undefined;
+  const submitRef = useRef<HTMLButtonElement>(null);
+
   let organizationHelper = (
     <FormHelperText>
       <HelperText>
@@ -508,8 +520,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
             <FormHelperText>
               <HelperText>
                 <HelperTextItem>
-                  Enter a group name, then select Add group. Users in these groups can use the subscription&apos;s
-                  models.
+                  Enter the names of user groups to grant them access to models in the subscription.
                 </HelperTextItem>
               </HelperText>
             </FormHelperText>
@@ -598,14 +609,22 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
 
         <ActionGroup>
           <Button
+            ref={submitRef}
             variant="primary"
             onClick={handleSubmit}
-            isDisabled={!canSubmit}
+            // Aria-disabled while a reason shows, so the button takes focus and shows why from the keyboard.
+            isAriaDisabled={!!submitBlockedReason}
+            isDisabled={!submitBlockedReason && !canSubmit}
             isLoading={isSubmitting}
             data-testid={isEditing ? 'update-subscription-button' : 'create-subscription-button'}
           >
             {isEditing ? 'Save changes' : 'Create subscription'}
           </Button>
+          {submitBlockedReason && (
+            // By triggerRef, not wrapped around the button: a wrapped trigger gets a wrapper element,
+            // which takes the button out of the action group's layout.
+            <Tooltip content={submitBlockedReason} triggerRef={submitRef} />
+          )}
           <Button
             variant="link"
             onClick={requestLeave}

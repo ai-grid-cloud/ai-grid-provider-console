@@ -1,5 +1,6 @@
 import { Card, CardBody, CardTitle, Flex, Icon } from '@patternfly/react-core';
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
+import { HelpPopover } from './HelpPopover';
 
 type Props = {
   label: string;
@@ -10,12 +11,16 @@ type Props = {
   detail?: string;
   /** Flags the value with a warning icon; the text is the icon's accessible name. */
   warning?: string;
+  /** What the number counts, in a help popover beside the label. */
+  help?: React.ReactNode;
 };
 
 /** One headline number on a compact card. The AI Grid summary lays a row of these out in a Gallery. */
-export const StatCard: React.FC<Props> = ({ label, value, unit, detail, warning }) => (
+export const StatCard: React.FC<Props> = ({ label, value, unit, detail, warning, help }) => (
   <Card isCompact isFullHeight>
-    <CardTitle>{label}</CardTitle>
+    <CardTitle>
+      {label} {help && <HelpPopover topic={`the ${label} count`}>{help}</HelpPopover>}
+    </CardTitle>
     <CardBody>
       <Flex alignItems={{ default: 'alignItemsBaseline' }} spaceItems={{ default: 'spaceItemsSm' }}>
         <span className="pf-v6-u-font-size-2xl pf-v6-u-font-weight-bold">

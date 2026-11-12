@@ -11,7 +11,11 @@ browser --Connect--> kube-auth-proxy + bff (relay) --> ai-grid-backend --> hub A
 The BFF serves the static frontend, checks who calls and relays the browser's calls (`docs/bff.md`). Every call to the cluster
 goes through [ai-grid-provider-backend](https://github.com/ai-grid-cloud/ai-grid-provider-backend), which runs in
 the same pod. The BFF forwards who is calling, and asks the hub one question itself with
-the caller's own token: may this user patch ManagedClusters? That answer is `isProviderAdmin`.
+the caller's own token: may this user `post` to `/ai-grid/provider-console`? That answer is
+`isProviderAdmin`, and only a provider admin gets past `/api/v1/user` and `/api/v1/config`. The chart
+ships the ClusterRole that grants it, `ai-grid-provider-admin`, bound to nobody: cluster-admins
+hold it already, and everyone else needs a binding
+([Provider admins](charts/ai-grid-provider-console/README.md#provider-admins)).
 
 ## Layout
 

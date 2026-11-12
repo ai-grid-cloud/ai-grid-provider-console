@@ -106,7 +106,7 @@ type Config struct {
 	PersesInsecure   bool
 	PersesTimeout    time.Duration
 	// PersesProject is the one Perses project the relay reads (with the global
-	// datasources); its dashboard- objects are the Monitoring tabs. Required
+	// datasources); its dashboard-*-admin objects are the Monitoring tabs. Required
 	// with PersesURL (bff/internal/perses says why).
 	PersesProject string
 
@@ -153,7 +153,7 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	fs.StringVar(&cfg.PersesServerName, "perses-server-name", env.str("PERSES_SERVER_NAME", ""), "Expected TLS server name of the Perses server (for a port-forward)")
 	fs.BoolVar(&cfg.PersesInsecure, "perses-insecure", env.boolean("perses-insecure", "PERSES_INSECURE", false), "Allow plaintext to a non-loopback Perses server (development only)")
 	fs.DurationVar(&cfg.PersesTimeout, "perses-timeout", env.duration("perses-timeout", "PERSES_TIMEOUT", 30*time.Second), "Bound on the exchange with the Perses server, from connecting to the last byte of its answer; at most 50s")
-	fs.StringVar(&cfg.PersesProject, "perses-project", env.str("PERSES_PROJECT", ""), "Perses project the Monitoring page reads, whose dashboard- objects are its tabs; required with perses-url")
+	fs.StringVar(&cfg.PersesProject, "perses-project", env.str("PERSES_PROJECT", ""), "Perses project the Monitoring page reads, whose dashboard-*-admin objects are its tabs; required with perses-url")
 	fs.StringVar(&modelHardware, "model-hardware", env.str("MODEL_HARDWARE", ""), "The Deploy model wizard's hardware choices, a JSON list (the chart's console.models.hardware); empty for the built-in NVIDIA GPU and CPU only")
 	fs.StringVar(&logLevel, "log-level", env.str("LOG_LEVEL", "info"), "Log level: debug, info, warn, error")
 

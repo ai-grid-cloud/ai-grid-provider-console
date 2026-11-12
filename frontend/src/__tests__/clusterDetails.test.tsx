@@ -48,9 +48,11 @@ it('shows a member: AI Grid, the cluster, its capacity and GPUs', async () => {
 
   expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioned');
   const aiGrid = details('AI Grid membership');
-  expect(aiGrid).toHaveTextContent('RoleCombined');
-  await user.click(within(aiGrid).getByRole('button', { name: 'More about the combined role' }));
-  expect(await screen.findByText('Does both: receives requests through MaaS and serves models.')).toBeVisible();
+  expect(aiGrid).toHaveTextContent('RoleIngress and inference');
+  await user.click(within(aiGrid).getByRole('button', { name: 'More about the ingress and inference role' }));
+  expect(
+    await screen.findByText('The cluster receives requests via Models-as-a-Service and serves models via KServe.'),
+  ).toBeVisible();
   expect(aiGrid).toHaveTextContent('site1');
   // The same order as the list's AI Grid columns: status, location, role (UX review).
   expect(
@@ -323,7 +325,7 @@ it('adds the cluster to AI Grid from its Actions', async () => {
   const modal = await screen.findByTestId('cluster-membership-modal');
   await user.click(within(modal).getByRole('combobox', { name: 'Role' }));
   await user.click(await screen.findByRole('option', { name: /Inference/ }));
-  await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
   expect(await screen.findByText('Cluster site4 added to AI Grid')).toBeVisible();
   await waitFor(() => expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioning'));
   expect(service.clusters.find((c) => c.name === 'site4')!.labels['ai-grid/role']).toBe('inference');
@@ -336,7 +338,7 @@ const addSite4 = async (user: ReturnType<typeof userEvent.setup>) => {
   const modal = await screen.findByTestId('cluster-membership-modal');
   await user.click(within(modal).getByRole('combobox', { name: 'Role' }));
   await user.click(await screen.findByRole('option', { name: /Inference/ }));
-  await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
 };
 
 it('shows the added membership while the reload is still running', async () => {
@@ -442,7 +444,7 @@ it('loads the cluster again into the open dialog after a conflict, so the next A
   };
   const enroll = vi.spyOn(service, 'enrollCluster');
 
-  await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
   expect(
     await within(modal).findByText(
       'This cluster was changed after this dialog opened. The latest version is now shown. Review it and try again.',
@@ -451,7 +453,7 @@ it('loads the cluster again into the open dialog after a conflict, so the next A
   // The user's choices stand when the other change didn't touch them.
   expect(within(modal).getByRole('textbox', { name: 'Location label' })).toHaveValue('us-east');
 
-  await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
   expect(await screen.findByText('Cluster site4 added to AI Grid')).toBeVisible();
   expect(enroll).toHaveBeenCalledTimes(2);
   expect(enroll.mock.calls[1][0].resourceVersion).toBe(String(Number(before.resourceVersion) + 5));
@@ -476,14 +478,15 @@ it('shows the location and role someone else set meanwhile instead of sending th
     resourceVersion: String(Number(before.resourceVersion) + 1),
   };
 
-  await user.click(within(modal).getByRole('button', { name: 'Add to AI Grid' }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
   expect(
     await within(modal).findByText(
       "Another user changed this cluster's location label or role after this dialog opened. Their values are now shown. Review them and try again.",
     ),
   ).toBeVisible();
   expect(within(modal).getByRole('textbox', { name: 'Location label' })).toHaveValue('eu-west');
-  expect(within(modal).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress');
+  // Their role is now the cluster's, so it shows read-only.
+  expect(within(modal).getByRole('textbox', { name: 'Role' })).toHaveValue('Ingress');
 });
 
 it('offers Retry when the cluster could not be loaded', async () => {
@@ -570,7 +573,12 @@ it("says in the status tooltip what the hub reports about the cluster's connecti
     state: 'Importing',
     statusMessage: 'The klusterlet is starting.',
   };
-  const offline: GridCluster = { ...bare(), name: 'offline-1', status: 'Offline', statusMessage: 'Lease not updated.' };
+  const offline: GridCluster = {
+    ...bare(),
+    name: 'offline-1',
+    status: 'Unavailable',
+    statusMessage: 'Lease not updated.',
+  };
   renderAt('/clusters/importing-1', new MockConsoleService(undefined, [importing, offline]));
   await user.hover(await within(await screen.findByTestId('cluster-status')).findByText('Unknown'));
   expect(await screen.findByRole('tooltip')).toHaveTextContent(
@@ -578,10 +586,17 @@ it("says in the status tooltip what the hub reports about the cluster's connecti
   );
 });
 
-it('says in the status tooltip what the hub reports, without a state', async () => {
+it('says in the status tooltip what Unavailable means, then what the hub reports', async () => {
   const user = userEvent.setup();
-  const offline: GridCluster = { ...bare(), name: 'offline-1', status: 'Offline', statusMessage: 'Lease not updated.' };
+  const offline: GridCluster = {
+    ...bare(),
+    name: 'offline-1',
+    status: 'Unavailable',
+    statusMessage: 'Lease not updated.',
+  };
   renderAt('/clusters/offline-1', new MockConsoleService(undefined, [offline]));
-  await user.hover(await within(await screen.findByTestId('cluster-status')).findByText('Offline'));
-  expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Hub connection: Lease not updated\.$/);
+  await user.hover(await within(await screen.findByTestId('cluster-status')).findByText('Unavailable'));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(
+    "The cluster's API server cannot be reached. Telemetry and console updates are unavailable, and the system is unable to confirm whether the cluster is running. Hub connection: Lease not updated.",
+  );
 });

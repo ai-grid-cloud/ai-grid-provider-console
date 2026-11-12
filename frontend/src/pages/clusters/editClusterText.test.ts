@@ -17,7 +17,7 @@ describe('roleSet', () => {
     ],
     [
       'combined',
-      'Saving sets the role to Combined. The hub then installs MaaS, the consumer gateway, the MaaS portal, the database replica, KServe model serving, the provider gateway, and the GPU operators on this cluster.',
+      'Saving sets the role to Ingress and inference. The hub then installs MaaS, the consumer gateway, the MaaS portal, the database replica, KServe model serving, the provider gateway, and the GPU operators on this cluster.',
     ],
   ])('words %s as what Save will do', (role, installs) => {
     expect(roleSet(role)).toEqual({ title: TITLE, installs, settling: SETTLES });

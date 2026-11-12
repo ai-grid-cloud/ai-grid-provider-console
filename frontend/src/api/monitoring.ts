@@ -12,10 +12,23 @@ export interface MonitoringService {
   listMonitoringDashboards(project: string): Promise<DashboardResource[]>;
 }
 
-/** The dashboards the Monitoring page shows as tabs: the `dashboard-*` ones, ordered by name. */
+/**
+ * The dashboards the Monitoring page shows as tabs: the `dashboard-*-admin` ones, ordered by name.
+ *
+ * The prefix and the suffix are odh-dashboard's (`filterDashboards`,
+ * packages/observability/src/utils/dashboardUtils.ts): its tabs are the `dashboard-*` dashboards,
+ * and for a user with cluster-wide metrics access `<name>-admin` replaces `<name>`. Every user of
+ * this console is a provider admin, but the project also holds the dashboards written for users
+ * without that access, scoped to their own projects or their own identity: OpenShift AI's
+ * `dashboard-1-model` beside `dashboard-1-model-admin`, and MaaS's `dashboard-5-maas-usage-logs`
+ * (My Usage), which has no admin variant and asks MaaS for the caller's own usage, which a provider
+ * admin's hub token can't do. So a dashboard without the suffix is never a tab here, whether or not
+ * it has an admin variant; AI Grid's own dashboards all have it (ai-grid-cluster-gitops
+ * apps/ai-grid-o11y).
+ */
 export const monitoringTabs = (dashboards: DashboardResource[]): DashboardResource[] =>
   dashboards
-    .filter((d) => d.metadata.name.startsWith('dashboard-'))
+    .filter((d) => d.metadata.name.startsWith('dashboard-') && d.metadata.name.endsWith('-admin'))
     .sort((a, b) => a.metadata.name.localeCompare(b.metadata.name));
 
 /** A dashboard's tab title: its display name, or its name. */

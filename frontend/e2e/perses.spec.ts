@@ -65,7 +65,10 @@ const injectedFailure = 'Compatibility test injected failure';
 // The relay's own answer when Perses is slower than PERSES_TIMEOUT, in the shape the BFF sends
 // (bff/internal/perses, writeError): Perses's own {"message": "..."}.
 const relayTimeout = "the hub's Perses did not answer in time";
-const dashboards = [dashboard('dashboard-1-fleet', 'Fleet health'), dashboard('dashboard-2-usage', 'Token usage')];
+const dashboards = [
+  dashboard('dashboard-1-fleet-admin', 'Fleet health'),
+  dashboard('dashboard-2-usage-admin', 'Token usage'),
+];
 // Each cluster's series counts up from its base to the base plus 9 over the queried range, so the
 // stat panel's last value is the base plus 9. One sample per step from the first step boundary, as
 // Prometheus answers: Perses places samples on the query's steps, and a step without one is a gap.
@@ -252,7 +255,7 @@ const detailsMarkup = [
 ].join('\n');
 const clusterDashboard = {
   kind: 'Dashboard',
-  metadata: { name: 'dashboard-0-cluster', project: 'ai-grid' },
+  metadata: { name: 'dashboard-0-cluster-admin', project: 'ai-grid' },
   spec: {
     display: { name: 'Cluster' },
     duration: '1h',
@@ -369,7 +372,7 @@ test("fills in the cluster details panel from the selected cluster's claims", as
 const bucketName = '<b>p99</b> & Fast <1s';
 const barDashboard = {
   kind: 'Dashboard',
-  metadata: { name: 'dashboard-1-model', project: 'ai-grid' },
+  metadata: { name: 'dashboard-1-model-admin', project: 'ai-grid' },
   spec: {
     display: { name: 'Model' },
     duration: '1h',
@@ -463,7 +466,7 @@ test('draws a bar chart, and shows a bar name in its tooltip as written', async 
 test('a panel whose plugin is not bundled shows the load error, and the tabs still switch', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push('Uncaught: ' + error.message));
-  const models = dashboard('dashboard-2-models', 'Models');
+  const models = dashboard('dashboard-2-models-admin', 'Models');
   const [grid] = models.spec.layouts;
   const unbundled = {
     ...models,
@@ -497,7 +500,7 @@ test('a panel whose plugin is not bundled shows the load error, and the tabs sti
   await page.route('**/perses/api/**', (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith('/dashboards'))
-      return route.fulfill({ json: [dashboard('dashboard-1-fleet', 'Fleet health'), unbundled] });
+      return route.fulfill({ json: [dashboard('dashboard-1-fleet-admin', 'Fleet health'), unbundled] });
     if (url.pathname.includes('/api/v1/projects/ai-grid/datasources')) return route.fulfill({ json: [datasource] });
     if (url.pathname.includes('/api/v1/globaldatasources')) return route.fulfill({ json: [] });
     if (url.pathname.includes('/label/cluster/values'))
@@ -532,7 +535,7 @@ test('a static list variable offers its values and queries with the selected one
   const errors: string[] = [];
   const queries: string[] = [];
   page.on('pageerror', (error) => errors.push('Uncaught: ' + error.message));
-  const usage = dashboard('dashboard-2-usage', 'Usage');
+  const usage = dashboard('dashboard-2-usage-admin', 'Usage');
   const viewBy = {
     kind: 'ListVariable',
     spec: {

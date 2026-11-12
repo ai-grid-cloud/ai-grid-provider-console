@@ -63,6 +63,9 @@ import { useBackgroundWrites } from '../../notifications/useBackgroundWrites';
 import { useModelWrites, usePlacementClusters } from './useModels';
 import { deploymentNameFromUri, modelPath } from './modelUtils';
 import { useClusterList } from '../clusters/useClusters';
+import { roleOf } from '../clusters/roles';
+import type { ClusterView } from '../clusters/clusterView';
+import { listOf } from '../../notifications/writeText';
 
 type Props = {
   /** The model to edit; without it the wizard deploys a new one. */
@@ -117,6 +120,39 @@ const Help: React.FC<{ children: React.ReactNode; error?: string; id?: string }>
 
 const notAvailable = (err: unknown, what: string) =>
   err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this AI Grid backend.` : undefined;
+
+/**
+ * Why ListPlacementClusters leaves out an AI Grid cluster, from what Clusters/List says of it: the RPC
+ * offers the members that are Available (Ready), Compliant with the ready Policy (Provisioned) and
+ * whose role is inference or combined (ai_grid.v1 Models.ListPlacementClusters). None for a member
+ * that Clusters/List shows meeting all three, which the two reads disagree on only for a moment.
+ */
+const notListedReasons = (c: ClusterView) => {
+  const role = roleOf(c.labels);
+  return [
+    c.status !== 'Ready' && 'not Ready',
+    c.provisioningStatus !== 'Provisioned' && 'not Provisioned',
+    !role ? 'no role' : role.value === 'ingress' && 'Ingress role',
+  ].filter((r): r is string => !!r);
+};
+
+/** Which AI Grid clusters the Clusters step lists, as ListPlacementClusters offers them (notListedReasons). */
+const listedClustersRule = (
+  <>
+    This list includes only clusters that have the <strong>Ready</strong> cluster status, the{' '}
+    <strong>Provisioned</strong> AI Grid status, and the <strong>Inference</strong> or{' '}
+    <strong>Ingress and inference</strong> role.
+  </>
+);
+
+/** "Not listed: site2 (not Ready) and site3 (Ingress role).", for each left-out member. */
+const notListedText = (members: ClusterView[]) => {
+  const named = members.map((c) => {
+    const reasons = notListedReasons(c);
+    return reasons.length ? `${c.name} (${reasons.join(', ')})` : c.name;
+  });
+  return `Not listed: ${listOf(named)}.`;
+};
 
 /** Says which chosen clusters are no longer offered; undefined when none are. */
 const goneClustersError = (names: string[]) =>
@@ -210,7 +246,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   );
   // AI Grid members ListPlacementClusters doesn't offer: not Available, not Compliant, or not a cluster
   // that serves models (role inference or combined).
-  const unavailableMembers = clusters.filter((c) => c.aiGridEnabled && !placementClusters.includes(c.name)).length;
+  const unlistedMembers = clusters.filter((c) => c.aiGridEnabled && !placementClusters.includes(c.name));
   const [clusterNames, setClusterNames] = useState<string[]>(start.clusterNames);
   // True from entering the Clusters step until its placement clusters reload answers; Next waits for it.
   const [reloadingPlacementClusters, setReloadingPlacementClusters] = useState(false);
@@ -331,7 +367,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       ? undefined
       : value.trim()
         ? fieldMessage(modelFieldsSchema.shape[field], value, parse)
-        : 'Required.';
+        : 'Required';
   // The deploy wizard's limits apply to a value an edit sets, not to one the model already has,
   // which the backend took.
   const kept = (value: string, stored: string | undefined) => editing && value.trim() === (stored ?? '');
@@ -356,7 +392,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const runtimeImageError = !touched.has('runtimeImage')
     ? undefined
     : imageMissing
-      ? 'Required.'
+      ? 'Required'
       : fieldMessage(modelFieldsSchema.shape.runtimeImage, runtimeImage);
   const replicasError = shownError('replicas', replicas, Number);
   // A model deployed without a CPU or memory request keeps none until one is entered.
@@ -379,7 +415,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     !touched.has('accelerators') || acceleratorsKept
       ? undefined
       : accelerators === ''
-        ? 'Required.'
+        ? 'Required'
         : acceleratorsValid
           ? undefined
           : `Enter a number from 1 to ${MAX_ACCELERATORS}.`;
@@ -506,7 +542,13 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     if (placementClusters.length === 0 && goneClusters.length === 0) {
       return (
         <Alert isInline variant="warning" title="No clusters available">
-          A cluster appears here when it is an AI Grid cluster that serves models, and is Ready and Provisioned.
+          {unlistedMembers.length > 0 ? (
+            <>
+              {listedClustersRule} {notListedText(unlistedMembers)}
+            </>
+          ) : (
+            'A cluster appears here when it is an AI Grid cluster that serves models, and is Ready and Provisioned.'
+          )}
         </Alert>
       );
     }
@@ -541,9 +583,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
           isDisabled={saving}
         />
         <Help>
-          The model runs on each selected AI Grid cluster.
-          {unavailableMembers > 0 &&
-            ` ${unavailableMembers} AI Grid ${unavailableMembers === 1 ? 'cluster is' : 'clusters are'} not listed because ${unavailableMembers === 1 ? 'it is' : 'they are'} not Ready and Provisioned, or ${unavailableMembers === 1 ? 'does' : 'do'} not serve models.`}
+          Select the AI Grid clusters where the model will run. {listedClustersRule}
+          {unlistedMembers.length > 0 && ` ${notListedText(unlistedMembers)}`}
         </Help>
       </FormGroup>
     );

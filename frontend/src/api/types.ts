@@ -46,13 +46,17 @@ export type ModelHardware = {
 export type MonitoringConfig = {
   /** The BFF relays /perses/api to the hub's Perses; off when it has no PERSES_URL. */
   enabled: boolean;
-  /** The one Perses project the relay reads, whose `dashboard-*` objects are the Monitoring tabs; set whenever Monitoring is on. */
+  /** The one Perses project the relay reads, whose `dashboard-*-admin` objects are the Monitoring tabs; set whenever Monitoring is on. */
   persesProject: string;
 };
 
-export type ClusterStatus = 'Ready' | 'Offline' | 'Unknown';
+/**
+ * The console's word for the backend's cluster state: Unavailable is ManagedClusterState.OFFLINE,
+ * which the ACM console calls Offline (clusterView.ts).
+ */
+export type ClusterStatus = 'Ready' | 'Unavailable' | 'Unknown';
 
-/** The ACM console's word for a cluster that is neither ready, offline, nor unknown. */
+/** The ACM console's word for a cluster that is neither ready, unavailable, nor unknown. */
 export type ClusterState = 'Pending import' | 'Importing' | 'Import failed' | 'Detaching' | 'Not accepted';
 
 export type ProvisioningStatus = 'Provisioned' | 'Provisioning' | 'Not provisioned';
@@ -103,7 +107,7 @@ export type ClusterCondition = {
 /** A ManagedCluster as the console shows it; the PoC's GridCluster plus the hub fields. */
 export type GridCluster = {
   name: string;
-  /** The PoC's availability; every ACM state other than ready and offline is Unknown. */
+  /** The PoC's availability; every ACM state other than ready and offline (Unavailable) is Unknown. */
   status: ClusterStatus;
   /** The ACM state behind an Unknown status, such as Importing. */
   state?: ClusterState;

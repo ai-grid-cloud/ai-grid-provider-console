@@ -55,7 +55,9 @@ but the proxy listens off loopback.
 
 The BFF still maps legacy JSON requests and responses. Its `requireProviderAdmin` middleware
 asks the hub for a `SelfSubjectAccessReview` with the caller's token and requires permission
-to patch ManagedClusters. Every `/api/v1` call except `GET` or `HEAD` on `/user` and `/config`
+to `post` to the non-resource URL `/ai-grid/provider-console`, which the chart's `ai-grid-provider-admin` ClusterRole
+grants (it was `patch` on ManagedClusters, which ACM grants every authenticated user; it is not
+`get`, which OpenShift's `cluster-reader` holds on every non-resource URL). Every `/api/v1` call except `GET` or `HEAD` on `/user` and `/config`
 passes this gate. The Connect relay (`/ai_grid.v1.*`) passes it too, after the session check
 and before its procedure allowlist, and so does the `/perses/api/` relay. kube-auth-proxy answers
 a Connect path without a session with 401 (`--api-route=^/ai_grid\.v1\.`) instead of a login

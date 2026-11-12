@@ -25,7 +25,7 @@ const maxFitZoom = 4;
 /** Each status's colour: PatternFly's status icon colours, so pins match the status labels. */
 const statusColor: Record<FleetCluster['status'], string> = {
   Ready: 'var(--pf-t--global--icon--color--status--success--default)',
-  Offline: 'var(--pf-t--global--icon--color--status--danger--default)',
+  Unavailable: 'var(--pf-t--global--icon--color--status--warning--default)',
   Unknown: 'var(--pf-t--global--icon--color--subtle)',
 };
 
@@ -33,7 +33,7 @@ const statusColor: Record<FleetCluster['status'], string> = {
 const pinColor = (cluster: FleetCluster) => statusColor[cluster.status];
 
 /** Which status a shared pin shows: the worst among its clusters. */
-const statusRank: Record<FleetCluster['status'], number> = { Ready: 0, Unknown: 1, Offline: 2 };
+const statusRank: Record<FleetCluster['status'], number> = { Ready: 0, Unknown: 1, Unavailable: 2 };
 
 /** "Site name · cluster name": the site's name, else the cloud region, else the cluster's name alone. */
 const pinLabel = (c: FleetCluster) => {

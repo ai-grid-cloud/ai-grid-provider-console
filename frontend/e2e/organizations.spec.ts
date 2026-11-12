@@ -4,8 +4,9 @@ import { expect, test } from './fixtures';
 
 // The Organizations pages call the backend's Tenants API over Connect, so this spec runs on the
 // backend's own fakes (playwright.config.ts, "backend fakes"): its fake Keycloak holds the PoC's
-// organizations (fixtures/poc/organizations.json). Its fake hub has no Secrets, so the backend
-// finds no client secret for an identity provider and refuses to create one.
+// organizations (fixtures/poc/organizations.json). Before it writes an identity provider, the
+// backend has Keycloak read the issuer's discovery document, as Keycloak does at login; the
+// issuer here answers nothing, so the backend refuses to create one.
 
 type Tenant = { id: string; metadata?: { name?: string; version?: number } };
 
@@ -39,22 +40,25 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
       [/^Authorization URL/, `${issuer}/auth`],
       [/^Token URL/, `${issuer}/token`],
       // Required while Validate signature is on, as it is by default.
-      [/^JWKS URL/, `${issuer}/certs`],
+      [/^JSON Web Key Set \(JWKS\) URL/, `${issuer}/certs`],
     ];
     for (const [name, value] of idpFields) await page.getByRole('textbox', { name }).fill(value);
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // Step 3: review. The backend can't read the Secret, so it refuses, and the form stays.
+    // Step 3: review. Keycloak can't read the issuer's discovery document, so the backend refuses
+    // in words that name it, and the form stays.
     await expect(page.getByText(issuer).first()).toBeVisible();
     await page.getByRole('button', { name: 'Create organization' }).click();
     await expect(page.getByText('Unable to save organization')).toBeVisible();
-    await expect(page.getByText('identity provider secret "idp-secret" not found')).toBeVisible();
+    await expect(
+      page.getByText(`Keycloak could not read the OIDC discovery document ${issuer}/.well-known/openid-configuration`),
+    ).toBeVisible();
 
     // Without an identity provider it saves.
     await page.getByRole('button', { name: 'Identity provider', exact: true }).click();
     for (const [name] of idpFields) await page.getByRole('textbox', { name }).fill('');
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect(page.getByText('No identity provider is configured.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'No identity provider configured in AI Grid' })).toBeVisible();
     await page.getByRole('button', { name: 'Create organization' }).click();
     await expect(page.getByText(`Organization ${unique} created`)).toBeVisible();
 
@@ -74,7 +78,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
     await page.reload();
     await page.getByRole('textbox', { name: /^Domain 1/ }).fill(editedDomain);
     await page.getByRole('button', { name: 'Review', exact: true }).click();
-    await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText(`Changes to organization ${unique} saved`)).toBeVisible();
     await expect(page.getByTestId('organization-configuration-details')).toContainText(editedDomain);
 

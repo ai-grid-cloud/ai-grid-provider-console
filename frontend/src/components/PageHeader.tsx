@@ -5,7 +5,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 type Props = {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   breadcrumb?: React.ReactElement;
   /** A resource's status label, beside its name. */
   status?: React.ReactNode;

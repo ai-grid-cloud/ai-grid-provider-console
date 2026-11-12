@@ -42,13 +42,18 @@ func (a *App) requireIdentity(next http.Handler) http.Handler {
 }
 
 // requireProviderAdmin lets a call through only when the hub says the caller
-// may patch ManagedClusters (hub.ProviderAdminCheck, asked with the caller's
-// own token), reads as well as writes. The backend acts with its own
-// ServiceAccount and authorizes nothing yet, and kube-auth-proxy admits any
-// OpenShift login, so without this any signed-in user could read every
-// cluster and organization and write through the backend's rights. GET /user and
-// GET /config stay open (and HEAD, which net/http routes to the same
-// handlers): the UI needs them to say who the caller is.
+// may post to the non-resource URL /ai-grid/provider-console
+// (hub.ProviderAdminCheck, asked with the token kube-auth-proxy forwards,
+// whether the caller signed in with a session cookie or sent a bearer token),
+// reads as well as writes. The chart's
+// ai-grid-provider-admin ClusterRole grants that right, and cluster-admin
+// holds it. The backend acts with its own ServiceAccount and authorizes
+// nothing yet, and kube-auth-proxy admits any OpenShift login, so without
+// this any signed-in user could read every cluster and organization and write
+// through the backend's rights. It guards /api/v1, the Perses relay and the
+// Connect relay alike (Handler). GET /user and GET /config stay open (and
+// HEAD, which net/http routes to the same handlers): the UI needs them to say
+// who the caller is.
 func (a *App) requireProviderAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if (r.Method == http.MethodGet || r.Method == http.MethodHead) && (r.URL.Path == APIPrefix+"/user" || r.URL.Path == APIPrefix+"/config") {
@@ -63,7 +68,7 @@ func (a *App) requireProviderAdmin(next http.Handler) http.Handler {
 		case err != nil:
 			a.respondError(w, r, fmt.Errorf("%w: provider-admin check for %s: %w", errHub, id.Username, err))
 		case !allowed:
-			a.respondError(w, r, Errorf(http.StatusForbidden, "this console is only for provider admins, users who may patch ManagedClusters on the hub, and the hub says you are not one"))
+			a.respondError(w, r, Errorf(http.StatusForbidden, "this console is only for provider admins, users the hub's ai-grid-provider-admin role allows, and the hub says you are not one"))
 		default:
 			next.ServeHTTP(w, r)
 		}

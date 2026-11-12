@@ -17,7 +17,7 @@ export type LocationSource = 'annotations' | 'cloud region' | 'none';
 /** A ManagedCluster as the Clusters pages and the map show it. */
 export type ClusterView = {
   name: string;
-  /** Ready, Offline or Unknown; Unknown for every other lifecycle state, which `state` names. */
+  /** Ready, Unavailable or Unknown; Unknown for every other lifecycle state, which `state` names. */
   status: ClusterStatus;
   state?: ClusterState;
   /** The message of the condition that decided the state. */
@@ -78,11 +78,15 @@ const CLAIM_PLATFORM = 'platform.open-cluster-management.io';
 const CLAIM_PRODUCT = 'product.open-cluster-management.io';
 const CAPACITY_GPU = 'nvidia.com/gpu';
 
-/** The backend's lifecycle state as the pages word it: the ACM console's words. */
+/**
+ * The backend's lifecycle state as the pages word it: the ACM console's words, except Unavailable
+ * for the state ACM calls Offline, which the cluster's agent reports (for example, its API server is
+ * down): the cluster may still be serving. A cluster the hub can't reach is UNKNOWN, so Unknown.
+ */
 const states: Record<ManagedClusterState, { status: ClusterStatus; state?: ClusterState }> = {
   [ManagedClusterState.UNSPECIFIED]: { status: 'Unknown' },
   [ManagedClusterState.READY]: { status: 'Ready' },
-  [ManagedClusterState.OFFLINE]: { status: 'Offline' },
+  [ManagedClusterState.OFFLINE]: { status: 'Unavailable' },
   [ManagedClusterState.UNKNOWN]: { status: 'Unknown' },
   [ManagedClusterState.PENDING_IMPORT]: { status: 'Unknown', state: 'Pending import' },
   [ManagedClusterState.IMPORTING]: { status: 'Unknown', state: 'Importing' },

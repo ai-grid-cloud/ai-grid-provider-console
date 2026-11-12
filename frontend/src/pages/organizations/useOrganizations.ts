@@ -25,7 +25,13 @@ import {
   update,
 } from '../../gen/ai_grid/v1/tenants_service-Tenants_connectquery';
 import { useLoadOptions, useLoaded, type Loaded } from '../clusters/useClusters';
-import { tenantOf, toOrganizationView, type OrganizationInput, type OrganizationView } from './organizationView';
+import {
+  tenantOf,
+  tenantSpecOf,
+  toOrganizationView,
+  type OrganizationInput,
+  type OrganizationView,
+} from './organizationView';
 
 const organizationViews = (answer: TenantsListResponse | undefined) => answer?.items.map(toOrganizationView) ?? [];
 const organizationView = (answer: TenantsGetResponse | undefined) =>
@@ -76,13 +82,22 @@ export const useOrganizationWrites = () => {
         return answered(object);
       },
       /**
-       * The domains only (mask `spec.domains`), at the version the form read: the name is fixed
-       * once created and the identity provider can't change after create, so neither is sent.
+       * What changed, at the version the form read: the domains (mask `spec.domains`) and the
+       * identity provider to add or change (`spec.identity_provider`), each only when given, so
+       * what isn't sent stays as stored. The name is fixed once created, so it is never sent.
        */
-      updateOrganization: async (organization: OrganizationView, domains: string[]): Promise<OrganizationView> => {
+      updateOrganization: async (
+        organization: OrganizationView,
+        change: Partial<Omit<OrganizationInput, 'name'>>,
+      ): Promise<OrganizationView> => {
         const { object } = await callUnaryMethod(transport, update, {
-          object: { id: organization.id, metadata: { version: organization.version }, spec: { domains } },
-          updateMask: { paths: ['spec.domains'] },
+          object: { id: organization.id, metadata: { version: organization.version }, spec: tenantSpecOf(change) },
+          updateMask: {
+            paths: [
+              ...(change.domains ? ['spec.domains'] : []),
+              ...(change.identityProvider ? ['spec.identity_provider'] : []),
+            ],
+          },
           lock: true,
         });
         const saved = answered(object);

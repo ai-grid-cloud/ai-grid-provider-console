@@ -15,7 +15,7 @@ type Props = {
 export const ProviderAdminsOnly: React.FC<Props> = ({ username, canSignOut }) => {
   useDocumentTitle('Provider admins only');
   return (
-    <FullPageState title="Access permissions needed">
+    <FullPageState title="No access">
       You are logged in as {username}, who is not a provider admin on this hub.{' '}
       {canSignOut
         ? 'To use this console, ask your hub administrator for provider admin access, then reload the page. To use another account, log out from the user menu.'

@@ -17,7 +17,7 @@ import { changedMessage, ClusterChangedError } from './ClusterChangedError';
 import { removeText } from './clusterInfo';
 import { isPositionNotSet, mapPositionOf, type ClusterView } from './clusterView';
 import { locationError } from './gridSettings';
-import { LocationLabelField, RoleField } from './MembershipFields';
+import { LocationLabelField, ReadOnlyRoleField, RoleField, roleFixedText } from './MembershipFields';
 import { roleOf } from './roles';
 
 export type MembershipChange = { cluster: ClusterView; join: boolean };
@@ -32,6 +32,12 @@ type Props = MembershipChange & {
 const defaultRole = (cluster: ClusterView): ClusterRole | '' => {
   return roleOf(cluster.labels)?.value ?? (cluster.name === 'local-cluster' ? 'combined' : '');
 };
+
+/**
+ * The role a cluster kept when it was removed from AI Grid (Remove drops only `ai-grid/enabled`),
+ * which Add shows read-only, as Edit shows the role of a cluster that has one (canSetRole).
+ */
+const keptRole = (cluster: ClusterView) => roleOf(cluster.labels)?.value;
 
 /** An Ingress or Combined cluster, which holds the subscriptions' copies (removeText). */
 const receivesRequests = (cluster: ClusterView) => {
@@ -53,11 +59,13 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
   const [error, setError] = useState<string>();
   const [location, setLocation] = useState(cluster.location ?? '');
   const [role, setRole] = useState<ClusterRole | ''>(defaultRole(cluster));
+  const [fixedRole, setFixedRole] = useState(keptRole(cluster));
   const [touched, setTouched] = useState({ location: false, role: false });
-  const title = join ? `Add ${cluster.name} to AI Grid?` : `Remove ${cluster.name} from AI Grid?`;
+  // Add is a form, titled as one; Remove is a confirmation, so a question (frontend/AGENTS.md, Wording).
+  const title = join ? 'Add cluster to AI Grid' : `Remove ${cluster.name} from AI Grid?`;
   const locationInvalid = locationError(location.trim());
   const shownLocationError = touched.location ? locationInvalid : undefined;
-  const shownRoleError = touched.role && !role ? 'Required.' : undefined;
+  const shownRoleError = touched.role && !role ? 'Required' : undefined;
 
   const confirm = async () => {
     if (join && (locationInvalid || !role)) {
@@ -79,6 +87,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         // dialog's choices over them without the user seeing what changed.
         setLocation(current.location ?? '');
         setRole(defaultRole(current));
+        setFixedRole(keptRole(current));
         setTouched({ location: false, role: false });
         setError(
           "Another user changed this cluster's location label or role after this dialog opened. Their values are now shown. Review them and try again.",
@@ -97,6 +106,8 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         title={title}
         deleteName={cluster.name}
         submitButtonLabel="Remove"
+        // Remove deletes nothing, so its prompt doesn't say deletion.
+        confirmText="to confirm:"
         deleting={busy}
         onDelete={() => void confirm()}
         onClose={() => {
@@ -135,14 +146,25 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
   }
 
   return (
-    <Modal isOpen variant="small" onClose={busy ? undefined : onClose} data-testid="cluster-membership-modal">
-      <ModalHeader title={title} />
+    <Modal
+      isOpen
+      variant="small"
+      onClose={busy ? undefined : onClose}
+      aria-labelledby="cluster-membership-modal-title"
+      data-testid="cluster-membership-modal"
+    >
+      <ModalHeader
+        labelId="cluster-membership-modal-title"
+        title={title}
+        description={
+          <>
+            Configure the location and role of the <strong>{cluster.name}</strong> cluster within the AI Grid. AI Grid
+            manages model deployment and request routing across multiple clusters.
+          </>
+        }
+      />
       <ModalBody>
         <Stack hasGutter>
-          <p>
-            The hub installs the AI Grid components for the selected role. After a cluster that serves models is
-            provisioned, you can select it when you deploy a model.
-          </p>
           <Form id="cluster-membership-form" onSubmit={(e) => e.preventDefault()}>
             <LocationLabelField
               value={location}
@@ -153,16 +175,24 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               onChange={setLocation}
               onBlur={() => setTouched((t) => ({ ...t, location: true }))}
             />
-            <RoleField
-              value={role}
-              error={shownRoleError}
-              isDisabled={busy}
-              onChange={(value) => {
-                setTouched((t) => ({ ...t, role: true }));
-                setRole(value);
-              }}
-              onBlur={() => setTouched((t) => ({ ...t, role: true }))}
-            />
+            {fixedRole ? (
+              <ReadOnlyRoleField role={fixedRole} />
+            ) : (
+              <>
+                <RoleField
+                  value={role}
+                  error={shownRoleError}
+                  isDisabled={busy}
+                  onChange={(value) => {
+                    setTouched((t) => ({ ...t, role: true }));
+                    setRole(value);
+                  }}
+                  onBlur={() => setTouched((t) => ({ ...t, role: true }))}
+                />
+                {/* Add only: Edit sets a role only on a cluster without one, and says what that installs. */}
+                <Alert isInline variant="info" title={roleFixedText} />
+              </>
+            )}
           </Form>
           {error && (
             <Alert isInline variant="danger" title="Unable to add cluster to AI Grid">
@@ -173,7 +203,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
       </ModalBody>
       <ModalFooter>
         <Button variant="primary" isLoading={busy} isDisabled={busy} onClick={() => void confirm()}>
-          Add to AI Grid
+          Add
         </Button>
         <Button variant="link" isDisabled={busy} onClick={onClose}>
           Cancel

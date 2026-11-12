@@ -40,10 +40,7 @@ export const roleSet = (role: ClusterRole): RoleSet => ({
 export const editText = {
   /** The row and page action, for AI Grid clusters only. */
   action: 'Edit',
-  title: (cluster: string) => `Edit ${cluster}`,
-  /** Under the role of a cluster that has one, shown read-only. */
-  roleFixed:
-    "Changing the role of a cluster in AI Grid isn't supported: the hub doesn't fully remove what the old role installed.",
+  title: 'Edit AI Grid cluster',
   errorTitle: 'Unable to update cluster',
   notAvailable: 'Editing a cluster is not available on this AI Grid backend.',
   changedByOther:

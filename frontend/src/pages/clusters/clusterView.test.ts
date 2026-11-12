@@ -111,11 +111,11 @@ describe('toClusterView', () => {
     expect(wrong.longitude).toBeUndefined();
   });
 
-  it("words the backend's lifecycle state: Ready, Offline, or Unknown with the ACM state behind it", () => {
+  it("words the backend's lifecycle state: Ready, Unavailable (ACM's Offline), or Unknown with the ACM state behind it", () => {
     const view = (state: ManagedClusterState) => toClusterView(cluster({ state, stateMessage: 'why' }));
     expect(view(ManagedClusterState.READY)).toMatchObject({ status: 'Ready', statusMessage: 'why' });
     expect(view(ManagedClusterState.READY).state).toBeUndefined();
-    expect(view(ManagedClusterState.OFFLINE).status).toBe('Offline');
+    expect(view(ManagedClusterState.OFFLINE).status).toBe('Unavailable');
     expect(view(ManagedClusterState.UNKNOWN).status).toBe('Unknown');
     expect(view(ManagedClusterState.UNSPECIFIED).status).toBe('Unknown');
     expect(view(ManagedClusterState.DETACHING)).toMatchObject({ status: 'Unknown', state: 'Detaching' });

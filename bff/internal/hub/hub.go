@@ -21,19 +21,27 @@ import (
 	"time"
 )
 
-// ResourceAttributes names the action an access review asks about.
-type ResourceAttributes struct {
-	Group    string `json:"group,omitempty"`
-	Resource string `json:"resource"`
-	Verb     string `json:"verb"`
+// NonResourceAttributes names the action an access review asks about: a verb
+// on a path that is no API resource.
+type NonResourceAttributes struct {
+	Path string `json:"path"`
+	Verb string `json:"verb"`
 }
 
-// ProviderAdminCheck defines a provider admin: someone who may patch
-// ManagedClusters, the smallest right every admin action in the console needs.
-var ProviderAdminCheck = ResourceAttributes{
-	Group:    "cluster.open-cluster-management.io",
-	Resource: "managedclusters",
-	Verb:     "patch",
+// ProviderAdminCheck defines a provider admin: someone the hub's RBAC lets
+// post to /ai-grid/provider-console, a non-resource URL that exists only to
+// say so. No server serves that path; RBAC grants it anyway, and `oc auth
+// can-i post /ai-grid/provider-console` asks the same question. The chart's
+// ai-grid-provider-admin ClusterRole holds exactly this rule; so does any role
+// with a `*` nonResourceURLs rule for post or every verb, such as
+// cluster-admin. The verb is post, not get: OpenShift's cluster-reader grants
+// get on every non-resource URL. It must be the console's own right, not one
+// borrowed from ACM: ACM binds patch on ManagedClusters to every authenticated
+// user (the open-cluster-management:hypershift-addon:agent
+// ClusterRoleBinding), so that question admitted anyone who could log in.
+var ProviderAdminCheck = NonResourceAttributes{
+	Path: "/ai-grid/provider-console",
+	Verb: "post",
 }
 
 // ErrUnauthorized reports that the hub rejected the caller's token.
@@ -125,19 +133,19 @@ type accessReview struct {
 }
 
 type accessReviewSpec struct {
-	ResourceAttributes ResourceAttributes `json:"resourceAttributes"`
+	NonResourceAttributes NonResourceAttributes `json:"nonResourceAttributes"`
 }
 
 // CanI runs a SelfSubjectAccessReview with the caller's token. The token is
 // sent to the hub only; it never appears in errors or logs.
-func (c *Client) CanI(ctx context.Context, token string, attrs ResourceAttributes) (bool, error) {
+func (c *Client) CanI(ctx context.Context, token string, attrs NonResourceAttributes) (bool, error) {
 	if token == "" {
 		return false, ErrUnauthorized
 	}
 	body, err := json.Marshal(accessReview{
 		APIVersion: "authorization.k8s.io/v1",
 		Kind:       "SelfSubjectAccessReview",
-		Spec:       accessReviewSpec{ResourceAttributes: attrs},
+		Spec:       accessReviewSpec{NonResourceAttributes: attrs},
 	})
 	if err != nil {
 		return false, err

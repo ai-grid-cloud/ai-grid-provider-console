@@ -72,6 +72,15 @@ const unavailable = () => new ConnectError('keycloak is unreachable', Code.Unava
 /** The console's words for Unavailable (describeError): the backend's own message isn't shown. */
 const UNAVAILABLE = 'The AI Grid backend is unavailable. Try again.';
 
+const NO_IDP = 'No identity provider configured in AI Grid';
+const NO_IDP_REASON =
+  "Unless an identity provider was set up directly in Keycloak, this organization's users cannot log in.";
+
+const MAYBE_SAVED =
+  'The AI Grid backend could not confirm the save, so the changes may have been saved. Reload the page to check, then try again if they are missing.';
+const ISSUER_MAYBE_SAVED =
+  'If the new issuer was saved, users already log in through it, so test logging in only after the reloaded page shows the new issuer.';
+
 type User = ReturnType<typeof userEvent.setup>;
 
 /** Opens an edit wizard step from its navigation: every step is open from the start when editing. */
@@ -81,7 +90,7 @@ const openStep = async (user: User, name: 'Organization details' | 'Identity pro
 /** Opens Review and saves the edit. */
 const saveEdit = async (user: User) => {
   await openStep(user, 'Review');
-  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await user.click(screen.getByRole('button', { name: 'Save' }));
 };
 /** A user the console couldn't load: the pages show, but without write actions. A viewer
  * (isProviderAdmin false) sees no pages at all (App.test.tsx). */
@@ -105,7 +114,7 @@ const requiredIdp: [string, string][] = [
   ['Authorization URL', 'https://idp.example.com/auth'],
   ['Token URL', 'https://idp.example.com/token'],
   // Required while Validate signature is on, as it is by default.
-  ['JWKS URL', 'https://idp.example.com/certs'],
+  ['JSON Web Key Set (JWKS) URL', 'https://idp.example.com/certs'],
 ];
 
 it('onboards organization details then IdP, saves only after review and orders navigation', async () => {
@@ -130,9 +139,11 @@ it('onboards organization details then IdP, saves only after review and orders n
   await user.click(screen.getByRole('button', { name: 'Add domain' }));
   await user.click(screen.getByRole('button', { name: 'Remove domain 2' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
+  // A new identity provider's issuer has an example, not what changing a saved one does.
+  expect(screen.queryByText(/The issuer can be edited only until/)).not.toBeInTheDocument();
   // A blank identity provider is optional; a partly filled one isn't.
   expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
-  await user.click(screen.getByRole('textbox', { name: 'Title' }));
+  await user.click(screen.getByRole('textbox', { name: 'Identity provider name' }));
   await user.paste('Tenant 1 SSO');
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   expect(tenantsOf(service).sent('create')).toEqual([]);
@@ -142,7 +153,7 @@ it('onboards organization details then IdP, saves only after review and orders n
     ['Issuer', 'https://sso.example.com/tenant1'],
     ['Authorization URL', 'https://sso.example.com/auth'],
     ['Token URL', 'https://sso.example.com/token'],
-    ['JWKS URL', 'https://sso.example.com/certs'],
+    ['JSON Web Key Set (JWKS) URL', 'https://sso.example.com/certs'],
   ]);
   await user.click(screen.getByRole('button', { name: 'Next' }));
   const review = screen.getByTestId('organization-configuration-details');
@@ -153,7 +164,7 @@ it('onboards organization details then IdP, saves only after review and orders n
   expect(screen.queryByText(/break.glass/i)).not.toBeInTheDocument();
   // Each section's Edit link goes back to its step.
   await user.click(screen.getByRole('button', { name: 'Edit identity provider' }));
-  expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Tenant 1 SSO');
+  expect(screen.getByRole('textbox', { name: 'Identity provider name' })).toHaveValue('Tenant 1 SSO');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
   const table = await screen.findByTestId('organizations-table');
@@ -166,7 +177,7 @@ it('onboards organization details then IdP, saves only after review and orders n
   expect(tenantsOf(service).tenants[0].spec?.identityProvider?.config?.clientSecretSecretName).toBe('tenant1-secret');
 });
 
-it('opens an organization from the list and edits its domains, its identity provider read-only', async () => {
+it('opens an organization from the list and edits its domains, with until when the issuer can change', async () => {
   const service = emptyService();
   addOrganization(service, input);
   const user = userEvent.setup();
@@ -180,17 +191,24 @@ it('opens an organization from the list and edits its domains, its identity prov
   await user.click(screen.getByTestId('organization-actions'));
   await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
   // Edit is the create wizard with every step open; the name can't change, so it's read-only.
-  expect(await screen.findByRole('heading', { name: 'Edit tenant1' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Edit organization' })).toBeVisible();
+  expect(screen.getByText('tenant1', { selector: 'strong' })).toBeVisible();
   expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAttribute('readonly');
   expect(screen.getByText('The name cannot be edited after the organization is created.')).toBeVisible();
   // Nothing changed yet, so Review can't save.
   await openStep(user, 'Review');
-  expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
-  // The backend keeps an identity provider immutable, so the edit shows it but can't change it.
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  // Every identity provider field can change, the issuer too, whose help says until when.
   await openStep(user, 'Identity provider');
-  expect(screen.getByRole('textbox', { name: 'Title' })).toBeDisabled();
-  expect(screen.getByRole('textbox', { name: 'Client ID' })).toBeDisabled();
-  expect(screen.getByText('Identity provider cannot be edited')).toBeVisible();
+  expect(screen.getByRole('textbox', { name: 'Identity provider name' })).toBeEnabled();
+  expect(screen.getByRole('textbox', { name: 'Client ID' })).toBeEnabled();
+  expect(screen.getByRole('textbox', { name: 'Issuer' })).toBeEnabled();
+  expect(screen.getByRole('textbox', { name: 'Issuer' })).not.toHaveAttribute('readonly');
+  expect(
+    screen.getByText(
+      "The issuer can be edited only until a user logs in through this identity provider. After that, to use a different issuer, remove the users' links to this identity provider in Keycloak, or create a new organization.",
+    ),
+  ).toBeVisible();
   await openStep(user, 'Organization details');
   const domain = screen.getByRole('textbox', { name: 'Domain 1' });
   await user.clear(domain);
@@ -351,7 +369,7 @@ it('create: Back keeps input, and Cancel asks before discarding it', async () =>
   await user.paste('unsaved-tenant');
   expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: 'Next' }));
-  await user.click(screen.getByRole('textbox', { name: 'Title' }));
+  await user.click(screen.getByRole('textbox', { name: 'Identity provider name' }));
   await user.paste('Unsaved IdP');
   await user.click(screen.getByRole('button', { name: 'Back' }));
   expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('unsaved-tenant');
@@ -402,7 +420,7 @@ it('keeps input on conflict', async () => {
     await screen.findByText('This organization was changed by another user. Reload the page, then try again.'),
   ).toBeVisible();
   expect(screen.getByText('Unable to save organization')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   await openStep(user, 'Organization details');
   expect(screen.getByRole('textbox', { name: 'Domain 1' })).toHaveValue('unsaved.example.com');
   expect(tenantsOf(service).tenants[0].spec?.domains).toEqual(['tenant1.example.com']);
@@ -482,7 +500,13 @@ it.each(['', '/edit'])('offers Retry when an organization fails to load: %s', as
   expect(await screen.findByRole('heading', { name: 'Unable to load organization' })).toBeVisible();
   await user.click(screen.getByRole('button', { name: 'Retry' }));
   await waitFor(() => expect(screen.queryByTestId('error-state')).not.toBeInTheDocument());
-  expect(screen.getByRole('heading', { level: 1, name: new RegExp(first.name) })).toBeVisible();
+  if (suffix) {
+    // Edit names the organization in its description, under the page title.
+    expect(screen.getByRole('heading', { level: 1, name: 'Edit organization' })).toBeVisible();
+    expect(screen.getByText(first.name, { selector: 'strong' })).toBeVisible();
+  } else {
+    expect(screen.getByRole('heading', { level: 1, name: new RegExp(first.name) })).toBeVisible();
+  }
 });
 
 it('keeps the list under a warning when a reload fails', async () => {
@@ -525,7 +549,7 @@ it('shows one pagination, in the toolbar, for a single page', async () => {
   expect(screen.getAllByRole('navigation', { name: /pagination/i })).toHaveLength(1);
 });
 
-it('edit sends Tenants/Update with the domains, their mask and the version read, leaving the identity provider out', async () => {
+it('edit sends Tenants/Update with the domains, their mask and the version read, leaving an unchanged identity provider out', async () => {
   const service = new MockConsoleService();
   // acme-robotics after two edits elsewhere.
   tenantsOf(service).bump(ACME_ID);
@@ -543,25 +567,212 @@ it('edit sends Tenants/Update with the domains, their mask and the version read,
   expect(update.object?.id).toBe(ACME_ID);
   expect(update.object?.metadata?.version).toBe(3);
   expect(update.lock).toBe(true);
-  // The name can't change, and the backend keeps an existing identity provider as it is: only the
-  // domains go, and the mask names them alone.
+  // The name can't change, and the identity provider didn't: only the domains go, and the mask
+  // names them alone.
   expect(update.updateMask?.paths).toEqual(['spec.domains']);
   expect(update.object?.spec?.domains).toEqual(['acme.example.net', 'acme.example.org']);
   expect(update.object?.spec?.identityProvider).toBeUndefined();
   expect(update.object?.metadata?.name).toBe('');
 });
 
-it('edit: an existing identity provider is shown read-only', async () => {
+it('edit: changes an identity provider in place, its issuer included, with its mask', async () => {
   const service = new MockConsoleService();
   const user = userEvent.setup();
   renderAt(`/organizations/${ACME_ID}/edit`, service);
   await openStep(user, 'Identity provider');
-  await waitFor(() => expect(screen.getByRole('textbox', { name: 'Client ID' })).toHaveValue('ai-grid'));
-  for (const box of screen.getAllByRole('textbox')) expect(box).toBeDisabled();
-  expect(screen.getByRole('checkbox', { name: 'Validate signature' })).toBeDisabled();
-  // Nothing can change here, so Review stays open and has nothing to save.
+  const clientId = screen.getByRole('textbox', { name: 'Client ID' });
+  await waitFor(() => expect(clientId).toHaveValue('ai-grid'));
+  await user.clear(clientId);
+  await user.paste('ai-grid-v2');
+  const secret = screen.getByRole('textbox', { name: 'Client secret reference' });
+  await user.clear(secret);
+  await user.paste('acme-robotics-oidc-client-v2');
+  await user.click(screen.getByRole('checkbox', { name: 'Validate signature' }));
+  const issuer = screen.getByRole('textbox', { name: 'Issuer' });
+  await user.clear(issuer);
+  await user.paste('https://sso.example.com/realms/acme-corp');
+  // The backend refuses a new issuer once a user has logged in through the provider, so the form
+  // warns under the field while it holds one.
+  expect(
+    screen.getByText('A new issuer is saved only if no user has logged in through this identity provider'),
+  ).toBeVisible();
+  await saveEdit(user);
+  expect(await screen.findByText('Changes to organization acme-robotics saved')).toBeVisible();
+
+  const [update] = tenantsOf(service).sent('update');
+  // The domains didn't change, so only the identity provider goes, and the mask names it alone.
+  expect(update.updateMask?.paths).toEqual(['spec.identity_provider']);
+  expect(update.object?.metadata?.version).toBe(1);
+  const config = update.object?.spec?.identityProvider?.config;
+  expect(config?.clientId).toBe('ai-grid-v2');
+  expect(config?.clientSecretSecretName).toBe('acme-robotics-oidc-client-v2');
+  expect(config?.validateSignature).toBe(false);
+  expect(config?.issuer).toBe('https://sso.example.com/realms/acme-corp');
+  expect(update.object?.spec?.domains).toEqual([]);
+  const stored = tenantsOf(service).find(ACME_ID);
+  expect(stored?.spec?.domains).toEqual(['acme-robotics.example.com', 'acme.example.org']);
+  expect(stored?.metadata?.version).toBe(2);
+  expect(stored?.spec?.identityProvider?.config?.clientId).toBe('ai-grid-v2');
+  expect(stored?.spec?.identityProvider?.config?.issuer).toBe('https://sso.example.com/realms/acme-corp');
+  const details = await screen.findByTestId('organization-configuration-details');
+  expect(details).toHaveTextContent('ai-grid-v2');
+  expect(details).toHaveTextContent('https://sso.example.com/realms/acme-corp');
+});
+
+it('edit: an identity provider is validated as on create and cannot be removed', async () => {
+  const service = new MockConsoleService();
+  const user = userEvent.setup();
+  renderAt(`/organizations/${ACME_ID}/edit`, service);
+  await openStep(user, 'Identity provider');
+  const clientId = screen.getByRole('textbox', { name: 'Client ID' });
+  await waitFor(() => expect(clientId).toHaveValue('ai-grid'));
+  await user.clear(clientId);
+  await user.tab();
+  expect(screen.getByText('Client ID is required.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Review' })).toBeDisabled();
+  // Clearing every field doesn't remove it: a blank provider is as invalid as a partial one.
+  for (const name of [
+    'Identity provider name',
+    'Description',
+    'Client secret reference',
+    'Default scopes',
+    'Authorization URL',
+    'Token URL',
+    'User info URL',
+    'JSON Web Key Set (JWKS) URL',
+    'Logout URL',
+  ]) {
+    await user.clear(screen.getByRole('textbox', { name }));
+  }
+  expect(screen.getByRole('button', { name: 'Review' })).toBeDisabled();
+  expect(screen.queryByRole('button', { name: /remove/i })).not.toBeInTheDocument();
+  expect(tenantsOf(service).sent('update')).toEqual([]);
+});
+
+it("edit: shows an identity provider refused in the backend's words, and a save it could not confirm as possibly saved", async () => {
+  const service = new MockConsoleService();
+  const refusal = new ConnectError(
+    'spec.identity_provider.config.issuer "https://sso.example.com/realms/acme-robotics" does not match the issuer "https://other.example.com" that its discovery document https://sso.example.com/realms/acme-robotics/.well-known/openid-configuration names',
+    Code.InvalidArgument,
+  );
+  const answers = [refusal, unavailable()];
+  tenantsOf(service).before.update = () => {
+    throw answers.shift();
+  };
+  const user = userEvent.setup();
+  renderAt(`/organizations/${ACME_ID}/edit`, service);
+  await openStep(user, 'Identity provider');
+  const title = screen.getByRole('textbox', { name: 'Identity provider name' });
+  await waitFor(() => expect(title).toHaveValue('Acme Robotics SSO'));
+  await user.click(title);
+  await user.paste(' v2');
+  await saveEdit(user);
+  expect(await screen.findByText('Unable to save organization')).toBeVisible();
+  expect(screen.getByText(refusal.rawMessage)).toBeVisible();
+
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  // The issuer didn't change, so the message says nothing about it.
+  expect(await screen.findByText(MAYBE_SAVED)).toBeVisible();
+  expect(screen.queryByText(UNAVAILABLE)).not.toBeInTheDocument();
+  // The form keeps the input.
+  await openStep(user, 'Identity provider');
+  expect(screen.getByRole('textbox', { name: 'Identity provider name' })).toHaveValue('Acme Robotics SSO v2');
+});
+
+it.each([
+  [
+    // A save the relay stopped waiting for may have landed, as one answered Unavailable.
+    'DeadlineExceeded as possibly saved',
+    new ConnectError('the backend did not answer in time', Code.DeadlineExceeded),
+    MAYBE_SAVED,
+  ],
+  [
+    // The stored provider's Secret, which the backend reads to restore it if the change fails.
+    "a missing Secret of the stored provider in the backend's words",
+    new ConnectError(
+      'read Secret "acme-robotics-oidc-client", the current identity provider\'s client secret, which restores it if this change fails: not found; recreate that Secret with the client secret Keycloak has now, then retry',
+      Code.FailedPrecondition,
+    ),
+    'read Secret "acme-robotics-oidc-client", the current identity provider\'s client secret, which restores it if this change fails: not found; recreate that Secret with the client secret Keycloak has now, then retry',
+  ],
+  [
+    // The Secret the change names.
+    "a missing Secret of the requested provider in the backend's words",
+    new ConnectError('identity provider secret "acme-robotics-oidc-client" not found', Code.NotFound),
+    'identity provider secret "acme-robotics-oidc-client" not found',
+  ],
+  [
+    // A new issuer once a user has logged in through the provider.
+    "a new issuer after users logged in in the backend's words",
+    new ConnectError(
+      'spec.identity_provider.config.issuer can\'t change after members have signed in through identity provider "acme-robotics" (3 linked): Keycloak links a member by the provider alias and the subject the provider sends, so a user of the new issuer with a matching subject would sign in as that member. To correct it, create a new organization, or remove the members\' links to the identity provider in Keycloak first',
+      Code.FailedPrecondition,
+    ),
+    'spec.identity_provider.config.issuer can\'t change after members have signed in through identity provider "acme-robotics" (3 linked): Keycloak links a member by the provider alias and the subject the provider sends, so a user of the new issuer with a matching subject would sign in as that member. To correct it, create a new organization, or remove the members\' links to the identity provider in Keycloak first',
+  ],
+])('edit: shows an identity provider change refused with %s', async (_case, refusal, shown) => {
+  const service = new MockConsoleService();
+  tenantsOf(service).before.update = () => {
+    throw refusal;
+  };
+  const user = userEvent.setup();
+  renderAt(`/organizations/${ACME_ID}/edit`, service);
+  await openStep(user, 'Identity provider');
+  const title = screen.getByRole('textbox', { name: 'Identity provider name' });
+  await waitFor(() => expect(title).toHaveValue('Acme Robotics SSO'));
+  await user.click(title);
+  await user.paste(' v2');
+  await saveEdit(user);
+  expect(await screen.findByText('Unable to save organization')).toBeVisible();
+  expect(screen.getByText(shown)).toBeVisible();
+  expect(tenantsOf(service).find(ACME_ID)?.metadata?.version).toBe(1);
+});
+
+it.each([
+  ['Unavailable', unavailable()],
+  ['DeadlineExceeded', new ConnectError('the backend did not answer in time', Code.DeadlineExceeded)],
+])('edit: a new issuer answered %s may already be in use for logging in', async (_code, answer) => {
+  const service = new MockConsoleService();
+  tenantsOf(service).before.update = () => {
+    throw answer;
+  };
+  const user = userEvent.setup();
+  renderAt(`/organizations/${ACME_ID}/edit`, service);
+  await openStep(user, 'Identity provider');
+  const issuer = screen.getByRole('textbox', { name: 'Issuer' });
+  await waitFor(() => expect(issuer).toHaveValue('https://sso.example.com/realms/acme-robotics'));
+  await user.clear(issuer);
+  await user.paste('https://sso.example.com/realms/acme-corp');
+  await saveEdit(user);
+  // If it landed, Keycloak already uses the new issuer, which the backend's own message (never
+  // shown: it embeds raw errors) says too.
+  expect(await screen.findByText(`${MAYBE_SAVED} ${ISSUER_MAYBE_SAVED}`)).toBeVisible();
+});
+
+it('edit: warns on leaving only when a save would send something', async () => {
+  const service = emptyService();
+  const organization = addOrganization(service, { name: input.name, domains: input.domains });
+  const user = userEvent.setup();
+  renderAt(`/organizations/${encodeURIComponent(organization.id)}/edit`, service);
+  // Turning off Validate signature alone leaves the provider blank, which a save doesn't send, so
+  // Cancel leaves at once, as Save is disabled.
+  await openStep(user, 'Identity provider');
+  await user.click(screen.getByRole('checkbox', { name: 'Validate signature' }));
   await openStep(user, 'Review');
-  expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(await screen.findByTestId('organization-configuration-details')).toBeVisible();
+  expect(screen.queryByTestId('discard-changes-modal')).not.toBeInTheDocument();
+
+  // Typing into the provider is something a save sends, so Cancel asks first.
+  await user.click(screen.getByTestId('organization-actions'));
+  await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
+  await openStep(user, 'Identity provider');
+  await user.click(screen.getByRole('textbox', { name: 'Identity provider name' }));
+  await user.paste('Tenant 1 SSO');
+  await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(await screen.findByTestId('discard-changes-modal')).toBeVisible();
+  expect(tenantsOf(service).sent('update')).toEqual([]);
 });
 
 it('leaves the create form out of history once the organization is created, so Back skips it', async () => {
@@ -595,9 +806,9 @@ it('create without an identity provider sends none, and Review says so', async (
   await user.paste('tenant1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
-  expect(screen.getByTestId('organization-configuration-details')).toHaveTextContent(
-    'No identity provider is configured.',
-  );
+  const review = screen.getByTestId('organization-configuration-details');
+  expect(within(review).getByRole('heading', { name: NO_IDP })).toBeVisible();
+  expect(review).toHaveTextContent(NO_IDP_REASON);
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
   expect(await screen.findByText('Organization tenant1 created')).toBeVisible();
   const [sent] = tenantsOf(service).sent('create');
@@ -606,7 +817,7 @@ it('create without an identity provider sends none, and Review says so', async (
   expect(sent.object?.spec?.identityProvider).toBeUndefined();
 });
 
-it('lists the identity provider by title and a dash without one, and no status the backend lacks', async () => {
+it('lists the identity provider by title, warns without one, and shows no status the backend lacks', async () => {
   const service = new MockConsoleService();
   addOrganization(service, { name: 'umbrella-biotech', domains: ['umbrella.example.com'] }, 'u');
   renderAt('/organizations', service);
@@ -614,7 +825,13 @@ it('lists the identity provider by title and a dash without one, and no status t
   expect(acme).toHaveTextContent('Acme Robotics SSO');
   expect(acme).not.toHaveTextContent('https://sso.example.com/realms/acme-robotics');
   const umbrella = screen.getByRole('row', { name: /^umbrella-biotech / });
-  expect(within(umbrella).getAllByText('—')).toHaveLength(1);
+  // AI Grid has none, so the cell says so, as a cluster without a role does, with what that means
+  // unless one was set up in Keycloak directly, which the backend doesn't report.
+  const missing = within(umbrella).getByTestId('missing-idp-umbrella-biotech');
+  expect(missing).toHaveTextContent(NO_IDP);
+  expect(within(umbrella).queryByText('—')).not.toBeInTheDocument();
+  await userEvent.setup().hover(missing);
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(NO_IDP_REASON);
   // The backend's Tenant reports no state (TenantStatus is empty), so the list has no Status column.
   expect(screen.queryByRole('columnheader', { name: /Status/ })).not.toBeInTheDocument();
 });
@@ -701,28 +918,95 @@ it('moves an edit refused for a field to that field, once, and lets the user ret
   expect(screen.getByText('The domain is already taken.')).toBeVisible();
   // Going back to Review stays there: the move happens once per refused save.
   await openStep(user, 'Review');
-  expect(screen.getByRole('button', { name: 'Save changes' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeVisible();
   expect(screen.queryByRole('textbox', { name: 'Domain 1' })).not.toBeInTheDocument();
 });
 
-it('edit: an organization without an identity provider says one can be added only on create', async () => {
+it('edit: an organization without an identity provider keeps none while the step stays blank', async () => {
   const service = emptyService();
   const organization = addOrganization(service, { name: input.name, domains: input.domains });
   const user = userEvent.setup();
   renderAt(`/organizations/${encodeURIComponent(organization.id)}/edit`, service);
   await openStep(user, 'Identity provider');
-  expect(
-    screen.getByText(
-      'This organization has no identity provider. One can be added only when an organization is created.',
-    ),
-  ).toBeVisible();
-  expect(screen.queryByRole('textbox', { name: 'Client ID' })).not.toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Client ID' })).toHaveValue('');
+  // Turning off Validate signature alone leaves the provider blank: nothing to send, nothing to save.
+  await user.click(screen.getByRole('checkbox', { name: 'Validate signature' }));
+  await openStep(user, 'Review');
+  expect(screen.getByRole('heading', { name: NO_IDP })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   await openStep(user, 'Organization details');
   await user.click(screen.getByRole('textbox', { name: 'Domain 1' }));
   await user.paste('x');
   await saveEdit(user);
   expect(await screen.findByText(`Changes to organization ${organization.name} saved`)).toBeVisible();
-  expect(tenantsOf(service).sent('update')[0].object?.spec?.identityProvider).toBeUndefined();
+  const [update] = tenantsOf(service).sent('update');
+  expect(update.updateMask?.paths).toEqual(['spec.domains']);
+  expect(update.object?.spec?.identityProvider).toBeUndefined();
+});
+
+it('edit: adds an identity provider to an organization without one, validated as on create', async () => {
+  const service = emptyService();
+  const organization = addOrganization(service, { name: input.name, domains: input.domains });
+  const user = userEvent.setup();
+  renderAt(`/organizations/${encodeURIComponent(organization.id)}/edit`, service);
+  await openStep(user, 'Identity provider');
+  // A partly filled provider isn't valid, as on create.
+  await user.click(screen.getByRole('textbox', { name: 'Identity provider name' }));
+  await user.paste('Tenant 1 SSO');
+  expect(screen.getByRole('button', { name: 'Review' })).toBeDisabled();
+  // Without a provider there are no users to match, so the issuer has its example, as on create.
+  expect(screen.getByText('For example https://sso.example.com/realms/acme.')).toBeVisible();
+  expect(screen.queryByText(/The issuer can be edited only until/)).not.toBeInTheDocument();
+  await fillRequiredIdp(user, requiredIdp);
+  await saveEdit(user);
+  expect(await screen.findByText(`Changes to organization ${organization.name} saved`)).toBeVisible();
+
+  const [update] = tenantsOf(service).sent('update');
+  expect(update.updateMask?.paths).toEqual(['spec.identity_provider']);
+  expect(update.object?.spec?.identityProvider?.title).toBe('Tenant 1 SSO');
+  expect(update.object?.spec?.identityProvider?.config?.issuer).toBe('https://idp.example.com');
+  expect(update.object?.spec?.domains).toEqual([]);
+  expect(tenantsOf(service).find(organization.id)?.spec?.domains).toEqual(input.domains);
+  expect(tenantsOf(service).find(organization.id)?.spec?.identityProvider?.config?.clientSecretSecretName).toBe(
+    'secret',
+  );
+  expect(await screen.findByTestId('organization-configuration-details')).toHaveTextContent('Tenant 1 SSO');
+});
+
+it("edit: shows an add refused for a provider this API did not create in the backend's words", async () => {
+  const service = emptyService();
+  const organization = addOrganization(service, { name: input.name, domains: input.domains });
+  // Made in Keycloak directly, with a provider of its own under the organization's alias.
+  tenantsOf(service).before.update = () => {
+    throw new ConnectError(
+      'the organization already has identity provider "tenant1", which this API didn\'t create; manage it in Keycloak, or remove it there before adding one here',
+      Code.FailedPrecondition,
+    );
+  };
+  const user = userEvent.setup();
+  renderAt(`/organizations/${encodeURIComponent(organization.id)}/edit`, service);
+  await openStep(user, 'Identity provider');
+  await fillRequiredIdp(user, requiredIdp);
+  await saveEdit(user);
+  expect(await screen.findByText('Unable to save organization')).toBeVisible();
+  expect(
+    screen.getByText(
+      'the organization already has identity provider "tenant1", which this API didn\'t create; manage it in Keycloak, or remove it there before adding one here',
+    ),
+  ).toBeVisible();
+  expect(tenantsOf(service).find(organization.id)?.spec?.identityProvider).toBeUndefined();
+});
+
+it('the organization page says when an organization has no identity provider', async () => {
+  const service = emptyService();
+  const organization = addOrganization(service, { name: input.name, domains: input.domains });
+  renderAt(`/organizations/${encodeURIComponent(organization.id)}`, service);
+  const details = await screen.findByTestId('organization-configuration-details');
+  // The backend reports only a provider it created, so the page can't say its users cannot log in:
+  // one set up in Keycloak directly is not reported.
+  expect(within(details).getByRole('heading', { name: NO_IDP })).toBeVisible();
+  expect(details).toHaveTextContent(NO_IDP_REASON);
+  expect(within(details).queryByRole('button', { name: 'OIDC endpoints' })).not.toBeInTheDocument();
 });
 
 it('reloads an organization after a stale delete from its page, keeping the typed name, so a retry succeeds', async () => {
@@ -822,7 +1106,7 @@ it('heads the wizard sections at h2, moves focus to an added domain, and names t
   await user.click(await screen.findByTestId('organization-actions'));
   await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
   const modal = await screen.findByTestId('delete-organization-modal');
-  expect(within(modal).getByRole('textbox', { name: `Type ${organization.name} to confirm:` })).toBeVisible();
+  expect(within(modal).getByRole('textbox', { name: `Type ${organization.name} to confirm deletion:` })).toBeVisible();
 });
 
 it('edit: an identity provider saved without a JWKS URL is kept, and the domains still save', async () => {

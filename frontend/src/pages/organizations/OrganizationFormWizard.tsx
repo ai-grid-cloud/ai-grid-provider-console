@@ -2,7 +2,7 @@
 // Combined adaptation of OSAC TenantCreatePage and IdentityProviderCreateWizard.
 // Source commit: 8cb0a227e45cc9b17421b6e79ce493ed370ebd5d. Break-glass flow is omitted.
 import { useEffect, useRef } from 'react';
-import { Alert, Content, Form, Wizard, WizardStep, useWizardContext } from '@patternfly/react-core';
+import { Form, Wizard, WizardStep, useWizardContext } from '@patternfly/react-core';
 import { ConsoleWizardFooter } from '../../components/ConsoleWizardFooter';
 import { useConfirmDiscard } from '../../hooks/useConfirmDiscard';
 import { IdentityProviderFields } from './IdentityProviderFields';
@@ -55,8 +55,8 @@ const GoToRefusedField: React.FC<{ refused?: object; errorStep?: string }> = ({ 
 /**
  * Creates an organization in three steps: its details, its identity provider, then a review. With
  * `organization` it edits that one through the same steps: every step can be opened from the start,
- * the name and the identity provider are read-only, and Save changes on the Review step
- * stays disabled until something changed.
+ * the name is read-only, an identity provider can be added or changed but not removed, and Save on
+ * the Review step stays disabled until something changed.
  */
 export const OrganizationFormWizard: React.FC<Props> = ({ organization }) => {
   const editing = !!organization;
@@ -83,7 +83,7 @@ export const OrganizationFormWizard: React.FC<Props> = ({ organization }) => {
             />
             <ConsoleWizardFooter
               submitStepId="organization-review"
-              submitLabel={editing ? 'Save changes' : 'Create organization'}
+              submitLabel={editing ? 'Save' : 'Create organization'}
               errorTitle="Unable to save organization"
               isStepValid={(step) =>
                 form.detailsValid &&
@@ -112,25 +112,13 @@ export const OrganizationFormWizard: React.FC<Props> = ({ organization }) => {
         </WizardStep>
         <WizardStep name="Identity provider" id="organization-idp" isDisabled={!form.detailsValid || saving}>
           <Form maxWidth="750px">
-            {form.idpLocked && !organization?.identityProvider ? (
-              <Content component="p">
-                This organization has no identity provider. One can be added only when an organization is created.
-              </Content>
-            ) : (
-              <>
-                {form.idpLocked && (
-                  <Alert variant="info" isInline isPlain title="Identity provider cannot be edited">
-                    It is set when the organization is created.
-                  </Alert>
-                )}
-                <IdentityProviderFields
-                  value={values.identityProvider}
-                  serverErrors={form.idpServerErrors}
-                  onChange={(identityProvider) => setValues({ ...values, identityProvider })}
-                  isDisabled={saving || form.idpLocked}
-                />
-              </>
-            )}
+            <IdentityProviderFields
+              value={values.identityProvider}
+              serverErrors={form.idpServerErrors}
+              onChange={(identityProvider) => setValues({ ...values, identityProvider })}
+              savedIssuer={form.savedIssuer}
+              isDisabled={saving}
+            />
           </Form>
         </WizardStep>
         <WizardStep name="Review" id="organization-review" isDisabled={!form.detailsValid || !form.idpValid || saving}>

@@ -32,7 +32,7 @@ vi.mock('../pages/monitoring/PersesDashboardView', async () => {
         <div data-testid="perses-dashboard">
           {dashboard.metadata.project}/{dashboard.metadata.name}
         </div>
-        <a href="/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage&project=ai-grid&var-cluster=site-a">
+        <a href="/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage-admin&project=ai-grid&var-cluster=site-a">
           usage of site-a
         </a>
         <a href="/monitoring/v2/dashboards/view?dashboard=acm-optimization-overview&project=ai-grid">optimization</a>
@@ -56,13 +56,13 @@ const withMonitoring = (persesProject: string, dashboards: DashboardResource[]) 
 };
 
 const hub = [
-  dashboard('ai-grid', 'dashboard-2-usage', 'Token usage'),
-  dashboard('ai-grid', 'dashboard-1-fleet', 'Fleet health'),
+  dashboard('ai-grid', 'dashboard-2-usage-admin', 'Token usage'),
+  dashboard('ai-grid', 'dashboard-1-fleet-admin', 'Fleet health'),
   dashboard('ai-grid', 'acm-clusters-overview', 'ACM Clusters Overview'),
-  dashboard('other', 'dashboard-1-fleet', 'Someone else'),
+  dashboard('other', 'dashboard-1-fleet-admin', 'Someone else'),
 ];
 
-it("shows the configured project's dashboard-* dashboards as tabs, the first one open", async () => {
+it("shows the configured project's dashboard-*-admin dashboards as tabs, the first one open", async () => {
   renderAt('/monitoring', withMonitoring('ai-grid', hub));
   const tabs = within(await screen.findByTestId('monitoring-tabs')).getByRole('tablist');
   expect(
@@ -71,15 +71,15 @@ it("shows the configured project's dashboard-* dashboards as tabs, the first one
       .map((t) => t.textContent),
   ).toEqual(['Fleet health', 'Token usage']);
   expect(within(tabs).getByRole('tab', { name: 'Fleet health' })).toHaveAttribute('aria-selected', 'true');
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
 });
 
 it('opens the tab ?dashboard= names, and another one on click', async () => {
   const user = userEvent.setup();
-  renderAt('/monitoring?dashboard=dashboard-2-usage', withMonitoring('ai-grid', hub));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-2-usage');
+  renderAt('/monitoring?dashboard=dashboard-2-usage-admin', withMonitoring('ai-grid', hub));
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-2-usage-admin');
   await user.click(screen.getByRole('tab', { name: 'Fleet health' }));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
   expect(screen.getByRole('tab', { name: 'Fleet health' })).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -94,9 +94,13 @@ it("says when the caller can't read the dashboards", async () => {
   const service = withMonitoring('ai-grid', []);
   service.listMonitoringDashboards = () => Promise.reject(new ServiceError(403, 'forbidden: project ai-grid'));
   renderAt('/monitoring', service);
-  expect(await screen.findByRole('heading', { name: 'Access permissions needed' })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'No access' })).toBeVisible();
   expect(screen.getByText('forbidden: project ai-grid')).toBeVisible();
-  expect(screen.getByText('To view dashboards, ask your hub administrator for access.')).toBeVisible();
+  expect(
+    screen.getByText(
+      "You don't have permission to view dashboards. To request permission, contact your hub administrator.",
+    ),
+  ).toBeVisible();
 });
 
 it("says when the dashboards can't be loaded, and retries", async () => {
@@ -108,7 +112,7 @@ it("says when the dashboards can't be loaded, and retries", async () => {
   expect(await screen.findByRole('heading', { name: 'Unable to load dashboards' })).toBeVisible();
   service.listMonitoringDashboards = list;
   await user.click(screen.getByRole('button', { name: 'Retry' }));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
 });
 
 it("says when the console's configuration can't be read, instead of falling back", async () => {
@@ -121,7 +125,7 @@ it("says when the console's configuration can't be read, instead of falling back
   expect(screen.queryByRole('heading', { name: 'Monitoring is not set up for this console' })).not.toBeInTheDocument();
   service.getConfig = getConfig;
   await user.click(screen.getByRole('button', { name: 'Retry' }));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
 });
 
 it('says Monitoring is not set up, and which Helm values set it up, when the console relays to no Perses', async () => {
@@ -147,12 +151,12 @@ it('says Monitoring is not set up, and which Helm values set it up, when the con
 it("opens a dashboard's link to another tab here, and says when a link goes elsewhere", async () => {
   const user = userEvent.setup();
   renderAt('/monitoring', withMonitoring('ai-grid', hub));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
   await user.click(screen.getByRole('link', { name: 'optimization' }));
   expect(await screen.findByText('Link not available in this console')).toBeVisible();
-  expect(screen.getByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet');
+  expect(screen.getByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-1-fleet-admin');
   await user.click(screen.getByRole('link', { name: 'usage of site-a' }));
-  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-2-usage');
+  expect(await screen.findByTestId('perses-dashboard')).toHaveTextContent('ai-grid/dashboard-2-usage-admin');
   expect(screen.getByRole('tab', { name: 'Token usage' })).toHaveAttribute('aria-selected', 'true');
   expect(screen.queryByText('Link not available in this console')).not.toBeInTheDocument();
 });
@@ -163,19 +167,19 @@ describe('monitoringLinkFor', () => {
   it("maps the OpenShift console's and Perses's dashboard links to a tab, keeping time and variables", () => {
     expect(
       monitoringLinkFor(
-        '/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage&project=ai-grid&var-cluster=site-a&start=6h&x=1',
+        '/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage-admin&project=ai-grid&var-cluster=site-a&start=6h&x=1',
         tabs,
         'ai-grid',
       ),
-    ).toBe('/monitoring?dashboard=dashboard-2-usage&var-cluster=site-a&start=6h');
-    expect(monitoringLinkFor('/projects/ai-grid/dashboards/dashboard-1-fleet?var-a=b', tabs, 'ai-grid')).toBe(
-      '/monitoring?dashboard=dashboard-1-fleet&var-a=b',
+    ).toBe('/monitoring?dashboard=dashboard-2-usage-admin&var-cluster=site-a&start=6h');
+    expect(monitoringLinkFor('/projects/ai-grid/dashboards/dashboard-1-fleet-admin?var-a=b', tabs, 'ai-grid')).toBe(
+      '/monitoring?dashboard=dashboard-1-fleet-admin&var-a=b',
     );
   });
 
   it('reads a link without a project as one to the same project', () => {
-    expect(monitoringLinkFor('/monitoring/v2/dashboards/view?dashboard=dashboard-1-fleet', tabs, 'ai-grid')).toBe(
-      '/monitoring?dashboard=dashboard-1-fleet',
+    expect(monitoringLinkFor('/monitoring/v2/dashboards/view?dashboard=dashboard-1-fleet-admin', tabs, 'ai-grid')).toBe(
+      '/monitoring?dashboard=dashboard-1-fleet-admin',
     );
   });
 
@@ -184,20 +188,41 @@ describe('monitoringLinkFor', () => {
       undefined,
     );
     expect(
-      monitoringLinkFor('/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage&project=other', tabs, 'ai-grid'),
+      monitoringLinkFor(
+        '/monitoring/v2/dashboards/view?dashboard=dashboard-2-usage-admin&project=other',
+        tabs,
+        'ai-grid',
+      ),
     ).toBe(undefined);
-    expect(monitoringLinkFor('/projects/other/dashboards/dashboard-1-fleet', tabs, 'ai-grid')).toBe(undefined);
+    expect(monitoringLinkFor('/projects/other/dashboards/dashboard-1-fleet-admin', tabs, 'ai-grid')).toBe(undefined);
     expect(monitoringLinkFor('/multicloud/infrastructure/clusters', tabs, 'ai-grid')).toBe(undefined);
-    expect(monitoringLinkFor('/projects/%/dashboards/dashboard-1-fleet', tabs, 'ai-grid')).toBe(undefined);
+    expect(monitoringLinkFor('/projects/%/dashboards/dashboard-1-fleet-admin', tabs, 'ai-grid')).toBe(undefined);
     expect(monitoringLinkFor('/projects/ai-grid/dashboards/%', tabs, 'ai-grid')).toBe(undefined);
   });
 });
 
 describe('monitoringTabs', () => {
-  it('keeps the dashboard-* dashboards, ordered by name', () => {
+  it('keeps the dashboard-*-admin dashboards, ordered by name', () => {
     expect(monitoringTabs(hub.slice(0, 3)).map((d) => d.metadata.name)).toEqual([
-      'dashboard-1-fleet',
-      'dashboard-2-usage',
+      'dashboard-1-fleet-admin',
+      'dashboard-2-usage-admin',
+    ]);
+  });
+
+  it('leaves out the dashboards for users without cluster-wide access, as odh-dashboard does for an admin, and My Usage', () => {
+    // A hub's redhat-ods-monitoring: OpenShift AI's two model dashboards, both titled Models, and
+    // MaaS's two usage dashboards, the per-user one (My Usage) without an admin variant.
+    const project = [
+      dashboard('redhat-ods-monitoring', 'dashboard-0-cluster-admin', 'Cluster'),
+      dashboard('redhat-ods-monitoring', 'dashboard-1-model', 'Models'),
+      dashboard('redhat-ods-monitoring', 'dashboard-1-model-admin', 'Models'),
+      dashboard('redhat-ods-monitoring', 'dashboard-4-maas-usage-logs-admin', 'Usage'),
+      dashboard('redhat-ods-monitoring', 'dashboard-5-maas-usage-logs', 'My Usage'),
+    ];
+    expect(monitoringTabs(project).map((d) => d.metadata.name)).toEqual([
+      'dashboard-0-cluster-admin',
+      'dashboard-1-model-admin',
+      'dashboard-4-maas-usage-logs-admin',
     ]);
   });
 });
@@ -236,7 +261,7 @@ describe('a 401 from the relay', () => {
     await user.click(screen.getByRole('button', { name: 'panels answered 401' }));
     await waitFor(() => expect(getUser).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('perses-dashboard')).toBeVisible();
-    expect(screen.queryByText(/Your session has ended|Logging you in/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Session expired|Logging you in/)).not.toBeInTheDocument();
   });
 
   it('checks the session, and keeps it, when Perses answers the dashboards list with 401', async () => {
@@ -247,7 +272,7 @@ describe('a 401 from the relay', () => {
     expect(await screen.findByText('Perses refused the token')).toBeVisible();
     // Once on load, once for the check.
     await waitFor(() => expect(getUser).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText(/Your session has ended|Logging you in/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Session expired|Logging you in/)).not.toBeInTheDocument();
   });
 
   it('ends the session when the user answers 401 too', async () => {

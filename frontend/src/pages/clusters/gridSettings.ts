@@ -11,7 +11,7 @@ const labelValue = /^[A-Za-z0-9]([-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?$/;
 
 /** What is wrong with a location label, trimmed, as Add and Edit check it; undefined when the hub accepts it. */
 export const locationError = (location: string) => {
-  if (!location) return 'Required.';
+  if (!location) return 'Required';
   if (!labelValue.test(location)) {
     return 'Must start and end with a letter or number. Valid characters include letters, numbers, hyphens (-), underscores (_), and periods (.). Up to 63 characters.';
   }
@@ -43,7 +43,7 @@ export const settingsErrors = (s: GridSettings): Partial<Record<GridSettingsFiel
   const errors: Partial<Record<GridSettingsField, string>> = {};
   const location = locationError(s.location.trim());
   if (location) errors.location = location;
-  if (!s.role) errors.role = 'Required.';
+  if (!s.role) errors.role = 'Required';
   return errors;
 };
 

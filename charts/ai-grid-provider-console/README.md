@@ -5,6 +5,60 @@ frontend) and `ai-grid-provider-backend`. `hack/deploy.sh` (`make deploy`) insta
 OAuthClient and Secrets it expects; `docs/dev-setup.md`, "Deploy to a cluster", has the details.
 `values.yaml` documents every value and `values.schema.json` refuses any it doesn't list.
 
+## Provider admins
+
+The console is for provider admins only. Before it serves anything but `/api/v1/user` and
+`/api/v1/config`, the BFF asks the hub with the caller's own token whether they may `post` to the
+non-resource URL `/ai-grid/provider-console`. No server serves that path; the right exists only
+for this check. The chart creates ClusterRole `ai-grid-provider-admin` with exactly that rule and
+binds it to nobody. Any role with a `*` nonResourceURLs rule for `post` (or every verb) grants it
+too, such as cluster-admin, so cluster-admins already hold it. The
+verb is `post` because OpenShift's `cluster-reader` may `get` every non-resource URL. Anyone else
+who signs in gets "Access permissions needed", and 403 from the API and the relays, until they
+are bound to the role.
+
+Provider admins sign in with their OpenShift account on the hub, through kube-auth-proxy. Bind
+OpenShift users and groups of the hub. An organization's identity provider and its groups are
+unrelated: organization users never reach this console.
+
+Grant access with `oc` (needs cluster-admin, or the right to bind the role):
+
+```sh
+oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group>
+oc adm policy add-cluster-role-to-user ai-grid-provider-admin <user>
+# and to take it away
+oc adm policy remove-cluster-role-from-group ai-grid-provider-admin <group>
+oc adm policy remove-cluster-role-from-user ai-grid-provider-admin <user>
+```
+
+Or with the chart's values, which keep the list in the release (for example in the GitOps
+repository that installs it). Non-empty lists create ClusterRoleBinding `ai-grid-provider-admins`:
+
+```yaml
+providerAdmins:
+  groups: [ai-grid-provider-admins]
+  users: [alice]
+```
+
+Check a user with `oc auth can-i post /ai-grid/provider-console --as=<user> [--as-group=<group>]`,
+the same question the BFF asks (`oc adm policy who-can` can't evaluate non-resource URLs).
+`helm uninstall` deletes the ClusterRole and the chart's binding. Bindings made with
+`oc adm policy` stay and take effect again when the chart is reinstalled.
+
+The role lets a provider admin into the console, and nothing more. The Monitoring page reads the
+hub's Perses through the BFF's Perses relay, which forwards the caller's own token: Perses
+authorizes the read of the PersesDashboards and PersesDatasources in the `console.perses.project`
+project and of the PersesGlobalDatasources, and each datasource's server (the hub's Thanos and
+Loki) authorizes the queries Perses sends it with that token. A provider admin who is not a
+cluster-admin needs those reads granted separately, such as read on those Perses resources and
+`cluster-monitoring-view` for metrics, or Monitoring shows their errors. The chart doesn't add
+them to `ai-grid-provider-admin`.
+
+Before this check, the console asked whether the caller may `patch` ManagedClusters. On ACM hubs
+the `open-cluster-management:hypershift-addon:agent` ClusterRoleBinding grants that to
+`system:authenticated`, so every OpenShift user was let in. Upgrading leaves out every admin who
+is not a cluster-admin until they are bound to the new role.
+
 ## Images
 
 Each image is `repository:tag`, `repository@digest`, or `repository:tag@digest` when both are set.

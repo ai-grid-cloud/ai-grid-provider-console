@@ -36,7 +36,7 @@ export const CreateSubscriptionPage: React.FC = () => {
   return (
     <PageStateSection
       title="Create subscription"
-      description="Give groups of an organization's users access to models, with token limits for each model."
+      description="Configure models available with this subscription, token limits for each one, and assign user groups as members to grant them access."
       breadcrumb={
         <Breadcrumb>
           <BreadcrumbItem

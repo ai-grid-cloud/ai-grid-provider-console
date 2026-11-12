@@ -191,8 +191,16 @@ when the RPCs allow it.
   reads or writes (a write gets `BACKEND_WRITE_TIMEOUT`). Remove the list once the
   backend authorizes every RPC itself.
 - `requireProviderAdmin` (`bff/internal/api/middleware.go`), the BFF's one authorization
-  decision: every `/api/v1` call except `GET` (or `HEAD`) `/user` and `/config` needs the caller's
-  `isProviderAdmin` review to pass (403 otherwise), until the backend authorizes the caller.
+  decision: every `/api/v1` call except `GET` (or `HEAD`) `/user` and `/config`, every Connect
+  relay call and every Perses relay call needs the caller's `isProviderAdmin` review to pass (403
+  otherwise), until the backend authorizes the caller. The review asks for `post` on the
+  non-resource URL `/ai-grid/provider-console` (`hub.ProviderAdminCheck`). The chart's
+  `ai-grid-provider-admin` ClusterRole grants it, and so does any role with a `*` nonResourceURLs
+  rule for `post` (or every verb), such as cluster-admin; check a user with
+  `oc auth can-i post /ai-grid/provider-console --as=<user> [--as-group=<group>]`
+  (`oc adm policy who-can` can't evaluate non-resource URLs). Don't borrow another component's
+  right for it, and don't make it `get`: ACM grants `patch` on ManagedClusters to every
+  authenticated user, and OpenShift's `cluster-reader` may `get` every non-resource URL.
 
 ## Agent skills
 

@@ -8,7 +8,7 @@ import { StaleDataAlert } from './StaleDataAlert';
 
 type Props = {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   breadcrumb?: React.ReactElement;
   /** The object's compact status label, beside the title. */
   status?: React.ReactNode;

@@ -3,23 +3,6 @@ packages:
 allowBuilds:
   esbuild: true
 
-# pnpm refuses a version published less than a day ago (minimumReleaseAge, one day by default),
-# even in a frozen install from a lockfile that names it. These Perses plugin prereleases were
-# published on 2026-11-05 between 11:37 and 11:56 UTC (the bar chart at 11:41:22, the time series
-# last, at 11:56:15); the list names exactly them, so every other package keeps the delay. Drop it
-# after 2026-11-06 11:57 UTC, when they're all a day old.
-minimumReleaseAgeExclude:
-  - '@perses-dev/bar-chart-plugin@0.15.0-beta.1'
-  - '@perses-dev/gauge-chart-plugin@0.15.0-beta.1'
-  - '@perses-dev/loki-plugin@0.8.0-beta.1'
-  - '@perses-dev/markdown-plugin@0.14.0-beta.1'
-  - '@perses-dev/pie-chart-plugin@0.16.0-beta.1'
-  - '@perses-dev/prometheus-plugin@0.60.0-beta.1'
-  - '@perses-dev/stat-chart-plugin@0.16.0-beta.1'
-  - '@perses-dev/static-list-variable-plugin@0.11.0-beta.1'
-  - '@perses-dev/table-plugin@0.15.0-beta.1'
-  - '@perses-dev/timeseries-chart-plugin@0.15.0-beta.1'
-
 overrides:
   # GHSA-w74x-v6f9-j3xg (URI scheme spoofing): @perses-dev/plugin-system 0.56.0-beta.1 pins
   # fast-uri 3.1.8. Drop this once the Perses release in use depends on fast-uri 3.1.9 or later.

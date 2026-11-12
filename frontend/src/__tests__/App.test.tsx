@@ -82,7 +82,7 @@ describe('App', () => {
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveAttribute('href', '/oauth2/sign_out');
     await user.click(screen.getByRole('menuitem', { name: 'About' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('Logged in asUnable to load');
-    expect(screen.queryByText('Your session has ended')).not.toBeInTheDocument();
+    expect(screen.queryByText('Session expired')).not.toBeInTheDocument();
   });
 
   it('opens About and offers Log out while the user is still loading', async () => {
@@ -120,7 +120,7 @@ describe('App', () => {
         <TestApp service={service} />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('heading', { level: 1, name: 'Access permissions needed' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'No access' })).toBeInTheDocument();
     expect(screen.getByText(/You are logged in as viewer/)).toHaveTextContent(
       'To use another account, log out from the user menu.',
     );
@@ -161,7 +161,7 @@ describe('App', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole('row', { name: /^site1 / })).toBeInTheDocument();
-    expect(screen.queryByText('Access permissions needed')).not.toBeInTheDocument();
+    expect(screen.queryByText('No access')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument();
     // Not silently read-only: the console says it couldn't tell, and tries again.
     const alert = screen.getByTestId('user-load-error');
@@ -339,7 +339,7 @@ describe('an ended session', () => {
     const navigation = fakeNavigation();
     const user = userEvent.setup();
     renderEnded(expiredService(), navigation);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Log in' }));
@@ -384,7 +384,7 @@ describe('an ended session', () => {
       throw expired();
     };
     await act(async () => organizations.reject(new ConnectError(expired().message, Code.Unauthenticated)));
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).toHaveBeenCalledTimes(1);
   });
@@ -398,14 +398,14 @@ describe('an ended session', () => {
     // that makes the console ask (sessionCheck).
     service.getUser = vi.fn<() => Promise<User>>().mockReturnValueOnce(user.promise).mockRejectedValue(expired());
     const first = renderEnded(service, navigation, undefined, '/organizations');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     await act(async () => user.resolve(await new MockConsoleService().getUser()));
     await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user'));
     first.unmount();
 
     // A reload within the window answers 401 again: still the ended session, not another redirect.
     renderEnded(expiredService(), navigation);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
   });
@@ -415,7 +415,7 @@ describe('an ended session', () => {
     renderEnded(expiredService(), navigation, () => {
       throw new DOMException('The operation is insecure.', 'SecurityError');
     });
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log in' })).toBeVisible();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
@@ -427,7 +427,7 @@ describe('an ended session', () => {
     const navigation = fakeNavigation();
     const user = userEvent.setup();
     renderEnded(service, navigation);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expect(screen.getByText(/The fake backend has no login/)).toBeVisible();
     await screen.findByText(/^Fake backend:/);
     expectFullPage();
@@ -458,7 +458,7 @@ describe('an ended session', () => {
     const user = userEvent.setup();
     renderEnded(service, navigation);
     // Without the config the console can't tell a login proxy from the fake backend, which has none.
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your session has ended' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Reload' }));

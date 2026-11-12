@@ -3,11 +3,14 @@
 // as the backend's internal/servers/tenants_server.go and identity_provider.go answer at
 // .backend-api-version: versions from 1, bumped on every write; a version required on Update and
 // Delete (InvalidArgument without one) and Aborted when stale; AlreadyExists for a taken name or
-// domain; NotFound; an identity provider set only on Create, normalized (an empty title is the
-// name, the default scopes "openid profile email", enabled and validate_signature true), and
-// refused on an Update that adds, changes or removes it. The backend sends no field violations;
-// a test that needs them throws its own from `before`.
-import { clone, create, type MessageInitShape } from '@bufbuild/protobuf';
+// domain; NotFound; an identity provider normalized (an empty title is the name, the default
+// scopes "openid profile email", enabled and validate_signature true), which Create sets and
+// Update adds or changes in place (identityProviderToWrite): an Update that repeats it writes
+// nothing, one that removes it is InvalidArgument. Refusals that depend on Keycloak's state (a new
+// issuer once a user has logged in through the provider, a provider this API didn't create, a
+// missing Secret) aren't modelled: a test throws the backend's from `before`. The backend sends no
+// field violations; a test that needs them throws its own from `before`.
+import { clone, create, equals, type MessageInitShape } from '@bufbuild/protobuf';
 import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Code, ConnectError } from '@connectrpc/connect';
 import type { FakeBackend } from '../api/connect/testing';
@@ -97,6 +100,25 @@ const normalized = (name: string, idp: IdentityProvider): IdentityProvider => {
   out.config.defaultScopes = out.config.defaultScopes.trim() || 'openid profile email';
   out.config.validateSignature ??= true;
   return out;
+};
+
+/**
+ * The identity provider an Update writes (identityProviderToWrite): the sent one, normalized, when
+ * it adds one or changes the stored one; none when it repeats the stored one or neither has one.
+ */
+const identityProviderToWrite = (stored: Tenant, sent: IdentityProvider | undefined): IdentityProvider | undefined => {
+  const kept = stored.spec?.identityProvider;
+  if (!sent) {
+    if (kept) {
+      throw new ConnectError(
+        "spec.identity_provider cannot be removed: the organization's members sign in through it; change it instead",
+        Code.InvalidArgument,
+      );
+    }
+    return undefined;
+  }
+  const next = normalized(stored.metadata?.name ?? '', sent);
+  return kept && equals(IdentityProviderSchema, kept, next) ? undefined : next;
 };
 
 /** The update_mask paths the backend accepts (tenantUpdatePaths), with what each writes. */
@@ -230,18 +252,12 @@ export class FakeTenants {
           );
         }
         const paths = maskPaths(updateMask?.paths ?? []);
-        if (paths.idp) {
-          const sent = object.spec?.identityProvider;
-          const kept = stored.spec?.identityProvider;
-          if (!kept && sent) {
-            throw new ConnectError('spec.identity_provider cannot be added after create', Code.InvalidArgument);
-          }
-          if (kept && !sent) throw new ConnectError('spec.identity_provider cannot be removed', Code.InvalidArgument);
-        }
+        const nextIdp = paths.idp ? identityProviderToWrite(stored, object.spec?.identityProvider) : undefined;
         const next = clone(TenantSchema, stored);
         if (paths.name && object.metadata?.name && next.metadata) next.metadata.name = object.metadata.name;
         if (paths.domains && next.spec) next.spec.domains = (object.spec?.domains ?? []).map((d) => d.trim());
-        if (paths.name || paths.domains) {
+        if (nextIdp && next.spec) next.spec.identityProvider = nextIdp;
+        if (paths.name || paths.domains || nextIdp) {
           if (this.taken(object.id, next.metadata?.name ?? '', next.spec?.domains ?? [])) {
             throw new ConnectError(
               `update tenant "${object.id}": the name or a domain is already used by another organization`,

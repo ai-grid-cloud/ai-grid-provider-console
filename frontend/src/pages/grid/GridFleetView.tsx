@@ -72,7 +72,7 @@ const whereOf = (cluster: FleetCluster) => [cluster.siteName, cluster.region].fi
 const hasCoordinates = (c: FleetCluster) => c.latitude !== undefined && c.longitude !== undefined;
 
 /** The availability filter: All, then each cluster status by the word the labels use. */
-const availabilityFilters: FleetCluster['status'][] = ['Ready', 'Offline', 'Unknown'];
+const availabilityFilters: FleetCluster['status'][] = ['Ready', 'Unavailable', 'Unknown'];
 
 /** A link can open the drawer on a cluster (?cluster=<name>) or a model (?model=<id>, the model's id). */
 const selectionFrom = (params: URLSearchParams): Selection | null => {
@@ -326,7 +326,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
       >
         {modelLinks(cluster)}
       </DetailsSection>
-      <Link to="/clusters">View cluster details</Link>
+      <Link to={`/clusters/${encodeURIComponent(cluster.name)}`}>View cluster details</Link>
     </Stack>
   );
 
@@ -358,10 +358,9 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
 
   const noResults = <NoResultsState body="Adjust your filters and try again." onClear={clearFilters} />;
 
-  // Not on the map: no position (no annotations, no known cloud region), or annotations to fix.
+  // Not on the map: no position (no annotations, no known cloud region), or annotations to fix. The
+  // drawer names each cluster's problem (Position error); the note only counts them.
   const notOnMap = clusters.filter((c) => !hasCoordinates(c));
-  const withProblem = notOnMap.filter((c) => c.locationProblem).length;
-  const withoutPosition = notOnMap.length - withProblem;
 
   const list = (
     <Stack hasGutter>
@@ -421,19 +420,18 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
             })}
       </Stack>
       {mode === 'cluster' && notOnMap.length > 0 && (
-        <SubtleText>
-          {notOnMap.length} {notOnMap.length === 1 ? 'cluster is not' : 'clusters are not'} on the map:{' '}
-          {[
-            withoutPosition && `${withoutPosition} without a position`,
-            withProblem && `${withProblem} with an invalid position`,
-          ]
-            .filter(Boolean)
-            .join(' and ')}
-          .{' '}
+        <Alert
+          isInline
+          isPlain
+          variant="info"
+          title={`${notOnMap.length} ${notOnMap.length === 1 ? 'cluster' : 'clusters'} not shown`}
+          data-testid="clusters-not-on-map"
+        >
+          Clusters are excluded from the map when their positions are missing or invalid.{' '}
           <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
             How to set a cluster&apos;s position
           </a>
-        </SubtleText>
+        </Alert>
       )}
     </Stack>
   );
@@ -455,8 +453,8 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
   );
 
   const ready = clusters.filter((c) => c.status === 'Ready').length;
-  const summary: [label: string, value: string, detail?: string][] = [
-    ['Clusters', `${ready}/${clusters.length}`, 'Ready'],
+  const summary: [label: string, value: string, detail: string | undefined, help: string][] = [
+    ['Clusters', `${ready}/${clusters.length}`, 'Ready', 'The total number of OpenShift clusters in the AI Grid.'],
     // A site is a site name, else the cloud region, else the ai-grid/site label: what the map names.
     [
       'Sites',
@@ -468,15 +466,18 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
           }),
         ).size,
       ),
+      undefined,
+      'The number of different sites or cloud regions where clusters in the AI Grid are located.',
     ],
-    ['Models', String(relevantModels.length)],
+    // Every model, placed or not (relevantModels keeps those placed on no cluster).
+    ['Models', String(relevantModels.length), undefined, 'The total number of models in the AI Grid.'],
   ];
 
   return (
     <Stack hasGutter>
       <Grid hasGutter md={4} role="region" aria-label="AI Grid summary">
-        {summary.map(([label, value, detail]) => (
-          <StatCard key={label} label={label} value={value} detail={detail} />
+        {summary.map(([label, value, detail, help]) => (
+          <StatCard key={label} label={label} value={value} detail={detail} help={help} />
         ))}
       </Grid>
       <Card className="fleet-region" role="region" aria-label="AI Grid map and drawer">

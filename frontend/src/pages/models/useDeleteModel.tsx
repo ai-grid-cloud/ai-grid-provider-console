@@ -83,11 +83,12 @@ export const useDeleteModel = ({
       // Only a guide: while the subscriptions load, or if they fail to, Delete stays enabled. The
       // backend refuses to delete a model a subscription uses, and stays the authority.
       disabledReason={inUse ? 'Remove this model from its subscriptions first.' : undefined}
+      // Nothing to type while subscriptions use the model: Delete can't go ahead until they don't.
+      hideTypedName={inUse}
     >
       <Stack hasGutter>
         <p>
-          The model is removed from every cluster it is deployed to. Remove it from any subscriptions and authorization
-          policies first.
+          The <strong>{titleOf(selected)}</strong> model will be removed from every cluster it is deployed to.
         </p>
         <ReferencingSubscriptions modelId={selected.id} onInUse={setInUse} />
       </Stack>

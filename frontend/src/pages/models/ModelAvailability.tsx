@@ -1,8 +1,9 @@
 // The Availability column and its dialog, following
 // jgiardino/ai-grid-provider-console@a4e6090 ModelAvailability.tsx: a compact label, the short reason under
-// it, and a dialog with the longer explanation. The state is the backend's (ModelStatus.maas); the
-// dialog also lists MaaS's own message for each ingress cluster (ModelStatus.ingress), because MaaS
-// has more pending reasons than the design's copy names.
+// it, and a dialog with the longer explanation (for Unavailable, the backend's reason when it sent
+// one: availabilityOf). The state is the backend's (ModelStatus.maas); the dialog also lists MaaS's
+// own message for each ingress cluster (ModelStatus.ingress), because MaaS has more pending reasons
+// than the design's copy names.
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
