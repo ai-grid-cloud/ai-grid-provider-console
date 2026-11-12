@@ -15,7 +15,7 @@ import { ServiceError } from '../../api/ConsoleService';
 import { DeleteModal } from '../../components/DeleteModal';
 import { changedMessage, ClusterChangedError } from './ClusterChangedError';
 import { removeText } from './clusterInfo';
-import { isPositionNotSet, mapPositionOf, type ClusterView } from './clusterView';
+import type { ClusterView } from './clusterView';
 import { locationError } from './gridSettings';
 import { LocationLabelField, ReadOnlyRoleField, RoleField, roleFixedText } from './MembershipFields';
 import { roleOf } from './roles';
@@ -170,8 +170,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               value={location}
               error={shownLocationError}
               isDisabled={busy}
-              mapPosition={mapPositionOf(cluster)}
-              positionNotSet={isPositionNotSet(cluster)}
+              position={cluster}
               onChange={setLocation}
               onBlur={() => setTouched((t) => ({ ...t, location: true }))}
             />

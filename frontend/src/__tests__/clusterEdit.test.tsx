@@ -356,6 +356,33 @@ it('says the map position is not set when the details page would', async () => {
   expect(within(dialog).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 
+it('says a map position from the cloud region comes from it, with how to set one', async () => {
+  const user = userEvent.setup();
+  const inRegion = noRole('in-region');
+  Object.assign(inRegion.status!.location!, {
+    latitude: 40.42,
+    longitude: -82.91,
+    source: ManagedClusterLocationSource.CLOUD_REGION,
+  });
+  renderList([inRegion]);
+  const dialog = await openEdit(user, 'in-region');
+  expect(within(dialog).getByText(/Map position is 40\.42, -82\.91 from the cloud region\./)).toBeVisible();
+  await user.click(within(dialog).getByRole('button', { name: "More about a cluster's map position" }));
+  expect(await screen.findByText(/The map places a cluster from two annotations/)).toBeVisible();
+});
+
+it('says why a map position the hub cannot use is not on the map, with how to set one', async () => {
+  const user = userEvent.setup();
+  const invalid = noRole('bad-position');
+  invalid.status!.location!.problem = 'ai-grid/latitude must be a number';
+  renderList([invalid]);
+  const dialog = await openEdit(user, 'bad-position');
+  expect(within(dialog).getByText(/Map position: not on the map, ai-grid\/latitude must be a number\./)).toBeVisible();
+  expect(within(dialog).queryByText(/Map position is not set/)).not.toBeInTheDocument();
+  await user.click(within(dialog).getByRole('button', { name: "More about a cluster's map position" }));
+  expect(await screen.findByText(/The map places a cluster from two annotations/)).toBeVisible();
+});
+
 it('asks for a role before saving a location label on a cluster without one', async () => {
   const user = userEvent.setup();
   const { requests } = renderList([noRole()]);

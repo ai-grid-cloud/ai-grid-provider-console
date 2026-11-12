@@ -13,8 +13,10 @@ import type { ClusterRole } from '../../api/clusters';
 import { ReadOnlyField } from '../../components/ReadOnlyField';
 import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { ClusterRolesList } from './ClusterRolesHelp';
+import type { ClusterView } from './clusterView';
 import { locationRule } from './gridSettings';
 import { PositionHelp } from './PositionHelp';
+import { isFromCloudRegion } from './site';
 import { clusterRoles } from './roles';
 
 type TextFieldProps = {
@@ -24,10 +26,34 @@ type TextFieldProps = {
   /** The error to show now: the caller decides when a field has been touched. */
   error?: string;
   isDisabled?: boolean;
-  /** The cluster's map position, "latitude, longitude", when the hub has one. */
-  mapPosition?: string;
-  /** The hub has not set a map position (details: "Not on the map: position not set"). */
-  positionNotSet?: boolean;
+  /** Where the map puts the cluster and from what, as the details page reads it. */
+  position?: MapPositionOf;
+};
+
+type MapPositionOf = Pick<ClusterView, 'latitude' | 'longitude' | 'locationSource' | 'locationProblem'>;
+
+/**
+ * The cluster's map position under the field, worded as the details page words it: from the hub admin's annotations,
+ * from the cloud region, not usable and why, or not set. Except for a position from the annotations, the help says
+ * how a hub admin sets one.
+ */
+const MapPositionText: React.FC<{ position: MapPositionOf }> = ({ position: p }) => {
+  if (p.latitude !== undefined && p.longitude !== undefined) {
+    const at = `${p.latitude}, ${p.longitude}`;
+    return isFromCloudRegion(p) ? (
+      <>
+        Map position is {at} from the cloud region. <PositionHelp />
+      </>
+    ) : (
+      <>Map position is {at}.</>
+    );
+  }
+  return (
+    <>
+      {p.locationProblem ? `Map position: not on the map, ${p.locationProblem}.` : 'Map position is not set.'}{' '}
+      <PositionHelp />
+    </>
+  );
 };
 
 /** The `location` label: required, a label value. */
@@ -37,8 +63,7 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({
   onBlur,
   error,
   isDisabled,
-  mapPosition,
-  positionNotSet,
+  position,
 }) => (
   <FormGroup
     label="Location label"
@@ -69,10 +94,9 @@ export const LocationLabelField: React.FC<TextFieldProps> = ({
       <HelperText id="cluster-location-help">
         <HelperTextItem variant={error === locationRule ? 'error' : 'default'}>{locationRule}</HelperTextItem>
         {error && error !== locationRule && <HelperTextItem variant="error">{error}</HelperTextItem>}
-        {mapPosition && <HelperTextItem>Map position is {mapPosition}.</HelperTextItem>}
-        {positionNotSet && (
+        {position && (
           <HelperTextItem>
-            Map position is not set. <PositionHelp />
+            <MapPositionText position={position} />
           </HelperTextItem>
         )}
       </HelperText>
