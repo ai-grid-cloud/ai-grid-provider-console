@@ -135,7 +135,7 @@ const LocationLabelHelp: React.FC<{ cluster: LocationCluster }> = ({ cluster }) 
   return (
     <Stack hasGutter>
       <p>
-        Optionally provide a text label that can help identify the cluster&apos;s location on the AI Grid map. This
+        Provide a text label that can help identify the cluster&apos;s location on the AI grid map. This
         label does not impact the cluster&apos;s location on the map.
       </p>
       <Title headingLevel="h6" id="location-label-details">

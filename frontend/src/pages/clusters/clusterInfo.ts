@@ -1,4 +1,4 @@
-import { mapPositionOf, type ClusterView } from './clusterView';
+import type { ClusterView } from './clusterView';
 import { editText } from './editClusterText';
 import type { MembershipChange } from './MembershipModal';
 
@@ -20,11 +20,10 @@ export const hubMessage = (c: ClusterView) =>
 
 /**
  * Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is
- * detaching it. A cluster with no map position and no coordinate problem stays addable, so the
- * Add dialog can show that position is not set while the hub is still importing it.
+ * detaching it. A missing map position does not change that. The Add dialog's help reads the
+ * cluster either way, so it can say the position is not set while Add stays disabled.
  */
 export const cannotAddReason = (c: ClusterView) => {
-  if (!mapPositionOf(c) && !c.locationProblem) return undefined;
   if (c.state === 'Not accepted') {
     return 'The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.';
   }

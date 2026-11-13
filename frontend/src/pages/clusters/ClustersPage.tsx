@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Content,
@@ -11,6 +11,7 @@ import {
 import { CubesIcon } from '@patternfly/react-icons';
 import { InnerScrollContainer, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import type { ThProps } from '@patternfly/react-table';
+import t_global_breakpoint_xl from '@patternfly/react-tokens/dist/esm/t_global_breakpoint_xl';
 import { Link } from 'react-router-dom';
 import type { GridMembership } from '../../api/clusters';
 import { PaginatedTable } from '../../components/PaginatedTable';
@@ -116,7 +117,8 @@ const columns: Column[] = [
 
 /**
  * The header groups over the columns, in order: each spans that many data columns.
- * For a provider admin, Actions is the last column of AI Grid, so that group spans one more.
+ * From PatternFly's xl breakpoint up, a provider admin's Actions column is the last column of
+ * AI grid, so that group spans one more. Below xl, Actions is the table's last column instead.
  */
 const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
   { label: 'Cluster', span: 4 },
@@ -160,6 +162,34 @@ const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
   },
 ];
 
+/**
+ * PatternFly's xl breakpoint. At that width and above, Actions stays in the AI grid group.
+ * Below it, Actions is the last column and sticks to the right edge while the table scrolls
+ * under it. A browser without matchMedia is compared to the same breakpoint in pixels.
+ */
+const XL_MEDIA = `(min-width: ${t_global_breakpoint_xl.value})`;
+const XL_PX = Number.parseInt(t_global_breakpoint_xl.value, 10) * 16;
+
+const viewportIsAtLeastXl = () => {
+  const query = window.matchMedia?.(XL_MEDIA);
+  return query ? query.matches : window.innerWidth >= XL_PX;
+};
+
+const useAtLeastXl = () => {
+  const [matches, setMatches] = useState(() => viewportIsAtLeastXl());
+  useEffect(() => {
+    const query = window.matchMedia?.(XL_MEDIA);
+    const update = () => setMatches(viewportIsAtLeastXl());
+    if (query) {
+      query.addEventListener('change', update);
+      return () => query.removeEventListener('change', update);
+    }
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return matches;
+};
+
 /** Each GPU configuration as one line: "NVIDIA L4, 1 GPU/node", with how it is shared. */
 const gpuConfigurations = (c: ClusterView) =>
   (c.gpus?.configurations ?? []).map((g) =>
@@ -192,6 +222,9 @@ export const ClustersPage: React.FC = () => {
   const writes = useMembershipWrites();
   const { user } = useConsoleSession();
   const isProviderAdmin = !!user?.isProviderAdmin;
+  // Wide: Actions ends the AI grid group. Narrow: it is the table's last column, stuck to the right.
+  const atLeastXl = useAtLeastXl();
+  const actionsInGrid = isProviderAdmin && atLeastXl;
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 0, direction: 'asc' });
   const [change, setChange] = useState<MembershipChange>();
@@ -264,6 +297,33 @@ export const ClustersPage: React.FC = () => {
     columnIndex: index,
   });
 
+  // One Actions cell. Its column changes with the width; the add icon and the member menu do not.
+  const actionsContent = (cluster: ClusterView) =>
+    cluster.aiGridEnabled ? (
+      <SimpleMenuActions
+        testId={`cluster-actions-${cluster.name}`}
+        ariaLabel={`Actions for ${cluster.name}`}
+        dropdownItems={membershipActions(cluster, setChange, setEditing)}
+      />
+    ) : (
+      <AddClusterButton cluster={cluster} onAdd={() => setChange({ cluster, join: true })} />
+    );
+  const actionsHeader = !isProviderAdmin ? null : actionsInGrid ? (
+    <Th isSubheader screenReaderText="Actions" hasRightBorder />
+  ) : (
+    <Th rowSpan={2} screenReaderText="Actions" isStickyColumn stickyMinWidth="3.5rem" hasLeftBorder />
+  );
+  const actionsCell = (cluster: ClusterView) =>
+    actionsInGrid ? (
+      <Td isActionCell hasRightBorder>
+        {actionsContent(cluster)}
+      </Td>
+    ) : (
+      <Td isActionCell isStickyColumn stickyMinWidth="3.5rem" hasLeftBorder>
+        {actionsContent(cluster)}
+      </Td>
+    );
+
   const body = () => {
     if (clusters.length === 0) {
       return (
@@ -294,7 +354,8 @@ export const ClustersPage: React.FC = () => {
           }
         >
           {(pageRows) => (
-            // When the window is too narrow for every column, the table scrolls sideways.
+            // Below xl, Actions sticks to this container's right edge and the table scrolls under it.
+            // At xl and above, Actions is inside the AI grid group and scrolls with the other columns.
             <InnerScrollContainer>
               <Table aria-label="AI grid clusters" data-testid="clusters-table">
                 <Thead hasNestedHeader>
@@ -302,13 +363,14 @@ export const ClustersPage: React.FC = () => {
                     {groups.map((g, i) => (
                       <Th
                         key={g.label}
-                        colSpan={g.label === 'AI grid' && isProviderAdmin ? g.span + 1 : g.span}
+                        colSpan={g.label === 'AI grid' && actionsInGrid ? g.span + 1 : g.span}
                         info={g.info}
                         hasRightBorder={i < groups.length - 1}
                       >
                         {g.label}
                       </Th>
                     ))}
+                    {isProviderAdmin && !actionsInGrid && actionsHeader}
                   </Tr>
                   <Tr>
                     {columns.map((c, i) => (
@@ -318,13 +380,13 @@ export const ClustersPage: React.FC = () => {
                           sort={sortParams(i)}
                           info={c.info}
                           modifier="wrap"
-                          hasRightBorder={i === 3 || (i === 6 && !isProviderAdmin)}
+                          hasRightBorder={i === 3 || (i === 6 && !actionsInGrid)}
                         >
                           {c.srPrefix && <span className="pf-v6-screen-reader">{c.srPrefix} </span>}
                           {c.label}
                         </Th>
-                        {/* Actions is the last column of AI Grid, after Role and before the GPU columns. */}
-                        {isProviderAdmin && i === 6 && <Th isSubheader screenReaderText="Actions" hasRightBorder />}
+                        {/* At xl and above, Actions is the last column of AI grid, after Role. */}
+                        {actionsInGrid && i === 6 && actionsHeader}
                       </Fragment>
                     ))}
                   </Tr>
@@ -355,7 +417,7 @@ export const ClustersPage: React.FC = () => {
                           {c.aiGridEnabled ? <StatusLabel isCompact status={c.provisioningStatus} /> : EMPTY_VALUE}
                         </Td>
                         <Td dataLabel="Location label">{c.location ?? EMPTY_VALUE}</Td>
-                        <Td dataLabel="Role" hasRightBorder={!isProviderAdmin}>
+                        <Td dataLabel="Role" hasRightBorder={!actionsInGrid}>
                           {!c.aiGridEnabled
                             ? EMPTY_VALUE
                             : (roleOf(c.labels)?.label ?? (
@@ -364,25 +426,14 @@ export const ClustersPage: React.FC = () => {
                                 </MissingLabel>
                               ))}
                         </Td>
-                        {isProviderAdmin && (
-                          <Td isActionCell hasRightBorder>
-                            {c.aiGridEnabled ? (
-                              <SimpleMenuActions
-                                testId={`cluster-actions-${c.name}`}
-                                ariaLabel={`Actions for ${c.name}`}
-                                dropdownItems={membershipActions(c, setChange, setEditing)}
-                              />
-                            ) : (
-                              <AddClusterButton cluster={c} onAdd={() => setChange({ cluster: c, join: true })} />
-                            )}
-                          </Td>
-                        )}
+                        {actionsInGrid && actionsCell(c)}
                         <Td dataLabel="GPU capacity" data-testid={`cluster-gpu-capacity-${c.name}`}>
                           {gpuCapacity(c)}
                         </Td>
                         <Td dataLabel="GPU configuration" data-testid={`cluster-gpu-models-${c.name}`}>
                           <OverflowList items={gpuConfigurations(c)} noun="GPU configurations" />
                         </Td>
+                        {isProviderAdmin && !actionsInGrid && actionsCell(c)}
                       </Tr>
                     ))
                   )}

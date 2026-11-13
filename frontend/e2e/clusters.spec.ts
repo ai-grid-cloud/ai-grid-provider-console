@@ -4,17 +4,23 @@ import { expect, test } from './fixtures';
 // membership; cluster-membership.spec.ts adds and removes site4.
 const MEMBER = 'site1';
 
-// UX review: at 1280 px the table was wider than the page and its actions column ended past the
-// window's edge. The actions column sticks to the table's right edge, so a window too narrow for
-// every column scrolls the table under it, and on a phone the table stacks.
+// Below PatternFly's xl breakpoint (1200px) Actions is the table's last column and sticks to the
+// right edge, so a window too narrow for every column scrolls the table under it. On a phone the
+// table stacks. At xl and above, Actions is the last column of the AI grid group and is not sticky.
 for (const { name, width } of [
-  { name: 'beside the navigation', width: 1210 },
+  { name: 'below the xl breakpoint', width: 1199 },
   { name: 'on a phone', width: 390 },
 ]) {
   test(`keeps each row's actions in view ${name}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/clusters');
     const table = page.getByTestId('clusters-table');
+    // On a phone the table stacks and its headers are not the thing in view; the wider narrow
+    // window still shows them, with Actions last and stuck to the right.
+    if (width > 500) {
+      await expect(table.getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '3');
+      await expect(table.getByRole('columnheader', { name: 'Actions' })).toHaveClass(/pf-v6-c-table__sticky-cell/);
+    }
     const actions = page.getByRole('button', { name: `Actions for ${MEMBER}` });
     await expect(actions).toBeVisible();
     // Scroll the table's container to its end, as far as it goes.
@@ -31,6 +37,23 @@ for (const { name, width } of [
     await page.keyboard.press('Escape');
   });
 }
+
+test('places Actions in the AI grid group from the xl breakpoint up', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/clusters');
+  const table = page.getByTestId('clusters-table');
+  await expect(table.getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '4');
+  const actions = table.getByRole('columnheader', { name: 'Actions' });
+  await expect(actions).not.toHaveClass(/pf-v6-c-table__sticky-cell/);
+  const names = (await table.getByRole('row').nth(1).getByRole('columnheader').allTextContents()).map((name) =>
+    name.trim(),
+  );
+  expect(names.indexOf('Capacity')).toBe(names.indexOf('Actions') + 1);
+  const menu = page.getByRole('button', { name: `Actions for ${MEMBER}` });
+  await expect(menu).toBeVisible();
+  await menu.click();
+  await expect(page.getByRole('menuitem', { name: 'Remove from AI grid' })).toBeVisible();
+});
 
 // fixtures/poc/managedclusters.json gives site1 a Ready condition with this hub message.
 test('opens a cluster status message from the keyboard without changing the list filter', async ({ page }) => {

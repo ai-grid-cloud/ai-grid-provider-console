@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Modal, ModalBody, ModalHeader } from '@patternfly/react-core';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TypeaheadSelect } from '../components/TypeaheadSelect';
+import { TypeaheadSelect, type TypeaheadSelectOption } from '../components/TypeaheadSelect';
 
 const OPTIONS = [
   { value: 'a', label: 'acme-robotics' },
@@ -18,7 +18,7 @@ const Harness = ({
 }: {
   onBlur?: () => void;
   onChange?: (value: string) => void;
-  options?: typeof OPTIONS;
+  options?: TypeaheadSelectOption[];
   initial?: string;
 }) => {
   const [value, setValue] = useState(initial);

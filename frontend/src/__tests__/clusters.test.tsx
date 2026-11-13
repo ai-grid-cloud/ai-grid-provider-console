@@ -308,7 +308,10 @@ it('asks for a location label and role before adding', async () => {
   const roleGroup = within(modal).getByRole('combobox', { name: 'Role' }).closest('.pf-v6-c-form__group')!;
   const alert = roleFixed.closest('.pf-v6-c-alert');
   expect(alert?.parentElement).toHaveClass('pf-v6-c-form__helper-text');
-  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-form__helper-text')).toContainElement(alert);
+  expect(alert).toBeInstanceOf(HTMLElement);
+  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-form__helper-text')).toContainElement(
+    alert instanceof HTMLElement ? alert : null,
+  );
   await user.click(within(modal).getByRole('button', { name: 'Add' }));
   // Nothing is written until both are given; each field says why and describes its error.
   const location = within(modal).getByRole('textbox', { name: 'Location label' });
@@ -335,7 +338,7 @@ it('asks for a location label and role before adding', async () => {
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   const help = await screen.findByRole('dialog', { name: 'Location label' });
   expect(help).toHaveTextContent(
-    "Optionally provide a text label that can help identify the cluster's location on the AI Grid map. This label does not impact the cluster's location on the map.",
+    "Provide a text label that can help identify the cluster's location on the AI grid map. This label does not impact the cluster's location on the map.",
   );
   expect(help).toHaveTextContent(
     "Use the cluster's position, site, and cloud region to inform the label. For example, a cluster with the position 43.65, -79.38 might have the location label Toronto.",
@@ -779,13 +782,10 @@ it('offers Edit, then Remove from AI grid, for a member, and an add button for a
   expect(await screen.findByRole('tooltip', { name: 'Add to AI grid' })).toHaveTextContent('Add to AI grid');
 });
 
-it('offers Add to AI grid for ready, unavailable, unknown, and clusters with no map position', async () => {
+it('offers Add to AI grid for ready, unavailable, and unknown clusters', async () => {
   const withState = (name: string, state: NonNullable<GridCluster['state']>): GridCluster => ({
     ...cluster(name, 'Unknown'),
     state,
-    // A position, so the import state still blocks Add. Without one, Add stays available.
-    latitude: 1,
-    longitude: 2,
   });
   renderAt(
     '/clusters',
@@ -798,16 +798,16 @@ it('offers Add to AI grid for ready, unavailable, unknown, and clusters with no 
       withState('is-notaccepted', 'Not accepted'),
       withState('is-pendingimport', 'Pending import'),
       withState('is-importing', 'Importing'),
-      { ...withState('is-unset', 'Pending import'), latitude: undefined, longitude: undefined },
+      withState('is-unset', 'Pending import'),
     ]),
   );
   await screen.findByTestId('clusters-table');
   const user = userEvent.setup();
-  for (const name of ['is-ready', 'is-offline', 'is-unknown', 'is-unset']) {
+  for (const name of ['is-ready', 'is-offline', 'is-unknown']) {
     expect(addButton(name)).not.toHaveAttribute('aria-disabled', 'true');
   }
   // The others say why they can't be added yet.
-  for (const name of ['is-detaching', 'is-importfailed', 'is-pendingimport', 'is-importing']) {
+  for (const name of ['is-detaching', 'is-importfailed', 'is-pendingimport', 'is-importing', 'is-unset']) {
     const item = addButton(name);
     expect(item).toHaveAttribute('aria-disabled', 'true');
     await user.hover(item);
@@ -895,12 +895,17 @@ it('explains the AI grid column group in a popover, as it does the GPUs group', 
   expect(within(help).getByText(AI_GRID_SUMMARY).tagName).toBe('P');
 });
 
+/** True when `earlier` precedes `later` in the document. */
+const isBefore = (earlier: Element, later: Element) =>
+  (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
 it('groups the columns as the details page does, wraps them, and has Site and Region but no Hub column', async () => {
+  // The test window is 1280px, above PatternFly's xl breakpoint (1200px).
   renderAt('/clusters', serviceWith(hubClusters()));
   const table = await screen.findByTestId('clusters-table');
   const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
   // Nested column headers (UX review): Cluster, AI grid and GPUs, as on the details page.
-  // Actions is the last column of AI grid, so that group spans its three data columns plus Actions.
+  // At xl and above, Actions is the last column of AI grid, so that group spans its three data columns plus Actions.
   expect(
     within(groups)
       .getAllByRole('columnheader')
@@ -933,8 +938,61 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
   expect(within(table).queryByRole('columnheader', { name: 'Hub' })).not.toBeInTheDocument();
   // The OpenShift version is on the details page, leaving room for GPUs and Capacity.
   expect(within(table).queryByRole('columnheader', { name: 'OpenShift' })).not.toBeInTheDocument();
-  // Actions sits in the column row, after Role, and is not stuck to the right edge.
-  expect(within(columns).getByRole('columnheader', { name: 'Actions' })).not.toHaveClass('pf-v6-c-table__sticky-cell');
+  // One Actions column, in the column row after Role, and not stuck to the right edge.
+  expect(within(table).getAllByRole('columnheader', { name: 'Actions' })).toHaveLength(1);
+  const actionsHeader = within(columns).getByRole('columnheader', { name: 'Actions' });
+  expect(actionsHeader).not.toHaveClass('pf-v6-c-table__sticky-cell');
+  expect(table.querySelectorAll('td.pf-v6-c-table__action')).toHaveLength(3);
+  const member = within(table).getByRole('row', { name: /^cluster-a / });
+  expect(
+    isBefore(
+      within(member).getByRole('button', { name: 'Actions for cluster-a' }),
+      within(member).getByTestId('cluster-gpu-capacity-cluster-a'),
+    ),
+  ).toBe(true);
+  const outsider = within(table).getByRole('row', { name: /^cluster-b / });
+  expect(
+    isBefore(
+      within(outsider).getByRole('button', { name: 'Add cluster-b to AI grid' }),
+      within(outsider).getByTestId('cluster-gpu-capacity-cluster-b'),
+    ),
+  ).toBe(true);
+});
+
+it('pins Actions to the right edge below the xl breakpoint, after the GPU columns', async () => {
+  window.innerWidth = 1199;
+  try {
+    renderAt('/clusters', serviceWith(hubClusters()));
+    const table = await screen.findByTestId('clusters-table');
+    const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
+    // AI grid spans only its own columns. Actions is the last header and sticks to the right.
+    expect(within(groups).getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '3');
+    expect(
+      within(groups)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Cluster', 'AI grid', 'GPUs', 'Actions']);
+    expect(within(columns).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(within(table).getAllByRole('columnheader', { name: 'Actions' })).toHaveLength(1);
+    const actionsHeader = within(groups).getByRole('columnheader', { name: 'Actions' });
+    expect(actionsHeader).toHaveClass('pf-v6-c-table__sticky-cell');
+    expect(actionsHeader).toHaveStyle({ '--pf-v6-c-table__sticky-cell--MinWidth': '3.5rem' });
+    expect(table.querySelectorAll('td.pf-v6-c-table__action')).toHaveLength(3);
+    const member = within(table).getByRole('row', { name: /^cluster-a / });
+    const menu = within(member).getByRole('button', { name: 'Actions for cluster-a' });
+    const memberCells = within(member).getAllByRole('cell');
+    expect(memberCells[memberCells.length - 1]).toContainElement(menu);
+    expect(menu.closest('td')).toHaveClass('pf-v6-c-table__sticky-cell');
+    expect(menu.closest('td')).toHaveStyle({ '--pf-v6-c-table__sticky-cell--MinWidth': '3.5rem' });
+    expect(isBefore(within(member).getByTestId('cluster-gpu-capacity-cluster-a'), menu)).toBe(true);
+    const outsider = within(table).getByRole('row', { name: /^cluster-b / });
+    const add = within(outsider).getByRole('button', { name: 'Add cluster-b to AI grid' });
+    const outsiderCells = within(outsider).getAllByRole('cell');
+    expect(outsiderCells[outsiderCells.length - 1]).toContainElement(add);
+    expect(isBefore(within(outsider).getByTestId('cluster-gpu-capacity-cluster-b'), add)).toBe(true);
+  } finally {
+    window.innerWidth = 1280;
+  }
 });
 
 it('says when the search matches no cluster, and clears it from the table', async () => {
