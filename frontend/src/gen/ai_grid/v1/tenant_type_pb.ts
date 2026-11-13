@@ -65,6 +65,8 @@ export const TenantSchema: GenMessage<Tenant> = /*@__PURE__*/
 export type TenantSpec = Message<"ai_grid.v1.TenantSpec"> & {
   /**
    * Email domains associated with this tenant (DNS hostnames, lowercase).
+   * Create and an update of the domains need at least one: Keycloak finds a
+   * user's organization, and so its identity provider, by their email domain.
    *
    * @generated from field: repeated string domains = 1;
    */
