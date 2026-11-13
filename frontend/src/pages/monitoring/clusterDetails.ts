@@ -55,7 +55,13 @@ export const claimsByCluster = (items: ManagedCluster[]): ClusterClaims =>
   );
 
 /** What Clusters/List has answered, as the variables need it. */
-export type ClusterLookup = { clusters?: ClusterClaims; loaded: boolean; error?: Error };
+export type ClusterLookup = {
+  clusters?: ClusterClaims;
+  loaded: boolean;
+  error?: Error;
+  /** Loads Clusters/List again. */
+  refresh: () => Promise<boolean>;
+};
 
 /**
  * The value of each of `names` for the cluster variable's value (undefined when the dashboard has

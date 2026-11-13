@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 // with the components that use them, and nothing on this page uses a description list, so opened
 // directly the panel had no layout.
 import '@patternfly/patternfly/components/DescriptionList/description-list.css';
-import { Flex, FlexItem } from '@patternfly/react-core';
+import { Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ChartsProvider, SnackbarProvider } from '@perses-dev/components';
@@ -33,6 +33,8 @@ import {
 import { QueryParamProvider } from 'use-query-params';
 import { ReactRouter6Adapter } from 'use-query-params/adapters/react-router-6';
 import { PageLoading } from '../../components/PageLoading';
+import { LoadFailedAlert } from '../../components/states/LoadFailedAlert';
+import { StaleDataAlert } from '../../components/states/StaleDataAlert';
 import { ClusterDetailsVariables } from './ClusterDetailsVariables';
 import { useClusterLookup } from './useClusterLookup';
 import { useOrganizationNames } from './useOrganizationNames';
@@ -53,6 +55,23 @@ const datasourceApi = new RelayDatasourceApi();
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 0 } } });
 
 type Props = { dashboard: DashboardResource };
+
+/**
+ * Says when a list the dashboard reads beside its own data failed, as ClusterLoadNote does on the
+ * Models pages: "Showing the last loaded ..." while some of it is on screen, "Unable to load ..."
+ * when none is. Compact, so the dashboard stays the page.
+ */
+const SideLoadNote: React.FC<{ object: string; error: Error; shown: boolean; onRetry: () => void }> = ({
+  object,
+  error,
+  shown,
+  onRetry,
+}) =>
+  shown ? (
+    <StaleDataAlert isCompact object={object} error={error} onRetry={onRetry} />
+  ) : (
+    <LoadFailedAlert isCompact object={object} error={error} onRetry={onRetry} />
+  );
 
 /**
  * The built-in variables Perses's own dashboard view defines (dashboards ViewDashboard): the
@@ -172,28 +191,52 @@ const PersesDashboardView: React.FC<Props> = ({ dashboard }) => {
     return <PageLoading label="Loading dashboard" />;
   }
   return (
-    <QueryClientProvider client={queryClient}>
-      <QueryParamProvider adapter={ReactRouter6Adapter}>
-        <ThemeProvider theme={muiTheme}>
-          <ChartsProvider chartsTheme={chartsTheme}>
-            <SnackbarProvider anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="default">
-              <PluginRegistry pluginLoader={pluginLoader}>
-                <PanelFocusProvider>
-                  {/* A changed organization name remounts the body; selections live in the URL and survive, but
-                      Perses's in-memory state (panel focus, time zone) resets. */}
-                  <DashboardBody
-                    key={names}
-                    dashboard={named}
-                    clusterDetails={clusterDetails}
-                    clusterLookup={clusterLookup}
-                  />
-                </PanelFocusProvider>
-              </PluginRegistry>
-            </SnackbarProvider>
-          </ChartsProvider>
-        </ThemeProvider>
-      </QueryParamProvider>
-    </QueryClientProvider>
+    <Stack hasGutter>
+      {byOrganization && organizations.error && (
+        <StackItem>
+          <SideLoadNote
+            object="organizations"
+            error={organizations.error}
+            shown={organizations.data.length > 0}
+            onRetry={() => void organizations.refresh()}
+          />
+        </StackItem>
+      )}
+      {clusterDetails.length > 0 && clusterLookup.error && (
+        <StackItem>
+          <SideLoadNote
+            object="clusters"
+            error={clusterLookup.error}
+            shown={(clusterLookup.clusters?.size ?? 0) > 0}
+            onRetry={() => void clusterLookup.refresh()}
+          />
+        </StackItem>
+      )}
+      <StackItem>
+        <QueryClientProvider client={queryClient}>
+          <QueryParamProvider adapter={ReactRouter6Adapter}>
+            <ThemeProvider theme={muiTheme}>
+              <ChartsProvider chartsTheme={chartsTheme}>
+                <SnackbarProvider anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="default">
+                  <PluginRegistry pluginLoader={pluginLoader}>
+                    <PanelFocusProvider>
+                      {/* A changed organization name remounts the body; selections live in the URL and survive, but
+                          Perses's in-memory state (panel focus, time zone) resets. */}
+                      <DashboardBody
+                        key={names}
+                        dashboard={named}
+                        clusterDetails={clusterDetails}
+                        clusterLookup={clusterLookup}
+                      />
+                    </PanelFocusProvider>
+                  </PluginRegistry>
+                </SnackbarProvider>
+              </ChartsProvider>
+            </ThemeProvider>
+          </QueryParamProvider>
+        </QueryClientProvider>
+      </StackItem>
+    </Stack>
   );
 };
 

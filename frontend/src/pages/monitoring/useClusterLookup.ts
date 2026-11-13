@@ -12,6 +12,9 @@ const claimsOf = (answer: ClustersListResponse | undefined) => answer && claimsB
  * answer is the console's cached one.
  */
 export const useClusterLookup = (enabled: boolean): ClusterLookup => {
-  const { data, loaded, error } = useLoaded(useConnectQuery(list, {}, { ...useLoadOptions(), enabled }), claimsOf);
-  return { clusters: data, loaded, error };
+  const { data, loaded, error, refresh } = useLoaded(
+    useConnectQuery(list, {}, { ...useLoadOptions(), enabled }),
+    claimsOf,
+  );
+  return { clusters: data, loaded, error, refresh };
 };

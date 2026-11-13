@@ -22,6 +22,7 @@ import { StatusLabel } from '../components/StatusLabel';
 import { EmptyListState } from '../components/states/EmptyListState';
 import { ErrorState } from '../components/states/ErrorState';
 import { LoadFailedAlert } from '../components/states/LoadFailedAlert';
+import { StaleDataAlert } from '../components/states/StaleDataAlert';
 import { PageStateSection } from '../components/states/PageStateSection';
 import { SectionEmptyState } from '../components/states/SectionEmptyState';
 import { getSubtextProps, subtextClassName } from '../utilities/phaseLabelUtils';
@@ -270,6 +271,41 @@ describe('page states', () => {
     expect(alert).toHaveTextContent('Parts show a dash until the widgets load.Hub unavailable.');
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('shows a compact alert with only the title, the message and Retry', async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    const stale = vi.fn();
+    render(
+      <>
+        <LoadFailedAlert isCompact object="widgets" error={new Error('Hub unavailable.')} onRetry={retry}>
+          Parts show a dash until the widgets load.
+        </LoadFailedAlert>
+        <StaleDataAlert isCompact object="gadgets" error={new Error('Hub timed out.')} onRetry={stale} />
+      </>,
+    );
+    const failed = screen.getByTestId('load-failed-alert');
+    expect(failed).toHaveClass('pf-m-plain', 'pf-m-warning');
+    // One line: the title, then the message, both in the heading; Retry below it.
+    expect(
+      within(failed).getByRole('heading', { name: 'Warning alert: Unable to load widgets. Hub unavailable.' }),
+    ).toBeVisible();
+    expect(failed.querySelector('.pf-v6-c-alert__description')).toBeNull();
+    // The title stays bold; the message after it is normal weight.
+    expect(within(failed).getByTestId('alert-message')).toHaveClass('pf-v6-u-font-weight-normal');
+    expect(within(failed).getByTestId('alert-message')).toHaveTextContent('Hub unavailable.');
+    expect(failed).not.toHaveTextContent('Parts show a dash');
+    const shown = screen.getByTestId('stale-data-alert');
+    expect(shown).toHaveClass('pf-m-plain', 'pf-m-warning');
+    expect(
+      within(shown).getByRole('heading', { name: 'Warning alert: Showing the last loaded gadgets. Hub timed out.' }),
+    ).toBeVisible();
+    expect(shown.querySelector('.pf-v6-c-alert__description')).toBeNull();
+    await user.click(within(failed).getByRole('button', { name: 'Retry' }));
+    expect(retry).toHaveBeenCalledOnce();
+    await user.click(within(shown).getByRole('button', { name: 'Retry' }));
+    expect(stale).toHaveBeenCalledOnce();
   });
 
   it('labels its action as asked', () => {
