@@ -18,7 +18,10 @@ for (const { name, width } of [
     // On a phone the table stacks and its headers are not the thing in view; the wider narrow
     // window still shows them, with Actions last and stuck to the right.
     if (width > 500) {
-      await expect(table.getByRole('columnheader', { name: 'AI grid', exact: true })).toHaveAttribute('colspan', '3');
+      // The group header's name includes its "About AI grid" button, and the column under it is
+      // "AI grid Status", so the group row is what has the one AI grid header.
+      const groups = table.getByRole('row').nth(0);
+      await expect(groups.getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '3');
       await expect(table.getByRole('columnheader', { name: 'Actions' })).toHaveClass(/pf-v6-c-table__sticky-cell/);
     }
     const actions = page.getByRole('button', { name: `Actions for ${MEMBER}` });
@@ -42,7 +45,8 @@ test('places Actions in the AI grid group from the xl breakpoint up', async ({ p
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/clusters');
   const table = page.getByTestId('clusters-table');
-  await expect(table.getByRole('columnheader', { name: 'AI grid', exact: true })).toHaveAttribute('colspan', '4');
+  const groups = table.getByRole('row').nth(0);
+  await expect(groups.getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '4');
   const actions = table.getByRole('columnheader', { name: 'Actions' });
   await expect(actions).not.toHaveClass(/pf-v6-c-table__sticky-cell/);
   const names = (await table.getByRole('row').nth(1).getByRole('columnheader').allTextContents()).map((name) =>
