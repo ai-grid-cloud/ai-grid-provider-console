@@ -10,7 +10,7 @@ import {
   TextInputGroup,
   TextInputGroupMain,
 } from '@patternfly/react-core';
-import { resolveSelectPopperAppendTo, useModalOverflowUnlock } from './selectPopper';
+import { resolveSelectPopperAppendTo, selectMenuWidth, useModalOverflowUnlock } from './selectPopper';
 
 export type TypeaheadSelectOption = {
   value: string;
@@ -188,7 +188,7 @@ export const TypeaheadSelect = ({
       toggle={toggle}
       variant="typeahead"
       isScrollable
-      popperProps={{ appendTo: () => resolveSelectPopperAppendTo(inputRef.current) }}
+      popperProps={{ ...selectMenuWidth, appendTo: () => resolveSelectPopperAppendTo(inputRef.current) }}
     >
       <SelectList id={listboxId} aria-label={ariaLabel}>
         {visible.length === 0 ? (

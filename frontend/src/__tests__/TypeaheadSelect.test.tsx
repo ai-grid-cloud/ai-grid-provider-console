@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Modal, ModalBody, ModalHeader } from '@patternfly/react-core';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TypeaheadSelect } from '../components/TypeaheadSelect';
+import { TypeaheadSelect, type TypeaheadSelectOption } from '../components/TypeaheadSelect';
 
 const OPTIONS = [
   { value: 'a', label: 'acme-robotics' },
@@ -17,7 +18,7 @@ const Harness = ({
 }: {
   onBlur?: () => void;
   onChange?: (value: string) => void;
-  options?: typeof OPTIONS;
+  options?: TypeaheadSelectOption[];
   initial?: string;
 }) => {
   const [value, setValue] = useState(initial);
@@ -123,6 +124,41 @@ it('calls onBlur when focus leaves the field, not when an option is clicked', as
   expect(onBlur).not.toHaveBeenCalled();
   await user.tab();
   expect(onBlur).toHaveBeenCalledTimes(1);
+});
+
+it('sizes the menu to the toggle, and lets it paint past a modal', async () => {
+  const user = userEvent.setup();
+  render(
+    <Modal isOpen variant="small" aria-label="Add cluster to AI grid">
+      <ModalHeader title="Add cluster to AI grid" />
+      <ModalBody>
+        <Harness
+          options={[
+            {
+              value: 'combined',
+              label: 'Ingress and inference',
+              description: 'The cluster receives requests via Models-as-a-Service and serves models via KServe.',
+            },
+          ]}
+        />
+      </ModalBody>
+    </Modal>,
+  );
+  await user.click(screen.getByRole('combobox', { name: 'Organization' }));
+  const menu = document.querySelector('.pf-v6-c-menu');
+  const toggle = document.querySelector('.pf-v6-c-menu-toggle');
+  const box = document.querySelector('.pf-v6-c-modal-box');
+  if (!(menu instanceof HTMLElement) || !(toggle instanceof HTMLElement) || !(box instanceof HTMLElement)) {
+    throw new Error('menu, toggle, or modal box missing');
+  }
+  // The description wraps inside the toggle's width instead of widening the menu.
+  expect(menu.style.width).toBe(`${toggle.offsetWidth}px`);
+  expect(menu.style.maxWidth).toBe(`${toggle.offsetWidth}px`);
+  expect(menu.parentElement).toBe(box);
+  expect(box.style.overflow).toBe('visible');
+
+  await user.keyboard('{Escape}');
+  expect(box.style.overflow).toBe('');
 });
 
 it('calls onBlur when focus leaves after opening the menu with the toggle button', async () => {

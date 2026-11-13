@@ -12,11 +12,10 @@ const ENROLLABLE = 'site4';
 test('adds an enrollable cluster to the AI grid, keeps it after a reload, and removes it', async ({ page }) => {
   await page.goto('/clusters');
   const row = page.getByRole('row').filter({ has: page.getByRole('gridcell', { name: ENROLLABLE, exact: true }) });
-  await expect(row).toContainText('Not added');
+  await expect(row.locator('[data-label="AI grid status"]')).toHaveText('—');
 
-  // The menu appears once /user has answered.
-  await page.getByRole('button', { name: `Actions for ${ENROLLABLE}` }).click();
-  await page.getByRole('menuitem', { name: 'Add to AI grid' }).click();
+  // The add button appears once /user has answered.
+  await row.getByRole('button', { name: `Add ${ENROLLABLE} to AI grid` }).click();
   // The location is prefilled from the cluster's label; the role has to be chosen.
   const add = page.getByRole('dialog', { name: 'Add cluster to AI grid' });
   await expect(add.getByRole('textbox', { name: 'Location label' })).toHaveValue(ENROLLABLE);
@@ -56,7 +55,14 @@ test('adds an enrollable cluster to the AI grid, keeps it after a reload, and re
   await remove.getByRole('textbox', { name: `Type ${ENROLLABLE} to confirm:` }).fill(ENROLLABLE);
   await remove.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByText(`Cluster ${ENROLLABLE} removed from AI grid`)).toBeVisible();
-  await expect(page.getByTestId('cluster-membership')).toContainText('Not added');
+  // A cluster outside AI grid shows the summary and Add, not the membership list.
+  await expect(
+    page.getByText(
+      'The AI grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add to AI grid' })).toBeVisible();
+  await expect(page.getByTestId('cluster-membership')).toHaveCount(0);
   // The fake hub's ready check stops listing a cluster as soon as it leaves, so the watch's first
   // read finds it gone; it arrives after the click, so unread.
   await expect(page.getByText(`Cluster ${ENROLLABLE} left AI grid`)).toBeVisible();

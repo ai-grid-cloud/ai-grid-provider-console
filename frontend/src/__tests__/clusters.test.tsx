@@ -16,6 +16,9 @@ import {
 import { createClient } from '@connectrpc/connect';
 import { Clusters } from '../api/connect/clients';
 import { notificationsKey, watchesKey } from '../notifications/storageKeys';
+import { AI_GRID_SUMMARY } from '../pages/clusters/clusterInfo';
+import { LOCATION_DOCS_URL } from '../pages/clusters/site';
+import { EMPTY_VALUE } from '../utilities/format';
 import { transportFor } from './connectClusters';
 import { renderAt } from './render';
 
@@ -45,13 +48,23 @@ const serviceWith = (clusters: GridCluster[]) => new MockConsoleService(undefine
 
 type User = ReturnType<typeof userEvent.setup>;
 
-/** Opens a row's actions menu and picks an item. */
+/** The add icon for a cluster outside AI grid. */
+const addButton = (cluster: string) => screen.getByRole('button', { name: `Add ${cluster} to AI grid` });
+
+/** The AI grid status cell: a member's provisioning, or — outside AI grid. */
+const aiGridStatus = (row: HTMLElement) => row.querySelector('[data-label="AI grid status"]');
+
+/** Opens a member's actions menu and picks an item, or clicks Add for a cluster outside AI grid. */
 const pick = async (user: User, cluster: string, item: string) => {
+  if (item === 'Add to AI grid') {
+    await user.click(await screen.findByRole('button', { name: `Add ${cluster} to AI grid` }));
+    return;
+  }
   await user.click(await screen.findByRole('button', { name: `Actions for ${cluster}` }));
   await user.click(screen.getByRole('menuitem', { name: item }));
 };
 
-/** Adds a cluster from its row menu as an inference cluster, keeping its location, and confirms. */
+/** Adds a cluster from its add button as an inference cluster, keeping its location, and confirms. */
 const add = async (user: User, cluster: string) => {
   await pick(user, cluster, 'Add to AI grid');
   const modal = await screen.findByTestId('cluster-membership-modal');
@@ -89,8 +102,7 @@ it('lists live Hub states, includes AI grid navigation and enrolls with a label-
   await user.click(screen.getByRole('textbox', { name: 'Filter clusters' }));
   await user.paste('cluster-c');
   expect(within(screen.getByTestId('clusters-table')).queryByText('cluster-a')).not.toBeInTheDocument();
-  await user.click(screen.getByRole('button', { name: 'Actions for cluster-c' }));
-  expect(screen.getByRole('menuitem', { name: 'Add to AI grid' })).not.toHaveAttribute('aria-disabled', 'true');
+  expect(addButton('cluster-c')).not.toHaveAttribute('aria-disabled', 'true');
 });
 
 it('removes a member from AI grid after a confirmation', async () => {
@@ -113,7 +125,8 @@ it('removes a member from AI grid after a confirmation', async () => {
   const removed = service.clusters.find((c) => c.name === 'cluster-a')!;
   expect(removed.labels).toEqual({ 'ai-grid/provisioned': 'true', location: 'site1' });
   const row = within(screen.getByTestId('clusters-table')).getByRole('link', { name: 'cluster-a' }).closest('tr')!;
-  expect(within(row).getByText('Not added')).toBeInTheDocument();
+  expect(aiGridStatus(row)).toHaveTextContent('—');
+  expect(row).not.toHaveTextContent('Not added');
 });
 
 it('does not say the hub is disconnected when removing local-cluster', async () => {
@@ -272,7 +285,7 @@ it('asks for a location label and role before adding', async () => {
   const user = userEvent.setup();
   const service = serviceWith([
     cluster('no-location-member', 'Ready', { 'ai-grid/enabled': 'true' }),
-    cluster('no-location', 'Ready'),
+    { ...cluster('no-location', 'Ready'), latitude: 37.7749, longitude: -122.4194 },
     cluster('local-cluster', 'Ready'),
   ]);
   renderAt('/clusters', service);
@@ -285,24 +298,33 @@ it('asks for a location label and role before adding', async () => {
   // A form, titled as one, that names the cluster in its description and says a role stays.
   expect(screen.getByRole('dialog', { name: 'Add cluster to AI grid' })).toBe(modal);
   expect(within(modal).getByText('no-location', { selector: 'strong' })).toBeVisible();
-  expect(modal).toHaveTextContent(
-    'Configure the no-location cluster for the AI grid. The AI grid manages model deployment and request routing across multiple clusters.',
-  );
-  // The role stays, said in an inline alert directly under the Role field's helper text.
+  expect(modal).toHaveTextContent(`Configure the no-location cluster for the AI grid. ${AI_GRID_SUMMARY}`);
+  // The role stays, said in a plain inline alert directly under the Role field's helper text.
   const roleFixed = within(modal).getByText(
     "A cluster's role cannot be changed once it has been added to the AI grid.",
   );
   expect(roleFixed).toBeVisible();
+  expect(roleFixed.closest('.pf-v6-c-alert')).toHaveClass('pf-m-inline', 'pf-m-plain');
   const roleGroup = within(modal).getByRole('combobox', { name: 'Role' }).closest('.pf-v6-c-form__group')!;
-  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-alert')).toContainElement(roleFixed);
+  const alert = roleFixed.closest('.pf-v6-c-alert');
+  expect(alert?.parentElement).toHaveClass('pf-v6-c-form__helper-text');
+  expect(alert).toBeInstanceOf(HTMLElement);
+  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-form__helper-text')).toContainElement(
+    alert instanceof HTMLElement ? alert : null,
+  );
   await user.click(within(modal).getByRole('button', { name: 'Add' }));
   // Nothing is written until both are given; each field says why and describes its error.
   const location = within(modal).getByRole('textbox', { name: 'Location label' });
   const role = within(modal).getByRole('combobox', { name: 'Role' });
+  // Location, then role, as Edit asks for them.
+  expect(location.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(location).toBeRequired();
   expect(location).toHaveAttribute('aria-invalid', 'true');
   expect(role).toHaveAttribute('aria-invalid', 'true');
-  expect(location).toHaveAccessibleDescription(/^Required : error status;$/);
+  expect(location).toHaveAccessibleDescription(/^Required : error status;/);
+  expect(within(modal).queryByText('For example, us-east.')).not.toBeInTheDocument();
+  // The position is in the field's help, not under the input.
+  expect(within(modal).queryByText('37.7749, -122.4194')).not.toBeInTheDocument();
   // The role keeps its helper, and the error follows it.
   expect(role).toHaveAccessibleDescription(
     /^Select the role this cluster will perform in the AI grid\. .* Required : error status;$/,
@@ -311,20 +333,38 @@ it('asks for a location label and role before adding', async () => {
   await user.paste('us east');
   expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
   expect(service.clusters[1].labels).toEqual({});
-  // What the label is, and that models don't go by it, is in the field's help.
+  // What the label is, and this cluster's position, site and cloud region, is in the field's help.
+  // An empty site or cloud region still has a row.
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
-  expect(await screen.findByRole('dialog', { name: 'Location label' })).toHaveTextContent(
-    'Models are placed on clusters by name, not by this label.',
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent(
+    "Provide a text label that can help identify the cluster's location on the AI grid map. This label does not impact the cluster's location on the map.",
   );
+  expect(help).toHaveTextContent(
+    "Use the cluster's position, site, and cloud region to inform the label. For example, a cluster with the position 43.65, -79.38 might have the location label Toronto.",
+  );
+  expect(within(help).getByText('Toronto').tagName).toBe('STRONG');
+  expect(within(help).getByRole('heading', { name: 'Cluster details' })).toBeVisible();
+  expect(within(help).queryByRole('heading', { name: 'Location label' })).not.toBeInTheDocument();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
+  expect(within(help).getByText('37.7749, -122.4194')).toBeVisible();
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
+  await user.click(within(help).getByRole('button', { name: 'Copy map position' }));
+  expect(await navigator.clipboard.readText()).toBe('37.7749, -122.4194');
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   // The Role field's help explains each role.
   await user.click(within(modal).getByRole('button', { name: 'More info for the role field' }));
-  const help = await screen.findByRole('dialog', { name: 'Cluster roles' });
+  const roles = await screen.findByRole('dialog', { name: 'Cluster roles' });
   // No heading: what roles are, each role with its name in bold, then that a role is set once.
-  expect(within(help).queryByRole('heading')).not.toBeInTheDocument();
-  expect(within(help).getByText('Roles define what each cluster does in the AI grid.')).toBeVisible();
+  expect(within(roles).queryByRole('heading')).not.toBeInTheDocument();
+  expect(within(roles).getByText('Roles define what each cluster does in the AI grid.')).toBeVisible();
   expect(
-    within(help)
+    within(roles)
       .getAllByRole('listitem')
       .map((item) => item.textContent),
   ).toEqual([
@@ -332,20 +372,32 @@ it('asks for a location label and role before adding', async () => {
     'Inference clusters serve models via KServe and receive requests through an ingress cluster.',
     'Ingress and inference clusters receive requests via Models-as-a-Service and serve models via KServe.',
   ]);
-  expect(Array.from(help.querySelectorAll('li > strong')).map((name) => name.textContent)).toEqual([
+  expect(Array.from(roles.querySelectorAll('li > strong')).map((name) => name.textContent)).toEqual([
     'Ingress',
     'Inference',
     'Ingress and inference',
   ]);
   expect(
-    within(help).getByText('Roles are assigned when adding a cluster to the AI grid, and cannot be changed once set.'),
+    within(roles).getByText('Roles are assigned when adding a cluster to the AI grid, and cannot be changed once set.'),
   ).toBeVisible();
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   // The hub itself defaults to the combined role.
   await pick(user, 'local-cluster', 'Add to AI grid');
-  expect(
-    within(await screen.findByTestId('cluster-membership-modal')).getByRole('combobox', { name: 'Role' }),
-  ).toHaveValue('Ingress and inference');
+  const hub = await screen.findByTestId('cluster-membership-modal');
+  expect(within(hub).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress and inference');
+  // No position, site, or cloud region.
+  await user.click(within(hub).getByRole('button', { name: 'More info for the location label field' }));
+  const hubHelp = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(hubHelp).toHaveTextContent('No map position, site, or cloud region is available to inform the label.');
+  expect(within(hubHelp).queryByRole('term')).not.toBeInTheDocument();
+  expect(within(hubHelp).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  const how = within(hubHelp).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.closest('p')).toHaveTextContent(
+    'No map position, site, or cloud region is available to inform the label.',
+  );
+  expect(how.querySelector('svg')).toBeInTheDocument();
+  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  expect(within(hubHelp).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 
 it('keeps an unenrolled cluster on patch failure and allows a retry', async () => {
@@ -393,7 +445,8 @@ it('refresh reflects external membership changes on the Hub', async () => {
   await waitFor(() => expect(row()).toHaveTextContent('Provisioning'));
   service.clusters[1] = cluster('cluster-b', 'Ready', { location: 'site2' });
   await user.click(screen.getByRole('button', { name: 'Refresh' }));
-  await waitFor(() => expect(within(row()).getByText('Not added')).toBeInTheDocument());
+  await waitFor(() => expect(aiGridStatus(row())).toHaveTextContent('—'));
+  expect(row()).not.toHaveTextContent('Not added');
 });
 
 it('shows the role a removed cluster kept read-only when it is added again, and sends it', async () => {
@@ -545,9 +598,10 @@ it('shows the seeded clusters with region, location label, status and provisioni
   // Its region shows in the Region column; its ai-grid/site label isn't shown.
   expect(within(sydney).getByRole('cell', { name: 'asia-pacific' })).toBeVisible();
   expect(sydney).not.toHaveTextContent('sydney');
-  // Not a member: says so, with no provisioning and no role.
+  // Not a member: a dash in AI Grid status, with no provisioning and no role.
   expect(sydney).not.toHaveTextContent('provisioned');
-  expect(within(sydney).getByText('Not added')).toBeVisible();
+  expect(aiGridStatus(sydney)).toHaveTextContent('—');
+  expect(sydney).not.toHaveTextContent('Not added');
   expect(sydney).not.toHaveTextContent('Ingress and inference');
   expect(within(table).getAllByText('Provisioned')).toHaveLength(3);
   expect(within(table).getAllByText('Ingress and inference')).toHaveLength(3);
@@ -571,7 +625,8 @@ it('shows the role of each member, and warns about a member without one', async 
   expect(within(table).getByRole('row', { name: /^edge-1 / })).toHaveTextContent('Ingress');
   expect(within(table).getByRole('row', { name: /^gpu-1 / })).toHaveTextContent('Inference');
   const former = within(table).getByRole('row', { name: /^former / });
-  expect(former).toHaveTextContent('Not added');
+  expect(aiGridStatus(former)).toHaveTextContent('—');
+  expect(former).not.toHaveTextContent('Not added');
   expect(former).not.toHaveTextContent('Ingress and inference');
   const missing = screen.getByTestId('missing-role-no-role');
   expect(missing).toHaveTextContent('No role');
@@ -641,6 +696,11 @@ it('hides write actions until it knows the user is a provider admin', async () =
   // site4 is both the name and the location, so find its row rather than the text.
   expect(await screen.findByRole('row', { name: /^site4 / })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^Actions for / })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Add .+ to AI grid$/ })).not.toBeInTheDocument();
+  const table = screen.getByTestId('clusters-table');
+  const [groupRow, columnRow] = within(table).getAllByRole('row').slice(0, 2);
+  expect(within(groupRow).getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '3');
+  expect(within(columnRow).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
 });
 
 it('shows the not-available state on a backend without the RPC', async () => {
@@ -706,7 +766,7 @@ it('shows the ACM state for an importing cluster', async () => {
   expect(within(status).getByText('Importing: Import of the managed cluster is in progress')).toBeVisible();
 });
 
-it('offers Edit, then Remove from AI grid, for a member and neither for another cluster', async () => {
+it('offers Edit, then Remove from AI grid, for a member, and an add button for another cluster', async () => {
   const user = userEvent.setup();
   renderAt('/clusters', new MockConsoleService());
   await user.click(await screen.findByRole('button', { name: 'Actions for site1' }));
@@ -714,11 +774,15 @@ it('offers Edit, then Remove from AI grid, for a member and neither for another 
   // Remove is destructive: last, after a divider.
   expect(within(screen.getByRole('menu')).getByRole('separator')).toBeInTheDocument();
   await user.keyboard('{Escape}');
-  await user.click(screen.getByRole('button', { name: 'Actions for site4' }));
-  expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Add to AI grid']);
+  // site4 is outside AI grid: an add icon, with the menu's Add label as its tooltip.
+  const add = addButton('site4');
+  expect(screen.queryByRole('button', { name: 'Actions for site4' })).not.toBeInTheDocument();
+  await user.hover(add);
+  // jsdom gives the icon button no box, so Popper keeps the tooltip at opacity 0; the text is still there.
+  expect(await screen.findByRole('tooltip', { name: 'Add to AI grid' })).toHaveTextContent('Add to AI grid');
 });
 
-it('offers Add to AI grid only for ready, unavailable or unknown clusters', async () => {
+it('offers Add to AI grid for ready, unavailable, and unknown clusters', async () => {
   const withState = (name: string, state: NonNullable<GridCluster['state']>): GridCluster => ({
     ...cluster(name, 'Unknown'),
     state,
@@ -734,33 +798,32 @@ it('offers Add to AI grid only for ready, unavailable or unknown clusters', asyn
       withState('is-notaccepted', 'Not accepted'),
       withState('is-pendingimport', 'Pending import'),
       withState('is-importing', 'Importing'),
+      withState('is-unset', 'Pending import'),
     ]),
   );
   await screen.findByTestId('clusters-table');
   const user = userEvent.setup();
-  const addItem = async (name: string) => {
-    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
-    const item = screen.getByRole('menuitem', { name: 'Add to AI grid' });
-    return item;
-  };
   for (const name of ['is-ready', 'is-offline', 'is-unknown']) {
-    expect(await addItem(name)).not.toHaveAttribute('aria-disabled', 'true');
-    await user.keyboard('{Escape}');
+    expect(addButton(name)).not.toHaveAttribute('aria-disabled', 'true');
   }
   // The others say why they can't be added yet.
-  for (const name of ['is-detaching', 'is-importfailed', 'is-pendingimport', 'is-importing']) {
-    const item = await addItem(name);
+  for (const name of ['is-detaching', 'is-importfailed', 'is-pendingimport', 'is-importing', 'is-unset']) {
+    const item = addButton(name);
     expect(item).toHaveAttribute('aria-disabled', 'true');
     await user.hover(item);
-    expect(await screen.findByText(/after the hub imports it/)).toBeInTheDocument();
-    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('tooltip', { name: /after the hub imports it/ })).toHaveTextContent(
+      /after the hub imports it/,
+    );
+    await user.unhover(item);
   }
-  const notAccepted = await addItem('is-notaccepted');
+  const notAccepted = addButton('is-notaccepted');
   expect(notAccepted).toHaveAttribute('aria-disabled', 'true');
   await user.hover(notAccepted);
   expect(
-    await screen.findByText('The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.'),
-  ).toBeInTheDocument();
+    await screen.findByRole('tooltip', {
+      name: 'The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.',
+    }),
+  ).toHaveTextContent('The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.');
 });
 
 it("lists each cluster's GPU configuration and capacity, as provider admins asked", async () => {
@@ -829,22 +892,26 @@ it('explains the AI grid column group in a popover, as it does the GPUs group', 
   const help = await screen.findByRole('dialog', { name: 'AI grid' });
   // The body only, without a heading.
   expect(within(help).queryByRole('heading')).not.toBeInTheDocument();
-  expect(
-    within(help).getByText('The AI grid coordinates model deployment and request routing across multiple clusters.'),
-  ).toBeVisible();
+  expect(within(help).getByText(AI_GRID_SUMMARY).tagName).toBe('P');
 });
 
+/** True when `earlier` precedes `later` in the document. */
+const isBefore = (earlier: Element, later: Element) =>
+  (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
 it('groups the columns as the details page does, wraps them, and has Site and Region but no Hub column', async () => {
+  // The test window is 1280px, above PatternFly's xl breakpoint (1200px).
   renderAt('/clusters', serviceWith(hubClusters()));
   const table = await screen.findByTestId('clusters-table');
   const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
   // Nested column headers (UX review): Cluster, AI grid and GPUs, as on the details page.
+  // At xl and above, Actions is the last column of AI grid, so that group spans its three data columns plus Actions.
   expect(
     within(groups)
       .getAllByRole('columnheader')
-      .map((h) => h.textContent)
-      .filter((t) => t !== 'Actions'),
+      .map((h) => h.textContent),
   ).toEqual(['Cluster', 'AI grid', 'GPUs']);
+  expect(within(groups).getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '4');
   const headers = within(columns).getAllByRole('columnheader');
   expect(headers.map((h) => h.textContent)).toEqual([
     'Name',
@@ -854,10 +921,12 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
     'AI grid Status',
     'Location label',
     'Role',
+    'Actions',
     'Capacity',
     'Configuration',
   ]);
   for (const header of headers) {
+    if (header.textContent === 'Actions') continue;
     expect(header).toHaveClass('pf-m-wrap');
   }
   // The two Status columns read Status on screen, under their groups; their sort buttons say which.
@@ -869,8 +938,61 @@ it('groups the columns as the details page does, wraps them, and has Site and Re
   expect(within(table).queryByRole('columnheader', { name: 'Hub' })).not.toBeInTheDocument();
   // The OpenShift version is on the details page, leaving room for GPUs and Capacity.
   expect(within(table).queryByRole('columnheader', { name: 'OpenShift' })).not.toBeInTheDocument();
-  // The actions column stays in view: it sticks to the right edge of the scrolling table.
-  expect(within(groups).getByRole('columnheader', { name: 'Actions' })).toHaveClass('pf-v6-c-table__sticky-cell');
+  // One Actions column, in the column row after Role, and not stuck to the right edge.
+  expect(within(table).getAllByRole('columnheader', { name: 'Actions' })).toHaveLength(1);
+  const actionsHeader = within(columns).getByRole('columnheader', { name: 'Actions' });
+  expect(actionsHeader).not.toHaveClass('pf-v6-c-table__sticky-cell');
+  expect(table.querySelectorAll('td.pf-v6-c-table__action')).toHaveLength(3);
+  const member = within(table).getByRole('row', { name: /^cluster-a / });
+  expect(
+    isBefore(
+      within(member).getByRole('button', { name: 'Actions for cluster-a' }),
+      within(member).getByTestId('cluster-gpu-capacity-cluster-a'),
+    ),
+  ).toBe(true);
+  const outsider = within(table).getByRole('row', { name: /^cluster-b / });
+  expect(
+    isBefore(
+      within(outsider).getByRole('button', { name: 'Add cluster-b to AI grid' }),
+      within(outsider).getByTestId('cluster-gpu-capacity-cluster-b'),
+    ),
+  ).toBe(true);
+});
+
+it('pins Actions to the right edge below the xl breakpoint, after the GPU columns', async () => {
+  window.innerWidth = 1199;
+  try {
+    renderAt('/clusters', serviceWith(hubClusters()));
+    const table = await screen.findByTestId('clusters-table');
+    const [groups, columns] = within(table).getAllByRole('row').slice(0, 2);
+    // AI grid spans only its own columns. Actions is the last header and sticks to the right.
+    expect(within(groups).getByRole('columnheader', { name: 'AI grid' })).toHaveAttribute('colspan', '3');
+    expect(
+      within(groups)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Cluster', 'AI grid', 'GPUs', 'Actions']);
+    expect(within(columns).queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(within(table).getAllByRole('columnheader', { name: 'Actions' })).toHaveLength(1);
+    const actionsHeader = within(groups).getByRole('columnheader', { name: 'Actions' });
+    expect(actionsHeader).toHaveClass('pf-v6-c-table__sticky-cell');
+    expect(actionsHeader).toHaveStyle({ '--pf-v6-c-table__sticky-cell--MinWidth': '3.5rem' });
+    expect(table.querySelectorAll('td.pf-v6-c-table__action')).toHaveLength(3);
+    const member = within(table).getByRole('row', { name: /^cluster-a / });
+    const menu = within(member).getByRole('button', { name: 'Actions for cluster-a' });
+    const memberCells = within(member).getAllByRole('cell');
+    expect(memberCells[memberCells.length - 1]).toContainElement(menu);
+    expect(menu.closest('td')).toHaveClass('pf-v6-c-table__sticky-cell');
+    expect(menu.closest('td')).toHaveStyle({ '--pf-v6-c-table__sticky-cell--MinWidth': '3.5rem' });
+    expect(isBefore(within(member).getByTestId('cluster-gpu-capacity-cluster-a'), menu)).toBe(true);
+    const outsider = within(table).getByRole('row', { name: /^cluster-b / });
+    const add = within(outsider).getByRole('button', { name: 'Add cluster-b to AI grid' });
+    const outsiderCells = within(outsider).getAllByRole('cell');
+    expect(outsiderCells[outsiderCells.length - 1]).toContainElement(add);
+    expect(isBefore(within(outsider).getByTestId('cluster-gpu-capacity-cluster-b'), add)).toBe(true);
+  } finally {
+    window.innerWidth = 1280;
+  }
 });
 
 it('says when the search matches no cluster, and clears it from the table', async () => {
@@ -1126,7 +1248,7 @@ it('returns focus to the row’s menu button when the dialog it opened closes', 
   const modal = await screen.findByTestId('cluster-membership-modal');
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   await waitFor(() => expect(screen.queryByTestId('cluster-membership-modal')).not.toBeInTheDocument());
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Actions for site4' })).toHaveFocus());
+  await waitFor(() => expect(addButton('site4')).toHaveFocus());
 });
 
 it("shows each cluster's site and region apart, or what to fix", async () => {

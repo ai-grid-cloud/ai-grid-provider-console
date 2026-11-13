@@ -99,8 +99,11 @@ a failed load.
   `unavailableAlert`, `clusterInfo.ts`) without the hub's message; the cluster's page keeps the
   hub's message in its status tooltip, after the same explanation (`unavailableText`). A cluster
   the hub can't reach (the backend's `UNKNOWN`) is _Unknown_. Without a message (and not
-  Unavailable) the label stays outline and noninteractive. AI grid status stays outline. A refresh
-  updates an open popover from the same row.
+  Unavailable) the label stays outline and noninteractive. AI grid status stays outline. A cluster
+  outside AI grid shows — in that column, and its row action is an add icon whose tooltip says Add
+  to AI grid, or why it can't be added yet. On that cluster's own page, the AI grid card shows what
+  the AI grid is and an Add button, and no membership list. A refresh updates an open popover from
+  the same row.
 - In Create subscription and its Add models picker, every model shows its status as the Models list
   does (`ModelStatusLabel`, from the latest poll; a model the subscription has saved shows its
   registration), and only Partially ready models with cluster reports open the shared

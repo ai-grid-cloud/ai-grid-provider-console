@@ -24,7 +24,7 @@ import {
 } from '@patternfly/react-core';
 
 import { TimesIcon } from '@patternfly/react-icons/dist/esm/icons/times-icon';
-import { resolveSelectPopperAppendTo, useModalOverflowUnlock } from './selectPopper';
+import { resolveSelectPopperAppendTo, selectMenuWidth, useModalOverflowUnlock } from './selectPopper';
 
 export type SelectionOptions = Omit<SelectOptionProps, 'id'> & {
   id: number | string;
@@ -167,6 +167,7 @@ export const MultiSelection: React.FC<MultiSelectionProps> = ({
 
   const mergedPopperProps = React.useMemo(
     () => ({
+      ...selectMenuWidth,
       ...popperProps,
       appendTo: popperProps?.appendTo ?? getPopperAppendTo,
     }),
