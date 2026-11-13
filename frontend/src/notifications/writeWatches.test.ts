@@ -221,11 +221,16 @@ describe('retryCreate', () => {
     expect(landed).toBeUndefined();
   });
 
-  it('warns when the token went with another payload', async () => {
-    const taken = new ConnectError('different payload', Code.AlreadyExists);
-    expect((await retryCreate(target, SENT, answers(taken), before)).response.status).toBe(
-      NotificationResponseStatus.WARNING,
+  it("warns when the token went with another payload, with the backend's message and the list, not the requested id", async () => {
+    const taken = new ConnectError(
+      'request_token already created Subscription "test-team-x7k2pq" with a different payload',
+      Code.AlreadyExists,
     );
+    const { response } = await retryCreate(target, SENT, answers(taken), before);
+    expect(response.status).toBe(NotificationResponseStatus.WARNING);
+    expect(JSON.stringify(response)).toContain('test-team-x7k2pq');
+    expect(JSON.stringify(response)).not.toContain('/subscriptions/view/test-team"');
+    expect(response).toMatchObject({ actions: [{ to: '/subscriptions' }] });
   });
 
   it.each([Code.InvalidArgument, Code.FailedPrecondition])("reports %s as the create's own refusal", async (code) => {

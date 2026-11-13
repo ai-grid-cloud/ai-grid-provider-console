@@ -426,9 +426,14 @@ describe('subscriptions', () => {
   it('sends the same request_token for each submit from one form, so a first send that landed is not created twice', async () => {
     const service = new MockConsoleService();
     const subscriptions = seedSubscriptionsOf(service);
-    // The first submit's answer, within the form's wait, is Unavailable: the form shows it.
-    subscriptions.before.create = () => {
+    subscriptions.idSuffix = '-x7k2pq';
+    // The first submit creates the subscription, but its answer, within the form's wait, is
+    // Unavailable: the form shows it.
+    subscriptions.before.create = async (request) => {
       delete subscriptions.before.create;
+      await subscriptions
+        .backend()
+        .create(request as Parameters<ReturnType<typeof subscriptions.backend>['create']>[0], {} as never);
       throw new ConnectError('The AI grid backend is unavailable.', Code.Unavailable);
     };
     const { formWait } = formWaits();
@@ -453,8 +458,65 @@ describe('subscriptions', () => {
     await user.click(screen.getByTestId('create-subscription-button'));
     expect(await toast('Subscription Test team saved to Git')).toBeVisible();
     const tokens = subscriptions.sent('create').map((r) => r.requestToken);
-    expect(tokens).toHaveLength(2);
-    expect(tokens[0]).toBe(tokens[1]);
+    expect(tokens.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(tokens).size).toBe(1);
+    // One subscription, the first submit's, which the second submit's answer names.
+    expect(subscriptions.subscriptions.filter((s) => s.id.startsWith('test-team'))).toHaveLength(1);
+    expect(await screen.findByRole('link', { name: 'Test team' })).toHaveAttribute(
+      'href',
+      '/subscriptions/view/test-team-x7k2pq',
+    );
+  });
+
+  it('says in plain words when an earlier submit from the form already created the subscription with other values', async () => {
+    const service = new MockConsoleService();
+    const subscriptions = seedSubscriptionsOf(service);
+    subscriptions.idSuffix = '-x7k2pq';
+    // The first submit creates it, but the form sees Unavailable.
+    subscriptions.before.create = async (request) => {
+      delete subscriptions.before.create;
+      await subscriptions
+        .backend()
+        .create(request as Parameters<ReturnType<typeof subscriptions.backend>['create']>[0], {} as never);
+      throw new ConnectError('The AI grid backend is unavailable.', Code.Unavailable);
+    };
+    const user = userEvent.setup();
+    renderConsole('/subscriptions/create', service, formWaits().formWait);
+    await user.click(await screen.findByRole('combobox', { name: 'Organization' }));
+    await user.click(screen.getByRole('option', { name: 'acme-robotics' }));
+    const name = screen.getByTestId('subscription-name-desc-name');
+    await user.click(name);
+    await user.paste('Test team');
+    await user.click(screen.getByRole('combobox', { name: 'Groups' }));
+    await user.paste('engineering');
+    const option = await screen.findByRole('option', { name: 'Add group "engineering"' });
+    await user.click(option.querySelector('button') ?? option);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByTestId('add-models-button'));
+    await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
+    await user.click(screen.getByTestId('confirm-add-models'));
+    await user.click(screen.getByTestId('add-token-limit-0'));
+    await user.click(screen.getByTestId('save-rate-limits'));
+    await user.click(screen.getByTestId('create-subscription-button'));
+    expect(await screen.findByText(/backend is unavailable/)).toBeVisible();
+    // The user changes the name and submits again: same token, other values.
+    await user.clear(name);
+    await user.paste('Test team 2');
+    await user.click(screen.getByTestId('create-subscription-button'));
+    const alert = (await screen.findByRole('heading', { name: /Unable to create subscription/ })).closest(
+      '.pf-v6-c-alert',
+    ) as HTMLElement;
+    await waitFor(() =>
+      expect(alert).toHaveTextContent(
+        'An earlier submit from this form already created subscription test-team-x7k2pq. Open it, or start a new create.',
+      ),
+    );
+    expect(screen.getByRole('link', { name: 'test-team-x7k2pq' })).toHaveAttribute(
+      'href',
+      '/subscriptions/view/test-team-x7k2pq',
+    );
+    expect(screen.queryByText(/request_token/)).not.toBeInTheDocument();
+    expect(subscriptions.subscriptions.filter((s) => s.id.startsWith('test-team'))).toHaveLength(1);
   });
 
   it("says a retried create's token went with something else when the backend answers AlreadyExists", async () => {

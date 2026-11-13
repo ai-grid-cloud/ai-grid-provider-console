@@ -36,6 +36,7 @@ import {
   subscriptionNotActiveText,
   subscriptionUnconfirmedText,
   succeededText,
+  tokenTakenText,
   unconfirmedText,
   unknownCreatedNameText,
   type WriteSubject,
@@ -290,7 +291,9 @@ export const retryCreate = async (
     return { response: success(succeededText(landed)), landed };
   } catch (err) {
     const code = ConnectError.from(err).code;
-    if (code === Code.AlreadyExists) return { response: warning(mismatchText(target)) };
+    if (code === Code.AlreadyExists) {
+      return { response: warning(tokenTakenText(target, describeError(err).message)) };
+    }
     // Refusals of the request itself, which the first send got too. Anything else (sign-in, access,
     // a backend or Git failure) says nothing about whether the first send landed: still unknown.
     if (!isUnknownOutcome(err) && (code === Code.InvalidArgument || code === Code.FailedPrecondition)) {

@@ -254,6 +254,18 @@ export const mismatchText = (t: WriteTarget): Text => {
   return { title: `Unable to confirm ${s.object} ${t.name}`, message, actions: [viewAction(t)] };
 };
 
+/**
+ * A create retried with its request_token that the backend answers AlreadyExists: an earlier submit
+ * with that token, from the same form, created the object with other content (backend PR 89). The
+ * backend's message names the object it created; the list is where to find it, as its id isn't
+ * the requested one.
+ */
+export const tokenTakenText = (t: WriteTarget, message: string): Text => ({
+  title: `Unable to confirm ${subjects[t.subject].object} ${t.name}`,
+  message: `An earlier submit from this form already created the ${subjects[t.subject].object} with other values: ${message}`,
+  actions: [listAction(t)],
+});
+
 /** An update whose object was deleted meanwhile. */
 export const goneText = (t: WriteTarget): Text => ({
   title: unable(t),
