@@ -1,6 +1,7 @@
 // The fields Add to AI grid and Edit share, so both dialogs draw, validate and word a cluster's
 // location label and role the same way.
 import {
+  Alert,
   ClipboardCopy,
   FormGroup,
   FormGroupLabelHelp,
@@ -92,8 +93,6 @@ type RoleFieldProps = {
   onBlur: () => void;
   error?: string;
   isDisabled?: boolean;
-  /** Shown directly under the field's helper text: Add's note that the role is set once. */
-  note?: React.ReactNode;
 };
 
 /** The roles' help beside a Role label, editable or not. */
@@ -105,8 +104,8 @@ const roleHelp = (
 
 /**
  * Why neither dialog changes a role a cluster has: the hub doesn't fully remove what the old role
- * installed (GLOSSARY.md, "Role"; editClusterText.ts). Under a read-only role, and in Add under an
- * editable one's helper text.
+ * installed (GLOSSARY.md, "Role"; editClusterText.ts). Under a read-only role as its helper text,
+ * and under an editable one (Add, and Edit when the cluster has none) as the plain info alert.
  */
 export const roleFixedText = "A cluster's role cannot be changed once it has been added to the AI grid.";
 
@@ -125,7 +124,7 @@ export const ReadOnlyRoleField: React.FC<{ role: ClusterRole }> = ({ role }) => 
 );
 
 /** The `ai-grid/role` label: one of the three roles, with their help beside the label. */
-export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, error, isDisabled, note }) => (
+export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, error, isDisabled }) => (
   <FormGroup label="Role" fieldId="cluster-role" isRequired labelHelp={roleHelp}>
     <TypeaheadSelect
       id="cluster-role"
@@ -149,6 +148,8 @@ export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, e
         {error && <HelperTextItem variant="error">{error}</HelperTextItem>}
       </HelperText>
     </FormHelperText>
-    {note}
+    <FormHelperText>
+      <Alert isInline isPlain variant="info" title={roleFixedText} />
+    </FormHelperText>
   </FormGroup>
 );

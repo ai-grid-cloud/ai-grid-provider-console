@@ -108,6 +108,15 @@ export const EditClusterModal: React.FC<Props> = ({ cluster, onConfirm, onClose 
       <ModalBody>
         <Stack hasGutter>
           <Form id="cluster-edit-form" onSubmit={(e) => e.preventDefault()}>
+            <LocationLabelField
+              value={values.location}
+              error={shown('location')}
+              isDisabled={busy}
+              mapPosition={mapPositionOf(cluster)}
+              positionNotSet={isPositionNotSet(cluster)}
+              onChange={(value) => setValues((v) => ({ ...v, location: value }))}
+              onBlur={touch('location')}
+            />
             {fixedRole ? (
               <ReadOnlyRoleField role={fixedRole} />
             ) : (
@@ -131,15 +140,6 @@ export const EditClusterModal: React.FC<Props> = ({ cluster, onConfirm, onClose 
                 </List>
               </Alert>
             )}
-            <LocationLabelField
-              value={values.location}
-              error={shown('location')}
-              isDisabled={busy}
-              mapPosition={mapPositionOf(cluster)}
-              positionNotSet={isPositionNotSet(cluster)}
-              onChange={(value) => setValues((v) => ({ ...v, location: value }))}
-              onBlur={touch('location')}
-            />
           </Form>
           {error && (
             <Alert isInline variant="danger" title={editText.errorTitle}>

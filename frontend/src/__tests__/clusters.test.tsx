@@ -299,17 +299,22 @@ it('asks for a location label and role before adding', async () => {
   expect(modal).toHaveTextContent(
     'Configure the no-location cluster for the AI grid. The AI grid manages model deployment and request routing across multiple clusters.',
   );
-  // The role stays, said in an inline alert directly under the Role field's helper text.
+  // The role stays, said in a plain inline alert directly under the Role field's helper text.
   const roleFixed = within(modal).getByText(
     "A cluster's role cannot be changed once it has been added to the AI grid.",
   );
   expect(roleFixed).toBeVisible();
+  expect(roleFixed.closest('.pf-v6-c-alert')).toHaveClass('pf-m-inline', 'pf-m-plain');
   const roleGroup = within(modal).getByRole('combobox', { name: 'Role' }).closest('.pf-v6-c-form__group')!;
-  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-alert')).toContainElement(roleFixed);
+  const alert = roleFixed.closest('.pf-v6-c-alert');
+  expect(alert?.parentElement).toHaveClass('pf-v6-c-form__helper-text');
+  expect(roleGroup.querySelector('.pf-v6-c-form__helper-text + .pf-v6-c-form__helper-text')).toContainElement(alert);
   await user.click(within(modal).getByRole('button', { name: 'Add' }));
   // Nothing is written until both are given; each field says why and describes its error.
   const location = within(modal).getByRole('textbox', { name: 'Location label' });
   const role = within(modal).getByRole('combobox', { name: 'Role' });
+  // Location, then role, as Edit asks for them.
+  expect(location.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(location).toBeRequired();
   expect(location).toHaveAttribute('aria-invalid', 'true');
   expect(role).toHaveAttribute('aria-invalid', 'true');

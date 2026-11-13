@@ -17,7 +17,7 @@ import { changedMessage, ClusterChangedError } from './ClusterChangedError';
 import { removeText } from './clusterInfo';
 import { isPositionNotSet, mapPositionOf, type ClusterView } from './clusterView';
 import { locationError } from './gridSettings';
-import { LocationLabelField, ReadOnlyRoleField, RoleField, roleFixedText } from './MembershipFields';
+import { LocationLabelField, ReadOnlyRoleField, RoleField } from './MembershipFields';
 import { roleOf } from './roles';
 
 export type MembershipChange = { cluster: ClusterView; join: boolean };
@@ -187,8 +187,6 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
                   setRole(value);
                 }}
                 onBlur={() => setTouched((t) => ({ ...t, role: true }))}
-                // Add only: Edit sets a role only on a cluster without one, and says what that installs.
-                note={<Alert isInline variant="info" title={roleFixedText} />}
               />
             )}
           </Form>

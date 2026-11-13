@@ -196,7 +196,10 @@ it('shows the role of a cluster that has one read-only, with why, and only the l
   expect(role).toHaveAccessibleDescription(ROLE_FIXED);
   expect(within(dialog).queryByRole('combobox', { name: 'Role' })).not.toBeInTheDocument();
   expect(within(dialog).getByRole('button', { name: 'More info for the role field' })).toBeVisible();
-  expect(field(dialog, 'Location label')).toHaveValue('eu-west');
+  const location = field(dialog, 'Location label');
+  expect(location).toHaveValue('eu-west');
+  // Location, then role, as Add asks for them.
+  expect(location.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(dialog).queryByText('For example, us-east.')).not.toBeInTheDocument();
   expect(within(dialog).getByText('48.8566, 2.3522')).toBeVisible();
   await user.click(within(dialog).getByRole('button', { name: 'Copy map position' }));
@@ -294,10 +297,20 @@ it.each([
     const user = userEvent.setup();
     const { requests } = renderList([noRole()]);
     const dialog = await openEdit(user, 'no-role');
-    expect(within(dialog).getByRole('combobox', { name: 'Role' })).toHaveValue('');
+    const roleField = within(dialog).getByRole('combobox', { name: 'Role' });
+    expect(roleField).toHaveValue('');
+    // The role is not set, so Edit shows Add's plain info alert under the field's helper text.
+    const roleFixed = within(dialog).getByText(ROLE_FIXED);
+    expect(roleFixed.closest('.pf-v6-c-alert')).toHaveClass('pf-m-inline', 'pf-m-plain');
+    expect(roleFixed.closest('.pf-v6-c-alert')?.parentElement).toHaveClass('pf-v6-c-form__helper-text');
+    // Location, then role, as Add asks for them.
+    expect(
+      field(dialog, 'Location label').compareDocumentPosition(roleField) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(dialog).queryByTestId('cluster-role-change')).not.toBeInTheDocument();
     await selectRole(user, dialog, label);
     const change = within(dialog).getByTestId('cluster-role-change');
+    expect(roleField.compareDocumentPosition(change) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(change).getByRole('heading', { name: 'Info alert: What the hub installs' })).toBeVisible();
     expect(
       within(within(change).getByRole('list'))
