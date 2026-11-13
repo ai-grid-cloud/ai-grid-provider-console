@@ -3,11 +3,11 @@ import { expect, test } from './fixtures';
 import { callBackend as call } from './backend';
 
 // Edit on the backend's own fakes (its fixtures/poc), through the BFF's Connect relay. The fixtures
-// give no member a role: this spec gives site2 the inference role first, as Add to AI Grid writes
+// give no member a role: this spec gives site2 the inference role first, as Add to AI grid writes
 // it, and edits its location label in the browser (its role is then read-only), and sets a role on
 // site3 in the browser. It puts both clusters' labels back afterwards: its project in
 // playwright.config.ts runs one test at a time, so the other specs see them as the fixture has them.
-// Both roles are inference: the backend refuses to take ingress away from AI Grid's only ingress
+// Both roles are inference: the backend refuses to take ingress away from AI grid's only ingress
 // cluster while other members stay (docs/connect.md, "The backend's role rules"), so an ingress role
 // given here could not be put back.
 const WITH_ROLE = 'site2';
@@ -44,7 +44,7 @@ const openEdit = async (page: Page, cluster: string) => {
   // The menu appears once /user has answered.
   await page.getByRole('button', { name: `Actions for ${cluster}` }).click();
   await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
-  return page.getByRole('dialog', { name: 'Edit AI Grid cluster' });
+  return page.getByRole('dialog', { name: 'Edit AI grid cluster' });
 };
 
 const rowOf = (page: Page, cluster: string) =>
@@ -97,9 +97,9 @@ test("edits a cluster's location label, and sets the role of a cluster without o
 
   await rowOf(page, WITH_ROLE).getByRole('link', { name: WITH_ROLE, exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: WITH_ROLE })).toBeVisible();
-  await expect(page.getByLabel('AI Grid membership')).toContainText('us-east-edge');
+  await expect(page.getByLabel('AI grid membership')).toContainText('us-east-edge');
 
   await page.goto(`/clusters/${WITHOUT_ROLE}`);
   await expect(page.getByRole('heading', { level: 1, name: WITHOUT_ROLE })).toBeVisible();
-  await expect(page.getByLabel('AI Grid membership')).toContainText('Inference');
+  await expect(page.getByLabel('AI grid membership')).toContainText('Inference');
 });

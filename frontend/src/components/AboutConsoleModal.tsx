@@ -51,7 +51,7 @@ export const AboutConsoleModal: React.FC<Props> = ({ isOpen, onClose, config, co
     [
       'Data',
       fromConfig((c) =>
-        c.fakeBackend ? 'Fake backend: fixture data; nothing you change reaches a cluster' : 'AI Grid backend',
+        c.fakeBackend ? 'Fake backend: fixture data; nothing you change reaches a cluster' : 'AI grid backend',
       ),
     ],
     [
@@ -77,8 +77,8 @@ export const AboutConsoleModal: React.FC<Props> = ({ isOpen, onClose, config, co
     >
       <Content>
         <Content component={ContentVariants.p}>
-          Manages AI Grid on this ACM hub: its clusters, the organizations and subscriptions that use it, and the models
-          it serves.
+          Manages the AI grid on this ACM hub: its clusters, the organizations and subscriptions that use it, and the
+          models it serves.
         </Content>
         <Content component={ContentVariants.dl}>
           {rows.map(([label, value]) => [

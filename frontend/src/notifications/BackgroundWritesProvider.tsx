@@ -105,6 +105,13 @@ const outcomeVariants = {
   [NotificationResponseStatus.WARNING]: 'warning',
 } as const;
 
+/**
+ * The write as it landed: under the id the backend answered with, when that differs from the one
+ * requested (a subscription's name with the backend's suffix). Its name, what the pages show, stays.
+ */
+const landedAs = (target: WriteTarget, id: string | undefined): WriteTarget =>
+  id && id !== target.id ? { ...target, id } : target;
+
 /** The write a record follows, without the record's own bookkeeping. */
 const targetOf = ({
   subject,
@@ -493,7 +500,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
      * - a delete stops the object's watches at once.
      *
      * One watch per cluster too: an add, or an edit that sets the role a cluster lacked, is watched
-     * until the cluster is provisioned, and a remove until it has left AI Grid, each replacing any
+     * until the cluster is provisioned, and a remove until it has left AI grid, each replacing any
      * earlier watch of the cluster. An edit of the location label alone starts none and leaves a
      * running one alone: it changes neither what the hub installs nor the name (clusters can't be
      * renamed).
@@ -524,7 +531,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
     }
     /**
      * Every page showing objects of this kind refetches them: the lists and each one's Get (for
-     * clusters, the Clusters list, a cluster's page and the AI Grid map).
+     * clusters, the Clusters list, a cluster's page and the AI grid map).
      */
     function refreshFn(subject: WriteTarget['subject']) {
       const schema = { model: Models, subscription: Subscriptions, cluster: Clusters }[subject];
@@ -575,7 +582,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
   }, [owner, storage, save, startWatch, unregisterNotification]);
 
   const submitWrite = useCallback<BackgroundWritesValue['submitWrite']>(
-    async ({ draft, ...target }, send) => {
+    async ({ draft, ...target }, send, idOf) => {
       const sentAt = now();
       const key = newKey();
       const started = generation.current;
@@ -583,7 +590,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
       inFlight.current.add(key);
       keep({ ...target, key, stage: 'sent', since: sentAt });
       const answer = send().then(
-        () => ({ ok: true }) as const,
+        (response) => ({ ok: true, landed: landedAs(target, idOf?.(response)) }) as const,
         (error: unknown) => ({ ok: false, error }) as const,
       );
       const waited = new AbortController();
@@ -600,8 +607,8 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
         if (first.ok) {
           drop(key);
           // In answer to the user's own click: kept in the drawer as read.
-          notify({ variant: 'success', ...succeededText(target), read: true });
-          landed(target);
+          notify({ variant: 'success', ...succeededText(first.landed), read: true });
+          landed(first.landed);
           return 'done';
         }
         // Any answer within the wait is the form's, as before the notification center, whatever its
@@ -622,8 +629,8 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
         if (!current()) return;
         if (result.ok) {
           drop(key);
-          notify({ id: notificationId, variant: 'success', ...succeededText(target) });
-          landed(target);
+          notify({ id: notificationId, variant: 'success', ...succeededText(result.landed) });
+          landed(result.landed);
         } else if (isUnknownOutcome(result.error)) {
           startWatch({ ...target, key, stage: 'readback', since: sentAt, notificationId });
         } else {

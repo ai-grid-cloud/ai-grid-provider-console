@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures';
 
-// A fixture AI Grid member (the backend's fixtures/poc/managedclusters.json). No spec changes its
+// A fixture AI grid member (the backend's fixtures/poc/managedclusters.json). No spec changes its
 // membership; cluster-membership.spec.ts adds and removes site4.
 const MEMBER = 'site1';
 
@@ -27,7 +27,7 @@ for (const { name, width } of [
     // The page itself never scrolls sideways.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await actions.click();
-    await expect(page.getByRole('menuitem', { name: 'Remove from AI Grid' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Remove from AI grid' })).toBeVisible();
     await page.keyboard.press('Escape');
   });
 }
@@ -41,7 +41,7 @@ test('opens a cluster status message from the keyboard without changing the list
   await expect(status).toBeVisible();
   await status.focus();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: `${MEMBER} status`, exact: true });
+  const dialog = page.getByRole('dialog', { name: `${MEMBER} Ready`, exact: true });
   await expect(dialog.getByText('Managed cluster is available', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

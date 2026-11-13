@@ -34,7 +34,7 @@ const text = (name: string): VariableDefinition => ({
   spec: { name, value: 'N/A', display: { name, hidden: true } },
 });
 
-// As the AI Grid cluster dashboard defines its cluster variable: multi-select, All by default.
+// As the AI grid cluster dashboard defines its cluster variable: multi-select, All by default.
 const clusterVariable: VariableDefinition = {
   kind: 'ListVariable',
   spec: {

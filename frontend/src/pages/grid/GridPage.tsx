@@ -17,11 +17,11 @@ import { GridFleetView } from './GridFleetView';
 import { tileLayerConfig } from './tiles';
 
 type Props = {
-  /** The map's AI Grid members, loaded by AiGridPage. */
+  /** The map's AI grid members, loaded by AiGridPage. */
   map: MapInventory;
 };
 
-/** The map's clusters: the AI Grid members, when they were read, and how to read them again. */
+/** The map's clusters: the AI grid members, when they were read, and how to read them again. */
 export type MapInventory = {
   /** Absent until they have been read; a failed reload keeps the last ones. */
   clusters?: FleetCluster[];
@@ -34,7 +34,7 @@ export type MapInventory = {
 
 const modelsErrorOf = (err: Error) =>
   err instanceof ServiceError && err.isNotImplemented
-    ? 'Models are not available on this AI Grid backend.'
+    ? 'Models are not available on this AI grid backend.'
     : err.message;
 
 export const GridPage: React.FC<Props> = ({ map }) => {
@@ -80,16 +80,16 @@ export const GridPage: React.FC<Props> = ({ map }) => {
   // or switch to, even if an earlier answer is still held (a backend redeployed without it).
   return (
     <PageStateSection
-      title="AI Grid"
-      description="The AI Grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
+      title="AI grid"
+      description="The AI grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
       headerAction={toolbar}
       loaded={map.loaded}
       error={map.error}
       onRetry={() => void refresh()}
-      subject="AI Grid"
-      object="AI Grid clusters"
-      notAvailableTitle="The AI Grid map is not available on this AI Grid backend"
-      loadingLabel="Loading AI Grid"
+      subject="AI grid"
+      object="AI grid clusters"
+      notAvailableTitle="The AI grid map is not available on this AI grid backend"
+      loadingLabel="Loading AI grid"
     >
       <Stack hasGutter>
         {map.clusters && (

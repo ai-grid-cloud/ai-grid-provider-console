@@ -5,7 +5,7 @@ import { expect, test } from './fixtures';
 // page of the console, in both themes, and checks that the policy is the one in force.
 
 const pages = [
-  { path: '/ai-grid', heading: 'AI Grid' },
+  { path: '/ai-grid', heading: 'AI grid' },
   { path: '/clusters', heading: 'Clusters' },
   { path: '/organizations', heading: 'Organizations' },
   { path: '/organizations/create', heading: 'Create organization' },
@@ -29,7 +29,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
 
       // The map draws its outline and pins, and a pin's label.
       await page.goto('/ai-grid');
-      const pin = page.getByLabel('AI Grid map of clusters').locator('path.fleet-pin').first();
+      const pin = page.getByLabel('AI grid map of clusters').locator('path.fleet-pin').first();
       await expect(pin).toBeVisible();
       await pin.hover();
       await expect(page.locator('.leaflet-tooltip')).toBeVisible();

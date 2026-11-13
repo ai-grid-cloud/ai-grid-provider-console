@@ -1,4 +1,4 @@
-// What the Models pages and the AI Grid map show of a Model from the backend's Models
+// What the Models pages and the AI grid map show of a Model from the backend's Models
 // API (ai_grid.v1, read over Connect): a thin selector layer over the generated message (ADR-0002),
 // as clusterView.ts is for clusters. Each field reads one documented field or key and words it; the
 // backend decides the phase, the clusters the placement chose, and each placed cluster's status
@@ -59,7 +59,7 @@ export type SyncWord = 'Synced' | 'Out of sync' | 'Sync failed' | 'Unknown';
 export type MaaSWord =
   | 'Available'
   | 'Awaiting subscription'
-  | 'Configuring routing'
+  | 'Configuring route'
   | 'Awaiting subscription and backend'
   | 'Unavailable'
   | 'Failed'
@@ -205,7 +205,7 @@ const syncWords: Partial<Record<ModelSyncState, SyncWord>> = {
 const maasWords: Partial<Record<ModelMaasState, MaaSWord>> = {
   [ModelMaasState.AVAILABLE]: 'Available',
   [ModelMaasState.AWAITING_SUBSCRIPTION]: 'Awaiting subscription',
-  [ModelMaasState.CONFIGURING_ROUTING]: 'Configuring routing',
+  [ModelMaasState.CONFIGURING_ROUTING]: 'Configuring route',
   [ModelMaasState.AWAITING_SUBSCRIPTION_AND_BACKEND]: 'Awaiting subscription and backend',
   [ModelMaasState.UNAVAILABLE]: 'Unavailable',
   [ModelMaasState.FAILED]: 'Failed',
@@ -364,7 +364,7 @@ const clusterUnsettled = (c: ModelClusterView): boolean =>
   c.state ? changingStates.has(c.state) : unsettledPhases.has(c.phase);
 
 /** MaaS states that leave on their own once a cluster serves the model. */
-const maasChanging: ReadonlySet<MaaSWord> = new Set(['Configuring routing', 'Awaiting subscription and backend']);
+const maasChanging: ReadonlySet<MaaSWord> = new Set(['Configuring route', 'Awaiting subscription and backend']);
 
 /**
  * Whether anything the model's pages show is still changing, so they poll sooner: the model is

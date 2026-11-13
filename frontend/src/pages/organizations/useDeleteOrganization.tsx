@@ -11,7 +11,7 @@ const deleteError = (err: unknown) => {
   const { kind, message } = describeError(err);
   return new Error(
     kind === 'notAvailable'
-      ? 'Deleting organizations is not available on this AI Grid backend.'
+      ? 'Deleting organizations is not available on this AI grid backend.'
       : kind === 'conflict'
         ? 'This organization was changed after this dialog opened. The latest version is now shown. Review it and try again.'
         : message,

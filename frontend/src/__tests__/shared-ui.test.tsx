@@ -217,15 +217,15 @@ describe('page states', () => {
 
   it('says a 501 is not available yet, without Retry', () => {
     renderLoadError(new ServiceError(501, 'not implemented'));
-    expect(screen.getByRole('heading', { name: 'Widgets are not available on this AI Grid backend' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Widgets are not available on this AI grid backend' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
-  it('says a 403 is no access, with the reason', () => {
+  it('says a 403 is no access, and who grants it, without the server message', () => {
     renderLoadError(new ServiceError(403, 'widgets are for admins'));
     expect(screen.getByRole('heading', { level: 2, name: 'No access' })).toBeVisible();
-    expect(screen.getByText('Message returned:')).toBeVisible();
-    expect(screen.getByText('widgets are for admins')).toBeVisible();
+    expect(screen.queryByText('Message returned:')).not.toBeInTheDocument();
+    expect(screen.queryByText('widgets are for admins')).not.toBeInTheDocument();
     expect(
       screen.getByText(
         "You don't have permission to view widget. To request permission, contact your hub administrator.",

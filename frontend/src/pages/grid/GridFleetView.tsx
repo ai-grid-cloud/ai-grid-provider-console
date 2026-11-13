@@ -208,7 +208,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
       </Flex>
     ) : (
       <SubtleText>
-        {model.selectedClusters.length ? 'No AI Grid clusters selected.' : 'No clusters selected.'}
+        {model.selectedClusters.length ? 'No AI grid clusters selected.' : 'No clusters selected.'}
       </SubtleText>
     );
   };
@@ -348,7 +348,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
         title="Clusters"
         headingLevel="h3"
         count={clustersOf(model).length}
-        help="The AI Grid clusters selected for this model. Being listed here does not confirm that the model is serving on the cluster."
+        help="The AI grid clusters selected for this model. Being listed here does not confirm that the model is serving on the cluster."
       >
         {clusterLinks(model)}
       </DetailsSection>
@@ -454,7 +454,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
 
   const ready = clusters.filter((c) => c.status === 'Ready').length;
   const summary: [label: string, value: string, detail: string | undefined, help: string][] = [
-    ['Clusters', `${ready}/${clusters.length}`, 'Ready', 'The total number of OpenShift clusters in the AI Grid.'],
+    ['Clusters', `${ready}/${clusters.length}`, 'Ready', 'The total number of OpenShift clusters in the AI grid.'],
     // A site is a site name, else the cloud region, else the ai-grid/site label: what the map names.
     [
       'Sites',
@@ -467,20 +467,20 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
         ).size,
       ),
       undefined,
-      'The number of different sites or cloud regions where clusters in the AI Grid are located.',
+      'The number of different sites or cloud regions where clusters in the AI grid are located.',
     ],
     // Every model, placed or not (relevantModels keeps those placed on no cluster).
-    ['Models', String(relevantModels.length), undefined, 'The total number of models in the AI Grid.'],
+    ['Models', String(relevantModels.length), undefined, 'The total number of models in the AI grid.'],
   ];
 
   return (
     <Stack hasGutter>
-      <Grid hasGutter md={4} role="region" aria-label="AI Grid summary">
+      <Grid hasGutter md={4} role="region" aria-label="AI grid summary">
         {summary.map(([label, value, detail, help]) => (
           <StatCard key={label} label={label} value={value} detail={detail} help={help} />
         ))}
       </Grid>
-      <Card className="fleet-region" role="region" aria-label="AI Grid map and drawer">
+      <Card className="fleet-region" role="region" aria-label="AI grid map and drawer">
         <Drawer isExpanded isInline isStatic>
           <DrawerContent panelContent={panel}>
             <DrawerContentBody>

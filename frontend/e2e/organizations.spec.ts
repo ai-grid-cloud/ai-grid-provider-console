@@ -58,7 +58,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
     await page.getByRole('button', { name: 'Identity provider', exact: true }).click();
     for (const [name] of idpFields) await page.getByRole('textbox', { name }).fill('');
     await page.getByRole('button', { name: 'Next' }).click();
-    await expect(page.getByRole('heading', { name: 'No identity provider configured in AI Grid' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'No identity provider configured in AI grid' })).toBeVisible();
     await page.getByRole('button', { name: 'Create organization' }).click();
     await expect(page.getByText(`Organization ${unique} created`)).toBeVisible();
 

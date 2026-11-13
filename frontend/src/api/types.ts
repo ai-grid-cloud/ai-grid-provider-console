@@ -23,7 +23,7 @@ export type ConsoleConfig = {
 };
 
 export type ModelsConfig = {
-  /** The wizard's Hardware choices, the first one selected; never empty (the BFF's MODEL_HARDWARE, or its built-in list). */
+  /** The wizard's Hardware choices, the first one selected, or the first without an accelerator on a grid whose serving clusters have no GPUs; never empty (the BFF's MODEL_HARDWARE, or its built-in list). */
   hardware: ModelHardware[];
 };
 
@@ -37,6 +37,8 @@ export type ModelHardware = {
   accelerator?: string;
   /** The runtime image a new model gets; none for the cluster's default vLLM image, which is for NVIDIA GPUs. */
   image?: string;
+  /** What the wizard shows for `image`, such as "vLLM CPU 0.18.0 (OpenShift AI 3.6)"; only with an image. */
+  imageName?: string;
   /** Environment variables for the model's main container. */
   env?: Record<string, string>;
   /** The resources the wizard starts from. */

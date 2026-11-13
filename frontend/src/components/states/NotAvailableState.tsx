@@ -2,7 +2,7 @@ import { EmptyState, EmptyStateBody } from '@patternfly/react-core';
 import { WrenchIcon } from '@patternfly/react-icons';
 
 type Props = {
-  /** e.g. "Models are not available on this AI Grid backend". */
+  /** e.g. "Models are not available on this AI grid backend". */
   title: string;
   /** What is missing and who sets it up, for a feature this console isn't configured for; the backend's sentence otherwise. */
   children?: React.ReactNode;
@@ -19,7 +19,7 @@ export const NotAvailableState: React.FC<Props> = ({ title, children }) => (
   <EmptyState variant="lg" titleText={title} headingLevel="h2" icon={WrenchIcon} data-testid="not-available-state">
     <EmptyStateBody>
       {children ??
-        'This AI Grid backend does not support this feature. The page becomes available when the backend supports it.'}
+        'This AI grid backend does not support this feature. The page becomes available when the backend supports it.'}
     </EmptyStateBody>
   </EmptyState>
 );

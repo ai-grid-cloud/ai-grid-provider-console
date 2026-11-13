@@ -1,4 +1,4 @@
-// What the Clusters pages and the AI Grid map show of a ManagedCluster from the backend's Clusters
+// What the Clusters pages and the AI grid map show of a ManagedCluster from the backend's Clusters
 // API (ai_grid.v1, read over Connect): a thin selector layer over the generated message (ADR-0002).
 // Each field reads one documented field or key and words it; the backend decides what a cluster
 // is: its membership (`ai_grid_member`), its lifecycle state and where it is (`location`).
@@ -65,7 +65,7 @@ export const mapPositionOf = (c: Pick<ClusterView, 'latitude' | 'longitude'>): s
 export const isPositionNotSet = (c: Pick<ClusterView, 'latitude' | 'longitude' | 'locationProblem'>): boolean =>
   (c.latitude === undefined || c.longitude === undefined) && !c.locationProblem;
 
-// The keys read here. The labels are AI Grid's own (the backend lets the console write the
+// The keys read here. The labels are AI grid's own (the backend lets the console write the
 // ai-grid/* keys and the location label, ClustersUpdateRequest); the claims are the ones
 // ManagedClusterStatus.cluster_claims documents; openshiftVersion is the label ACM sets.
 export const LABEL_ENABLED = 'ai-grid/enabled';

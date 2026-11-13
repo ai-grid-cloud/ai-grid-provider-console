@@ -4,24 +4,27 @@ import type { MembershipChange } from './MembershipModal';
 
 /**
  * What Unavailable means, in the console's words: the hub's own message for the state varies, so
- * the status tooltip and dialog lead with this.
+ * the Clusters list's status popover shows this alert instead.
  */
-export const unavailableText =
-  "The cluster's API server cannot be reached. Telemetry and console updates are unavailable, and the system is unable to confirm whether the cluster is running.";
+export const unavailableAlert = {
+  title: 'Cannot reach API server',
+  body: 'Telemetry and console updates are unavailable, and the system is unable to confirm whether the cluster is running.',
+} as const;
+
+/** The same in one sentence, which the cluster page's status tooltip leads with. */
+export const unavailableText = `The cluster's API server cannot be reached. ${unavailableAlert.body}`;
 
 /** The hub's side of the status: the ACM state behind Unknown, then the backend's message. */
-export const hubMessage = (c: ClusterView) => [c.state, c.statusMessage].filter(Boolean).join(': ') || undefined;
-
-/** The status tooltip: what Unavailable means, or the hub's message for any other status. */
-export const statusReason = (c: ClusterView) => (c.status === 'Unavailable' ? unavailableText : hubMessage(c));
+export const hubMessage = (c: ClusterView) =>
+  [c.state, c.statusMessage?.trim()].filter(Boolean).join(': ') || undefined;
 
 /** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */
 export const cannotAddReason = (c: ClusterView) => {
   if (c.state === 'Not accepted') {
-    return 'The hub has not accepted this cluster. To add it to AI Grid, first accept it in ACM.';
+    return 'The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.';
   }
   return c.state
-    ? `This cluster can be added to AI Grid after the hub imports it. Current state: ${c.state}.`
+    ? `This cluster can be added to the AI grid after the hub imports it. Current state: ${c.state}.`
     : undefined;
 };
 
@@ -33,7 +36,7 @@ export const cannotAddReason = (c: ClusterView) => {
 export const gpuCount = (c: ClusterView): number | undefined => c.gpuCapacity;
 
 /**
- * Remove from AI Grid's texts. A cluster that receives requests (Ingress or Combined) holds a copy
+ * Remove from AI grid's texts. A cluster that receives requests (Ingress or Combined) holds a copy
  * of every subscription. Deleting a copy runs MaaS's `maas.opendatahub.io/subscription-cleanup`
  * finalizer, which revokes the subscription's API keys in the database every ingress cluster
  * shares, so on every cluster. The backend therefore refuses the removal, with a message that says
@@ -49,23 +52,23 @@ export const gpuCount = (c: ClusterView): number | undefined => c.gpuCapacity;
  * it off triggers such a reconcile, so a delete after it can find the finalizer back.
  */
 export const removeText = {
-  action: 'Remove from AI Grid',
+  action: 'Remove from AI grid',
   /** The warning of the Remove dialog of an Ingress or Combined cluster: what happens to users. */
   warningTitle: 'Requests move to the other ingress clusters',
   warningBody:
-    "This cluster receives requests from organizations' users. After it is removed, their requests go through the other ingress clusters, and their API keys keep working. AI Grid refuses the removal and shows the reason while this is the only ingress cluster, or while removing it would delete a subscription's copy and revoke its API keys.",
+    "This cluster receives requests from organizations' users. After it is removed, their requests go through the other ingress clusters, and their API keys keep working. The AI grid refuses the removal and shows the reason while this is the only ingress cluster, or while removing it would delete a subscription's copy and revoke its API keys.",
   /** The warning's second paragraph: what not to do on the removed cluster while it keeps copies. */
   warningDetail:
     "If this cluster keeps copies of subscriptions after removal, don't delete them, uninstall MaaS, or delete their namespace on this cluster. MaaS would revoke their API keys on every cluster.",
 } as const;
 
-/** Add to AI Grid's label, on the details page's menu and as the list's add-button tooltip. */
+/** Add to AI grid's label, on the details page's menu and as the list's add-button tooltip. */
 export const addText = {
-  action: 'Add to AI Grid',
+  action: 'Add to AI grid',
 } as const;
 
 /**
- * The AI Grid actions a provider admin has on a cluster: for a member, Edit, then Remove
+ * The AI grid actions a provider admin has on a cluster: for a member, Edit, then Remove
  * (destructive, last, after a divider); otherwise Add. The list shows Add as an icon button
  * instead of this menu.
  */

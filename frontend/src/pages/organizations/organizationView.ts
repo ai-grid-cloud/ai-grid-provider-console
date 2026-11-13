@@ -25,10 +25,10 @@ export type IdentityProvider = { title: string; description: string; enabled: tr
 /**
  * What the pages say for a Tenant without spec.identity_provider. The backend projects only the
  * identity provider it created (its own organization attribute), so an organization whose provider
- * was set up in Keycloak directly arrives without one too: the words state what AI Grid knows, and
+ * was set up in Keycloak directly arrives without one too: the words state what AI grid knows, and
  * the consequence only unless Keycloak has one.
  */
-export const NO_IDENTITY_PROVIDER = 'No identity provider configured in AI Grid';
+export const NO_IDENTITY_PROVIDER = 'No identity provider configured in AI grid';
 export const NO_IDENTITY_PROVIDER_REASON =
   "Unless an identity provider was set up directly in Keycloak, this organization's users cannot log in.";
 

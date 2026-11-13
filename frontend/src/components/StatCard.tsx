@@ -15,7 +15,7 @@ type Props = {
   help?: React.ReactNode;
 };
 
-/** One headline number on a compact card. The AI Grid summary lays a row of these out in a Gallery. */
+/** One headline number on a compact card. The AI grid summary lays a row of these out in a Gallery. */
 export const StatCard: React.FC<Props> = ({ label, value, unit, detail, warning, help }) => (
   <Card isCompact isFullHeight>
     <CardTitle>

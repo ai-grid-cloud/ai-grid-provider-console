@@ -129,6 +129,8 @@ export const useSubscriptionWrites = () => {
             draft,
           },
           () => callUnaryMethod(transport, create, request),
+          // The backend may add a suffix to the requested id: its answer names the subscription.
+          (response) => response.object?.id,
         ),
       updateSubscription: (request: MessageInitShape<typeof SubscriptionsUpdateRequestSchema>, name: string) =>
         submitWrite(

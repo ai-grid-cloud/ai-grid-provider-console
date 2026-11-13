@@ -114,9 +114,9 @@ const SectionsNav: React.FC<{ pathname: string }> = ({ pathname }) => {
 const MAIN_ID = 'console-main';
 
 // Section order and active-state matching follow the PoC (src/app/App.tsx at 62319b8):
-// AI Grid and Monitoring match exactly, the others match by prefix.
+// AI grid and Monitoring match exactly, the others match by prefix.
 const sections: { path: string; label: string; exact?: boolean }[] = [
-  { path: '/ai-grid', label: 'AI Grid', exact: true },
+  { path: '/ai-grid', label: 'AI grid', exact: true },
   { path: '/monitoring', label: 'Monitoring', exact: true },
   { path: '/clusters', label: 'Clusters' },
   { path: '/organizations', label: 'Organizations' },
@@ -153,7 +153,7 @@ export const App: React.FC<Props> = ({
   const [config, , configError, reloadConfig] = useServiceData(() => service.getConfig(), undefined, 0);
   // Only the config says whether a login proxy runs: the fake backend has none. Without it (it
   // failed to load, for whatever reason) the console can't tell, so it doesn't redirect on its own
-  // and offers both Try again and Reload.
+  // and offers Log in.
   const sessionEnd: SessionEnd | undefined = !ended
     ? undefined
     : config

@@ -37,7 +37,7 @@ type Props = {
   model: Pick<ModelView, 'id' | 'displayName' | 'ingress'>;
   availability: AvailabilityView;
   /**
-   * On the model's own page: the dialog leaves out "Go to the model", which would only reload the
+   * On the model's own page: the dialog leaves out "View model details", which would only reload the
    * page behind it.
    */
   onModelPage?: boolean;
@@ -130,7 +130,7 @@ const AvailabilityModal: React.FC<Props & { onClose: () => void }> = ({
           </Flex>
         </Title>
         <p>
-          <strong>Availability</strong>
+          <strong>Model status</strong>
         </p>
       </ModalHeader>
       <ModalBody>
@@ -162,7 +162,7 @@ const AvailabilityModal: React.FC<Props & { onClose: () => void }> = ({
             )}
             {modelsLink && (
               <Button variant="link" isInline component={(props) => <Link {...props} to={modelPath(model)} />}>
-                Go to the model
+                View model details
               </Button>
             )}
           </Flex>

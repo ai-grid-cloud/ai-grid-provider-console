@@ -131,9 +131,7 @@ export const AddModelsModal: React.FC<Props> = ({
           <ModalHeader title="Add models" />
           <ModalBody>
             <Stack hasGutter>
-              <StackItem>
-                Select models to make available to members of this subscription, then set token limits for each one.
-              </StackItem>
+              <StackItem>Select models to make available to members of this subscription.</StackItem>
               <StackItem>
                 <SearchInput
                   placeholder="Filter by model name"
@@ -217,7 +215,7 @@ export const AddModelsModal: React.FC<Props> = ({
               isDisabled={!loaded || !!error}
               data-testid="confirm-add-models"
             >
-              {currentModels.length ? 'Update models' : 'Add models'}
+              {currentModels.length ? 'Update models' : 'Add'}
             </Button>
             <Button variant="link" onClick={onClose}>
               Cancel

@@ -161,6 +161,11 @@ for bad in \
   "[{\"id\":\"cpu\",\"label\":\"CPU\",\"image\":\"quay.io/vllm${nbsp}cpu:1\"}]" \
   '[{"id":"gpu","label":"GPU","accelerator":"requests.nvidia.com/gpu"}]' \
   '[{"id":"cpu","label":"CPU","image":"quay.io/vllm cpu:1"}]' \
+  '[{"id":"cpu","label":"CPU","imageName":"vLLM CPU"}]' \
+  '[{"id":"cpu","label":"CPU","image":"quay.io/vllm:1","imageName":" vLLM CPU"}]' \
+  '[{"id":"cpu","label":"CPU","image":"quay.io/vllm:1","imageName":"vLLM CPU "}]' \
+  "[{\"id\":\"cpu\",\"label\":\"CPU\",\"image\":\"quay.io/vllm:1\",\"imageName\":\"vLLM CPU${nbsp}\"}]" \
+  "[{\"id\":\"cpu\",\"label\":\"CPU\",\"image\":\"quay.io/vllm:1\",\"imageName\":\"${nbsp}vLLM CPU\"}]" \
   '[{"id":"cpu","label":"CPU","env":{"1THREADS":"4"}}]' \
   '[{"id":"cpu","label":"CPU","env":{"VLLM_ADDITIONAL_ARGS":"--x"}}]' \
   '[{"id":"cpu","label":"CPU","env":{"OMP_NUM_THREADS":4}}]' \

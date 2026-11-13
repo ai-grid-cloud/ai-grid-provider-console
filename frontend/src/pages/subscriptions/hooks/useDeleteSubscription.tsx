@@ -16,7 +16,7 @@ import { useSubscriptionWrites } from '../useSubscriptions';
 const deleteErrorOf = (err: unknown) => {
   const error = toServiceError(err);
   if (error.isNotImplemented) {
-    return new Error('Deleting subscriptions is not available on this AI Grid backend.');
+    return new Error('Deleting subscriptions is not available on this AI grid backend.');
   }
   // Aborted: the version sent is not the stored one (gitDelete, internal/servers/subscriptions_git.go).
   if (error.isConflict) {

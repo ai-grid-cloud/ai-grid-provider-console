@@ -174,6 +174,11 @@ export class FakeSubscriptions {
    */
   before: Partial<Record<Method, (request: unknown) => unknown>> = {};
   requests: { method: Method; request: unknown }[] = [];
+  /**
+   * What Create adds to the requested id, as a backend that makes subscription names unique does
+   * ("-" and six characters; backend PR 89); none answers the requested id, as today's backend does.
+   */
+  idSuffix = '';
 
   constructor(private readonly fleet: FakeModels) {}
 
@@ -290,6 +295,7 @@ export class FakeSubscriptions {
           throw new ConnectError(`Subscription "${object.id}" already exists`, Code.AlreadyExists);
         }
         const subscription = this.check(clone(SubscriptionSchema, object), models);
+        subscription.id = `${object.id}${this.idSuffix}`;
         subscription.metadata = create(MetadataSchema, {
           name: subscription.id,
           version: 1,

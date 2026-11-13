@@ -116,7 +116,7 @@ export const ModelsPage: React.FC = () => {
     if (models.length === 0) {
       return (
         <EmptyListState title="No models" action={deployButton}>
-          To serve models on clusters in the AI Grid, deploy one.
+          To serve models on clusters in the AI grid, deploy one.
         </EmptyListState>
       );
     }
@@ -255,7 +255,7 @@ export const ModelsPage: React.FC = () => {
     <>
       <PageStateSection
         title="Models"
-        description="Manage models and serve them on clusters in the AI Grid."
+        description="Manage models and serve them on clusters in the AI grid."
         loaded={loaded}
         error={error}
         onRetry={() => void refresh()}

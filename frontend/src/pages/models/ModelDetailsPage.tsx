@@ -18,7 +18,8 @@ import { availabilityOf, rolloutExplanation } from './modelStatusInfo';
 import { titleOf } from './modelView';
 import { useDeleteModel } from './useDeleteModel';
 import { useModel } from './useModels';
-import { acceleratorsText, runtimeImageText } from './modelHardware';
+import { acceleratorsText, imageNameFor, runtimeImageText } from './modelHardware';
+import { RuntimeImageValue } from './RuntimeImageValue';
 import { useClusterList } from '../clusters/useClusters';
 
 /**
@@ -31,7 +32,7 @@ export const ModelDetailsPage: React.FC = () => {
   const { data: loadedModel, loaded, error, refresh } = useModel(id);
   const clusterList = useClusterList();
   const clusters = clusterList.data;
-  const { user } = useConsoleSession();
+  const { user, config } = useConsoleSession();
   // A 404 means the deployment is gone, even when an earlier answer is still held (PageStateSection
   // shows the not-found state then).
   const model = error instanceof ServiceError && error.status === 404 ? undefined : loadedModel;
@@ -46,6 +47,7 @@ export const ModelDetailsPage: React.FC = () => {
       return null;
     }
     const availability = availabilityOf(model);
+    const imageName = imageNameFor(config?.models?.hardware ?? [], model.runtimeImage);
     return (
       <Flex direction={{ default: 'column' }} flexWrap={{ default: 'nowrap' }} spaceItems={{ default: 'spaceItemsXl' }}>
         <ClusterLoadNote clusters={clusterList} />
@@ -78,7 +80,15 @@ export const ModelDetailsPage: React.FC = () => {
               { term: 'CPU', value: model.cpu },
               { term: 'Memory', value: model.memory },
               { term: 'Accelerators', value: acceleratorsText(model) },
-              { term: 'Runtime image', value: runtimeImageText(model) },
+              {
+                term: 'Runtime image',
+                value:
+                  imageName && model.runtimeImage ? (
+                    <RuntimeImageValue name={imageName} image={model.runtimeImage} />
+                  ) : (
+                    runtimeImageText(model)
+                  ),
+              },
               { term: 'Replicas', value: model.autoscaled ? 'Autoscaled' : model.replicas },
               { term: 'Endpoint', value: model.url },
               { term: 'Created', value: model.creationTimestamp && <RelativeTime time={model.creationTimestamp} /> },
@@ -103,12 +113,12 @@ export const ModelDetailsPage: React.FC = () => {
             // one reports, the clusters the placement chose until then.
             <Stack hasGutter data-testid="model-clusters">
               <ModelClustersTable model={model} clusters={clusters} />
-              <Link to={`/ai-grid?model=${encodeURIComponent(model.id)}`}>View on the AI Grid map</Link>
+              <Link to={`/ai-grid?model=${encodeURIComponent(model.id)}`}>View on the AI grid map</Link>
             </Stack>
           ) : (
             <SectionEmptyState title="No clusters selected">
               {model.placed
-                ? 'No AI Grid cluster matches this model’s placement.'
+                ? 'No AI grid cluster matches this model’s placement.'
                 : 'To serve this model, select one or more clusters.'}
             </SectionEmptyState>
           )}

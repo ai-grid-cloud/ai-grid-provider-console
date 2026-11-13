@@ -33,9 +33,9 @@ const at = (path: InitialEntry, service = new MockConsoleService()) =>
   );
 
 describe('routes', () => {
-  it('lands on the AI Grid map', async () => {
+  it('lands on the AI grid map', async () => {
     at('/');
-    expect(await screen.findByRole('heading', { level: 1, name: 'AI Grid' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'AI grid' })).toBeInTheDocument();
   });
 
   it('deep-links to every route', async () => {
@@ -85,8 +85,8 @@ describe('routes', () => {
 
   // Review focus 1 (A33/C10): on the real backend, which has only Ping, ListManagedClusters and
   // ListTenants, every page that needs a missing RPC says so instead of showing an error.
-  const orgs = 'Organizations are not available on this AI Grid backend';
-  const subs = 'Subscriptions are not available on this AI Grid backend';
+  const orgs = 'Organizations are not available on this AI grid backend';
+  const subs = 'Subscriptions are not available on this AI grid backend';
   /** The deploy wizard loads locations up front but shows them on its third step. */
   const toClustersStep = async (user: ReturnType<typeof userEvent.setup>) => {
     await user.click(await screen.findByRole('textbox', { name: /Model URI/ }));
@@ -102,14 +102,14 @@ describe('routes', () => {
     ['/organizations', 'tenants.list', orgs],
     ['/organizations/org-1', 'tenants.get', orgs],
     ['/organizations/org-1/edit', 'tenants.get', orgs],
-    ['/models', 'models.list', 'Models are not available on this AI Grid backend'],
+    ['/models', 'models.list', 'Models are not available on this AI grid backend'],
     [
       '/models/deploy',
       'models.listPlacementClusters',
-      'Clusters are not available on this AI Grid backend.',
+      'Clusters are not available on this AI grid backend.',
       toClustersStep,
     ],
-    ['/ai-grid', 'listClusters', 'The AI Grid map is not available on this AI Grid backend'],
+    ['/ai-grid', 'listClusters', 'The AI grid map is not available on this AI grid backend'],
   ])('renders not-available pages: %s without %s', async (path, methods, text, open) => {
     const service = new MockConsoleService();
     // `methods` lists the service calls that answer 501, joined with +.
@@ -129,7 +129,7 @@ describe('routes', () => {
         continue;
       }
       vi.spyOn(service, name as 'listClusters').mockRejectedValue(
-        new ServiceError(501, 'The AI Grid backend does not support this operation.'),
+        new ServiceError(501, 'The AI grid backend does not support this operation.'),
       );
     }
     const user = userEvent.setup();
@@ -139,7 +139,7 @@ describe('routes', () => {
     await open?.(user);
     expect(await screen.findByText(text)).toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
-    expect(screen.queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The AI grid backend does not support this operation.')).not.toBeInTheDocument();
   });
 
   // The subscription pages call the backend over Connect: one without the Subscriptions and
@@ -161,7 +161,7 @@ describe('routes', () => {
     );
     await waitFor(() => expect(screen.getByTestId('masthead-user')).toHaveTextContent('dev-user'));
     expect(await screen.findByText(subs)).toBeInTheDocument();
-    expect(screen.queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The AI grid backend does not support this operation.')).not.toBeInTheDocument();
   });
 
   it.each([
@@ -198,7 +198,7 @@ describe('routes', () => {
   it('shows the not-found page with a way back', async () => {
     at('/nowhere');
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Go to AI Grid' })).toHaveAttribute('href', '/ai-grid');
+    expect(screen.getByRole('link', { name: 'Go to AI grid' })).toHaveAttribute('href', '/ai-grid');
     expect(document.title).toBe('Page not found · Cloud Provider Admin Console');
   });
 
@@ -206,7 +206,7 @@ describe('routes', () => {
     at('/clusters');
     const nav = await screen.findByRole('navigation', { name: 'Console sections' });
     const names = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent);
-    expect(names).toEqual(['AI Grid', 'Monitoring', 'Clusters', 'Organizations', 'Models', 'Subscriptions']);
+    expect(names).toEqual(['AI grid', 'Monitoring', 'Clusters', 'Organizations', 'Models', 'Subscriptions']);
   });
 
   it('collapses and expands the navigation from the masthead, as the PoC does', async () => {

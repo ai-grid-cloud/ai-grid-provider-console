@@ -26,9 +26,16 @@ export type BackgroundWritesValue = {
    * Sends a write from the app root, so it keeps running after the form unmounts. Resolves within
    * the form's short wait; rejects with any answer that came back within it, which the form shows
    * as before (a definite refusal, or the backend unreachable). `draft` is what a create's form
-   * holds, kept should the backend refuse the create after the form has left.
+   * holds, kept should the backend refuse the create after the form has left. `idOf` reads the id
+   * the backend gave the object from its answer, which a create may not keep as requested (the
+   * backend adds a suffix to a subscription's name): the landed write is followed, and linked, by
+   * that id. Without one, or when the answer names none, the requested id stands.
    */
-  submitWrite: (target: WriteTarget & { draft?: unknown }, send: () => Promise<unknown>) => Promise<WriteOutcome>;
+  submitWrite: <A>(
+    target: WriteTarget & { draft?: unknown },
+    send: () => Promise<A>,
+    idOf?: (answer: A) => string | undefined,
+  ) => Promise<WriteOutcome>;
   /**
    * A write the page sent itself and the backend confirmed, a cluster's labels, which the backend
    * writes at once while the dialog waits, keeping its refusals: the notification center says it

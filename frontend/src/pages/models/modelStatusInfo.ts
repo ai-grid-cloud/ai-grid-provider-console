@@ -16,7 +16,7 @@ export const failureExplanations: Record<string, { summary: string; next: string
   },
   GatewaysNotReady: {
     summary: 'The gateway that serves this model isn’t ready.',
-    next: 'Check the AI Grid gateway on the hub.',
+    next: 'Check the AI grid gateway on the hub.',
   },
 };
 
@@ -149,11 +149,11 @@ const availabilityViews: Record<MaaSWord, AvailabilityView> = {
     subscriptionsLink: true,
     modelsLink: true,
   },
-  'Configuring routing': {
+  'Configuring route': {
     label: 'Pending',
-    subtext: 'Configuring routing',
-    heading: 'Configuring routing',
-    body: 'The route for this model is being configured for one or more clusters.',
+    subtext: 'Configuring route',
+    heading: 'Configuring route',
+    body: 'Traffic routing for this model is in progress.',
   },
   Unavailable: {
     label: 'Unavailable',

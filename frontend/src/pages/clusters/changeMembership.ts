@@ -9,7 +9,7 @@ import { roleOf } from './roles';
 import type { MembershipWrites } from './useClusters';
 
 /**
- * Add to AI Grid (with the membership the dialog set) or Remove, as the notification center
+ * Add to AI grid (with the membership the dialog set) or Remove, as the notification center
  * follows it (followWrite): an add until the cluster is provisioned, a remove until it has left.
  */
 export const membershipTarget = (name: string, membership: GridMembership | undefined): WriteTarget =>
@@ -43,7 +43,7 @@ type Options = {
  * onConflict and throws ClusterChangedError, and the dialog decides whether the user's values still
  * stand. Any other failure is thrown as it is. Only Aborted means a stale version here:
  * FailedPrecondition (412, which ServiceError.isConflict also counts for the JSON API's If-Match) is
- * the backend refusing the change itself, such as a role change that would leave AI Grid without an
+ * the backend refusing the change itself, such as a role change that would leave AI grid without an
  * ingress cluster, and reloading would not help; the dialog shows its message.
  */
 const withConflictReload = async (
@@ -64,7 +64,7 @@ const withConflictReload = async (
 };
 
 /**
- * Adds the cluster to AI Grid (with a membership) or removes it, for the Clusters list and the
+ * Adds the cluster to AI grid (with a membership) or removes it, for the Clusters list and the
  * cluster's page alike, reloading it after a conflict (withConflictReload). Returns the cluster as
  * the backend answered; throws for the dialog to show.
  */
@@ -86,7 +86,7 @@ export const changeMembership = async (
 };
 
 /**
- * Writes an AI Grid cluster's edited labels, for the Clusters list and the cluster's page
+ * Writes an AI grid cluster's edited labels, for the Clusters list and the cluster's page
  * alike, reloading it after a conflict (withConflictReload). Returns the cluster as the backend
  * answered; throws for the dialog to show, the backend's refusals included.
  */

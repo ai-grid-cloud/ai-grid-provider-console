@@ -1,7 +1,7 @@
 {{- if .Values.backend.clusterWrites }}
 # With patch on ManagedClusters the backend could reach spec (hubAcceptsClient detaches a
 # cluster), finalizers and every label, such as the cluster set. This policy limits its writes to
-# what Add to AI Grid, Edit and Remove change: labels ai-grid/* and location, and annotations
+# what Add to AI grid, Edit and Remove change: labels ai-grid/* and location, and annotations
 # ai-grid/*.
 # Other users and controllers are unaffected. From ai-grid-env-setup's apps/console.
 #

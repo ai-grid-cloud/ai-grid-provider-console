@@ -98,8 +98,7 @@ export const SubscriptionsList: React.FC = () => {
             )
           }
         >
-          To grant users access to models in the AI Grid, create a subscription. Subscriptions control which models
-          their members can access, and enforce token limits for each one.
+          To grant organizations access to models in the AI grid, create a subscription.
         </EmptyListState>
       );
     }

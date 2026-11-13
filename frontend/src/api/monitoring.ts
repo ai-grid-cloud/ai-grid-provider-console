@@ -23,7 +23,7 @@ export interface MonitoringService {
  * `dashboard-1-model` beside `dashboard-1-model-admin`, and MaaS's `dashboard-5-maas-usage-logs`
  * (My Usage), which has no admin variant and asks MaaS for the caller's own usage, which a provider
  * admin's hub token can't do. So a dashboard without the suffix is never a tab here, whether or not
- * it has an admin variant; AI Grid's own dashboards all have it (ai-grid-cluster-gitops
+ * it has an admin variant; AI grid's own dashboards all have it (ai-grid-cluster-gitops
  * apps/ai-grid-o11y).
  */
 export const monitoringTabs = (dashboards: DashboardResource[]): DashboardResource[] =>

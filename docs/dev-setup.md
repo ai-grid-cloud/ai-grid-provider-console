@@ -51,7 +51,7 @@ what it found; set `NAMESPACE` (and `DEPLOYMENT`) to choose it yourself. You see
 deployed console shows, from the same backend build, ServiceAccount, RBAC and Keycloak. Writes are real and go through the deployed backend's ServiceAccount, so they work
 exactly where the deployed console's do. On a hub set up by ai-grid-env-setup, which deploys the
 chart with `backend.clusterWrites: true` (`patch` on ManagedClusters for that ServiceAccount),
-Add to AI Grid, Edit and Remove change the hub's clusters. With `make deploy` alone, the chart
+Add to AI grid, Edit and Remove change the hub's clusters. With `make deploy` alone, the chart
 grants only `get`, `list` and `watch` (unless `HELM_ARGS="--set backend.clusterWrites=true"`), so
 they are refused (403). Organization create, update and delete go to the backend's Tenants RPCs
 over Connect and change the hub's Keycloak.
@@ -59,7 +59,7 @@ Before it starts
 anything, `make dev-cluster` checks your login, `pods/portforward` in the namespace, an available pod
 and a free local port. The forward listens on one loopback address only, reconnects when a rollout
 replaces the pod, and creates nothing on the cluster. Pages whose RPCs the backend doesn't serve
-yet say "not available on this AI Grid backend".
+yet say "not available on this AI grid backend".
 
 For the Monitoring page, set `PERSES_PROJECT` to the Perses project whose `dashboard-*-admin` objects are
 the tabs (the relay reads only that project; without it Monitoring stays off). `make dev-cluster` then
@@ -323,7 +323,7 @@ standalone deployment the architecture expects for the provider console in 3.6 (
 operator for it on the hub). Its values (`values.yaml`) choose the three images (tag, digest or
 both), the Route, its host and the CA it trusts for the proxy, the serving certificate
 (OpenShift's service CA, or a Secret you provide), the names of the Secrets, the console's `/api/v1/config` settings, resources, and
-`backend.clusterWrites`: `patch` on ManagedClusters for Add to AI Grid, Edit and Remove, together with a
+`backend.clusterWrites`: `patch` on ManagedClusters for Add to AI grid, Edit and Remove, together with a
 `ValidatingAdmissionPolicy` (from ai-grid-env-setup) that limits the backend to the `ai-grid/*`
 and `location` labels and `ai-grid/*` annotations. Argo CD applies the policy before the grant
 (sync wave -1); `helm` applies it last, so turning `clusterWrites` on with `helm` leaves the backend

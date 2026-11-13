@@ -15,7 +15,7 @@ export const CHANNEL = `${CLUSTER_DETAILS_PREFIX}CHANNEL`;
 export const API_SERVER = `${CLUSTER_DETAILS_PREFIX}API_SERVER`;
 
 /**
- * The list variable that picks the cluster on the AI Grid cluster dashboard
+ * The list variable that picks the cluster on the AI grid cluster dashboard
  * (ai-grid-cluster-gitops apps/ai-grid-o11y/manifests/perses-dashboard-cluster.yaml, variable
  * `cluster_name`, multi-select with All): its values are ManagedCluster names.
  */

@@ -1276,12 +1276,12 @@ describe('a cluster watch', () => {
     vi.useRealTimers();
   });
 
-  it('follows a cluster added to AI Grid until it is provisioned: says so once, refreshes the list, and stops polling', async () => {
+  it('follows a cluster added to AI grid until it is provisioned: says so once, refreshes the list, and stops polling', async () => {
     const { state, storage } = clustering();
     await pass(0);
     act(() => followWrite(addSiteB));
     await pass(0);
-    expect(screen.getByText('Cluster site-b added to AI Grid')).toBeInTheDocument();
+    expect(screen.getByText('Cluster site-b added to AI grid')).toBeInTheDocument();
     expect(
       screen.getByText(
         "The hub is installing what its Inference role needs. You'll be notified when it's provisioned.",
@@ -1394,7 +1394,7 @@ describe('a cluster watch', () => {
     expect(screen.getByText("Cluster site-b isn't provisioned yet")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "It isn't provisioned 60 minutes after it was added to AI Grid. Open the cluster to check its status.",
+        "It isn't provisioned 60 minutes after it was added to the AI grid. Open the cluster to check its status.",
       ),
     ).toBeInTheDocument();
     expect(clusterWatches(storage)).toEqual([]);
@@ -1451,16 +1451,18 @@ describe('a cluster watch', () => {
     await pass(0);
     act(() => followWrite(removeSiteB));
     await pass(0);
-    expect(screen.getByText('Cluster site-b removed from AI Grid')).toBeInTheDocument();
-    expect(screen.getByText("You'll be notified when the hub no longer includes it in AI Grid.")).toBeInTheDocument();
-    expect(screen.queryByText('Cluster site-b left AI Grid')).not.toBeInTheDocument();
+    expect(screen.getByText('Cluster site-b removed from AI grid')).toBeInTheDocument();
+    expect(
+      screen.getByText("You'll be notified when the hub no longer includes it in the AI grid."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Cluster site-b left AI grid')).not.toBeInTheDocument();
     expect(clusterWatches(storage)).toMatchObject([{ op: 'remove', stage: 'ready' }]);
     await pass(1);
     const lists = state.lists;
 
     state.cluster = siteB(false, '');
     await pass(CLUSTER_POLL_MS);
-    expect(screen.getAllByText('Cluster site-b left AI Grid')).toHaveLength(1);
+    expect(screen.getAllByText('Cluster site-b left AI grid')).toHaveLength(1);
     await pass(1);
     expect(state.lists).toBe(lists + 1);
     expect(screen.getByText('list none')).toBeInTheDocument();
@@ -1477,7 +1479,7 @@ describe('a cluster watch', () => {
       reloadCluster();
     });
     await pass(1);
-    expect(screen.getByText('Cluster site-b left AI Grid')).toBeInTheDocument();
+    expect(screen.getByText('Cluster site-b left AI grid')).toBeInTheDocument();
   });
 
   it("warns that a removed cluster hasn't left when its 60 minutes run out", async () => {
@@ -1485,7 +1487,7 @@ describe('a cluster watch', () => {
     state.cluster = siteB(false, 'Compliant');
     await pass(0);
     await pass(CLUSTER_POLL_MS);
-    expect(screen.getByText("Cluster site-b hasn't left AI Grid yet")).toBeInTheDocument();
+    expect(screen.getByText("Cluster site-b hasn't left AI grid yet")).toBeInTheDocument();
   });
 
   it('keeps one watch per cluster: a remove replaces the provisioning watch, and nothing more is said of it', async () => {
@@ -1497,7 +1499,7 @@ describe('a cluster watch', () => {
     expect(clusterWatches(storage)).toMatchObject([{ op: 'remove' }]);
     state.cluster = siteB(false, '');
     await pass(CLUSTER_POLL_MS);
-    expect(screen.getByText('Cluster site-b left AI Grid')).toBeInTheDocument();
+    expect(screen.getByText('Cluster site-b left AI grid')).toBeInTheDocument();
     expect(screen.queryByText(/provisioned/)).not.toBeInTheDocument();
     expect(screen.queryByText(/isn't provisioned/)).not.toBeInTheDocument();
   });

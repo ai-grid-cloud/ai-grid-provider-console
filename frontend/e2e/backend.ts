@@ -12,6 +12,16 @@ export const writeConfirmed = (page: Page, title: string) =>
 // the BFF's Connect relay, as the browser's client calls it. The specs assert on the pages, not on
 // these calls.
 
+/**
+ * The id Subscriptions/Create answers for the next create the page sends: the requested id, or that
+ * id with a suffix on a backend that makes subscription names unique (backend PR 89). Start it
+ * before the click that creates; it resolves to undefined when the create fails.
+ */
+export const createdSubscriptionId = (page: Page): Promise<string | undefined> =>
+  page
+    .waitForResponse((r) => r.url().includes('/ai_grid.v1.Subscriptions/Create'))
+    .then(async (r) => (r.ok() ? ((await r.json()) as { object?: { id?: string } }).object?.id : undefined));
+
 /** One Connect unary call; fails the test unless the backend answers 200. */
 export const callBackend = async <T>(request: APIRequestContext, procedure: string, body: unknown): Promise<T> => {
   const res = await request.post(`/ai_grid.v1.${procedure}`, {

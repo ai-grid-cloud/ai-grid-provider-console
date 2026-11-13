@@ -169,7 +169,7 @@ const writeLabels = async (
   return toClusterView(object);
 };
 
-/** What Add to AI Grid, Remove from AI Grid and Edit write, and how a page loads one cluster again. */
+/** What Add to AI grid, Remove from AI grid and Edit write, and how a page loads one cluster again. */
 export type MembershipWrites = {
   enrollCluster: (cluster: ClusterView, membership: GridMembership) => Promise<ClusterView>;
   removeClusterFromGrid: (cluster: ClusterView) => Promise<ClusterView>;

@@ -9,7 +9,7 @@ type Props = {
 };
 
 /**
- * The row action for a cluster outside AI Grid. The add icon replaces the actions menu, and its
+ * The row action for a cluster outside AI grid. The add icon replaces the actions menu, and its
  * tooltip is that menu's Add label. While the cluster can't be added yet, the button stays
  * focusable and the tooltip says why, as the menu item did.
  */
@@ -20,7 +20,7 @@ export const AddClusterButton: React.FC<Props> = ({ cluster, onAdd }) => {
       <Button
         variant="plain"
         icon={<PlusCircleIcon />}
-        aria-label={`Add ${cluster.name} to AI Grid`}
+        aria-label={`Add ${cluster.name} to AI grid`}
         isAriaDisabled={!!reason}
         data-testid={`cluster-add-${cluster.name}`}
         onClick={() => {

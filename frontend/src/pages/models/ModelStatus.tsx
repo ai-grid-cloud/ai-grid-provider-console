@@ -32,7 +32,7 @@ export const ModelStatusDetails: React.FC<{ model: ModelView }> = ({ model }) =>
  * The model's Status column (ModelStatus.state): the backend's rollout word (status.state). Saved to Git, Syncing
  * and Partially ready open the model's status dialog through `onOpen`; the other words are outline,
  * with what explains the word in a tooltip (stateTooltipOf), never the phase's message. Without
- * `onOpen` (the model page, the AI Grid page), nothing opens.
+ * `onOpen` (the model page, the AI grid page), nothing opens.
  */
 export const ModelStatusLabel: React.FC<{ model: ModelView; onOpen?: () => void }> = ({ model, onOpen }) => {
   const opens = statusOpens(model.state) && !!onOpen;

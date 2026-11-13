@@ -5,10 +5,6 @@ import {
   DescriptionListDescription,
   DescriptionListGroup,
   DescriptionListTerm,
-  Modal,
-  ModalBody,
-  ModalHeader,
-  Stack,
   ToolbarItem,
 } from '@patternfly/react-core';
 import { CubesIcon } from '@patternfly/react-icons';
@@ -36,7 +32,8 @@ import { editText } from './editClusterText';
 import { MissingLabel } from '../../components/MissingLabel';
 import { ClusterSite } from './ClusterSite';
 import { AddClusterButton } from './AddClusterButton';
-import { gpuCount, hubMessage, membershipActions, statusReason, unavailableText } from './clusterInfo';
+import { gpuCount, membershipActions } from './clusterInfo';
+import { ClusterStatusLabel } from './ClusterStatusLabel';
 import { capacityText, configurationText, gpuCountText, gpuSharing } from './gpuText';
 import { ClusterRolesList } from './ClusterRolesHelp';
 import { roleOf } from './roles';
@@ -46,15 +43,15 @@ import { useClusterList, useMembershipWrites } from './useClusters';
 // Ported from krisv/ai-grid-cloud-provider-poc src/app/pages/clusters/ClustersPage.tsx at 62319b8.
 // The PoC's columns, labels, and enroll flow, plus the console's Role and GPU columns (capacity and
 // configuration, as provider-admin feedback asks: "4 nodes, 32 GPUs" and "H200, 8 GPUs/node"; the
-// OpenShift version moved to the details page to make room), removal from AI Grid, and a
+// OpenShift version moved to the details page to make room), removal from AI grid, and a
 // confirmation both ways. The columns sit under nested headers that match the details page's
 // cards (UX review). Each name opens the cluster's details page. No Hub column: a cluster the hub
-// hasn't accepted shows Not accepted in the cluster status's tooltip, and Add says why it's
+// hasn't accepted shows Not accepted in the cluster status's popover, and Add says why it's
 // disabled (on the real backend the BFF derives that state from spec.hub_accepts_client,
 // the backend's state). Site is the name a hub admin set (annotation ai-grid/site-name), with a
 // warning when the coordinate annotations are wrong; Region is the cloud region ACM reports. Location
 // label is the `location` label Add and Edit write, which nothing places or routes by; Edit also
-// sets the role of a member without one. The status tooltip adds the ACM state behind Unknown (such
+// sets the role of a member without one. The status popover adds the ACM state behind Unknown (such
 // as Importing) and the backend's message, which the PoC's three states don't have.
 
 type Column = {
@@ -72,7 +69,7 @@ type Column = {
 };
 
 // Nested column headers (PatternFly), grouped the way the details page groups its cards: the
-// cluster as the hub sees it, its AI Grid membership, and its GPUs.
+// cluster as the hub sees it, its AI grid membership, and its GPUs.
 const columns: Column[] = [
   { label: 'Name', dataLabel: 'Cluster', sort: (a, b) => a.name.localeCompare(b.name) },
   {
@@ -89,8 +86,8 @@ const columns: Column[] = [
   { label: 'Region', dataLabel: 'Region', sort: (a, b) => (a.region ?? '').localeCompare(b.region ?? '') },
   {
     label: 'Status',
-    dataLabel: 'AI Grid status',
-    srPrefix: 'AI Grid',
+    dataLabel: 'AI grid status',
+    srPrefix: 'AI grid',
     sort: (a, b) => membership(a).localeCompare(membership(b)),
   },
   {
@@ -105,7 +102,7 @@ const columns: Column[] = [
     info: {
       ariaLabel: 'About cluster roles',
       popover: <ClusterRolesList />,
-      popoverProps: { headerContent: 'Cluster roles' },
+      popoverProps: { 'aria-label': 'Cluster roles' },
     },
   },
   { label: 'Capacity', dataLabel: 'GPU capacity', sort: (a, b) => gpuTotal(a) - gpuTotal(b) },
@@ -123,12 +120,12 @@ const columns: Column[] = [
 const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
   { label: 'Cluster', span: 4 },
   {
-    label: 'AI Grid',
+    label: 'AI grid',
     span: 3,
     info: {
-      ariaLabel: 'About AI Grid',
-      popover: 'AI Grid coordinates model deployment and request routing across multiple clusters.',
-      popoverProps: { headerContent: 'AI Grid' },
+      ariaLabel: 'About AI grid',
+      popover: 'The AI grid coordinates model deployment and request routing across multiple clusters.',
+      popoverProps: { 'aria-label': 'AI grid' },
     },
   },
   {
@@ -178,10 +175,10 @@ const gpuCapacity = (c: ClusterView) => {
   return n ? gpuCountText(n) : 'No GPUs';
 };
 
-/** A member's provisioning, or nothing for a cluster outside AI Grid (sorts first). */
+/** A member's provisioning, or nothing for a cluster outside AI grid (sorts first). */
 const membership = (c: ClusterView) => (c.aiGridEnabled ? c.provisioningStatus : '');
 
-/** A member's role label, '-' for a member without one, nothing outside AI Grid (sorts first). */
+/** A member's role label, '-' for a member without one, nothing outside AI grid (sorts first). */
 const memberRole = (c: ClusterView) => (c.aiGridEnabled ? (roleOf(c.labels)?.label ?? '-') : '');
 
 export const ClustersPage: React.FC = () => {
@@ -193,18 +190,13 @@ export const ClustersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<{ index: number; direction: 'asc' | 'desc' }>({ index: 0, direction: 'asc' });
   const [change, setChange] = useState<MembershipChange>();
-  const [statusClusterName, setStatusClusterName] = useState<string>();
-  // The AI Grid cluster whose Edit dialog is open.
+  // The AI grid cluster whose Edit dialog is open.
   const [editing, setEditing] = useState<ClusterView>();
   // Clusters as the backend returned them from Add, Remove or Edit, with their new labels (role and
   // location), shown in place of the listed ones until a reload started after the latest change
   // answers. A poll that answers in between can't bring back the row from before the change.
   const [confirmed, setConfirmed] = useState<Map<string, ClusterView>>(new Map());
   const lastReload = useRef(0);
-  const statusCluster = statusClusterName
-    ? (confirmed.get(statusClusterName) ?? clusters.find((cluster) => cluster.name === statusClusterName))
-    : undefined;
-  if (statusClusterName && !statusCluster?.statusMessage?.trim()) setStatusClusterName(undefined);
 
   const rows = useMemo(() => {
     const term = search.toLowerCase();
@@ -224,7 +216,7 @@ export const ClustersPage: React.FC = () => {
   };
 
   /**
-   * Adds the cluster to AI Grid or removes it; throws for the modal to show. The notification center
+   * Adds the cluster to AI grid or removes it; throws for the modal to show. The notification center
    * says it was done and follows what the hub does next.
    */
   const applyChange = async (change: MembershipChange, membership?: GridMembership) => {
@@ -244,7 +236,7 @@ export const ClustersPage: React.FC = () => {
   };
 
   /**
-   * Saves an AI Grid cluster's edited labels; throws for the modal to show. The notification center
+   * Saves an AI grid cluster's edited labels; throws for the modal to show. The notification center
    * says they were saved, and follows the provisioning a role set starts.
    */
   const applyEdit = async (cluster: ClusterView, labels: Record<string, string>) => {
@@ -279,7 +271,7 @@ export const ClustersPage: React.FC = () => {
             </Button>
           }
         >
-          To add clusters to the AI Grid, first import them using Red Hat Advanced Cluster Management for Kubernetes.
+          To add clusters to the AI grid, first import them using Red Hat Advanced Cluster Management for Kubernetes.
         </EmptyListState>
       );
     }
@@ -299,13 +291,13 @@ export const ClustersPage: React.FC = () => {
           {(pageRows) => (
             // When the window is too narrow for every column, the table scrolls sideways.
             <InnerScrollContainer>
-              <Table aria-label="AI Grid clusters" data-testid="clusters-table">
+              <Table aria-label="AI grid clusters" data-testid="clusters-table">
                 <Thead hasNestedHeader>
                   <Tr>
                     {groups.map((g, i) => (
                       <Th
                         key={g.label}
-                        colSpan={g.label === 'AI Grid' && isProviderAdmin ? g.span + 1 : g.span}
+                        colSpan={g.label === 'AI grid' && isProviderAdmin ? g.span + 1 : g.span}
                         info={g.info}
                         hasRightBorder={i < groups.length - 1}
                       >
@@ -346,13 +338,7 @@ export const ClustersPage: React.FC = () => {
                           <Link to={`/clusters/${encodeURIComponent(c.name)}`}>{c.name}</Link>
                         </Td>
                         <Td dataLabel="Cluster status">
-                          <StatusLabel
-                            isCompact
-                            status={c.status}
-                            reason={statusReason(c)}
-                            onClick={c.statusMessage?.trim() ? () => setStatusClusterName(c.name) : undefined}
-                            screenReaderSuffix={c.statusMessage?.trim() ? ` for ${c.name}` : undefined}
-                          />
+                          <ClusterStatusLabel cluster={c} />
                         </Td>
                         <Td dataLabel="Site">
                           <ClusterSite cluster={c} testId={`cluster-site-${c.name}`} />
@@ -360,7 +346,7 @@ export const ClustersPage: React.FC = () => {
                         <Td dataLabel="Region" hasRightBorder>
                           {c.region ?? EMPTY_VALUE}
                         </Td>
-                        <Td dataLabel="AI Grid status">
+                        <Td dataLabel="AI grid status">
                           {c.aiGridEnabled ? <StatusLabel isCompact status={c.provisioningStatus} /> : EMPTY_VALUE}
                         </Td>
                         <Td dataLabel="Location label">{c.location ?? EMPTY_VALUE}</Td>
@@ -408,7 +394,7 @@ export const ClustersPage: React.FC = () => {
     <>
       <PageStateSection
         title="Clusters"
-        description="Add OpenShift clusters to the AI Grid, which connects them into a unified network to serve models and route traffic across locations. Assign each cluster a role to control whether they receive incoming requests or serve models."
+        description="Add OpenShift clusters to the AI grid, which connects them into a unified network to serve models and route traffic across locations. Assign each cluster a role to control whether they receive incoming requests or serve models."
         loaded={loaded}
         error={error}
         onRetry={reload}
@@ -417,24 +403,6 @@ export const ClustersPage: React.FC = () => {
       >
         {body()}
       </PageStateSection>
-      {statusCluster?.statusMessage?.trim() && (
-        <Modal
-          variant="medium"
-          isOpen
-          appendTo={() => document.body}
-          aria-label={`${statusCluster.name} status`}
-          onClose={() => setStatusClusterName(undefined)}
-        >
-          <ModalHeader title={`${statusCluster.name} status`} />
-          <ModalBody>
-            <Stack hasGutter>
-              <StatusLabel isCompact status={statusCluster.status} />
-              {statusCluster.status === 'Unavailable' && <p>{unavailableText}</p>}
-              <p>{hubMessage(statusCluster)}</p>
-            </Stack>
-          </ModalBody>
-        </Modal>
-      )}
       {change && (
         <MembershipModal
           {...change}

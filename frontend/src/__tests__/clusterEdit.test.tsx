@@ -20,7 +20,7 @@ import '../pages/clusters/ClusterDetailsPage';
 import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { deferred, findVisible, renderAt } from './render';
 
-/** A ready cluster, an AI Grid member unless its labels say otherwise, at version 7. */
+/** A ready cluster, an AI grid member unless its labels say otherwise, at version 7. */
 const managedCluster = (
   id: string,
   labels: Record<string, string>,
@@ -118,7 +118,7 @@ type User = ReturnType<typeof userEvent.setup>;
 const openEdit = async (user: User, cluster: string) => {
   await user.click(await screen.findByRole('button', { name: `Actions for ${cluster}` }));
   await user.click(await findVisible('menuitem', 'Edit'));
-  return screen.findByRole('dialog', { name: 'Edit AI Grid cluster' });
+  return screen.findByRole('dialog', { name: 'Edit AI grid cluster' });
 };
 
 const field = (dialog: HTMLElement, name: string) => within(dialog).getByRole('textbox', { name });
@@ -145,31 +145,34 @@ const renderList = (clusters: ManagedCluster[]) => {
   return backend;
 };
 
-const ROLE_FIXED = "A cluster's role cannot be changed once it has been added to the AI Grid.";
+const ROLE_FIXED = "A cluster's role cannot be changed once it has been added to the AI grid.";
 const SETTLES = 'The cluster shows Provisioning until the installation finishes.';
 
-it('offers Edit for AI Grid clusters on the cluster page, before Remove from AI Grid', async () => {
+it('offers Edit for AI grid clusters on the cluster page, before Remove from AI grid', async () => {
   const user = userEvent.setup();
   const { transport } = clustersOf([paris()]);
   renderAt('/clusters/paris-1', new MockConsoleService(), transport);
   await user.click(await screen.findByRole('button', { name: 'Actions for paris-1' }));
-  expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Edit', 'Remove from AI Grid']);
+  expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Edit', 'Remove from AI grid']);
   await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
-  expect(await screen.findByRole('dialog', { name: 'Edit AI Grid cluster' })).toBeVisible();
+  const dialog = await screen.findByRole('dialog', { name: 'Edit AI grid cluster' });
+  expect(dialog).toBeVisible();
+  expect(dialog).toHaveTextContent('Make changes to the configuration of the paris-1 cluster for the AI grid.');
+  expect(within(dialog).getByText('paris-1', { selector: 'strong' })).toBeVisible();
 });
 
-it('offers no Edit for a cluster outside AI Grid, and the page still links to how a hub admin places it', async () => {
+it('offers no Edit for a cluster outside AI grid, and the page still links to how a hub admin places it', async () => {
   const user = userEvent.setup();
   const { transport } = clustersOf([managedCluster('outside-1', { location: 'eu-west' })]);
   renderAt('/clusters/outside-1', new MockConsoleService(), transport);
   await user.click(await screen.findByRole('button', { name: 'Actions for outside-1' }));
-  expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Add to AI Grid']);
+  expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Add to AI grid']);
   await user.keyboard('{Escape}');
   const position = screen.getByTestId('cluster-map-position');
   expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
 });
 
-it('links an AI Grid cluster without a position to how a hub admin sets it, not to Edit', async () => {
+it('links an AI grid cluster without a position to how a hub admin sets it, not to Edit', async () => {
   const { transport } = clustersOf([noRole('bare-1')]);
   renderAt('/clusters/bare-1', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
@@ -211,7 +214,7 @@ it('saves a location-only edit as the labels as read with the location changed, 
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
   expect(await screen.findByText('Changes to cluster paris-1 saved')).toBeVisible();
-  expect(screen.queryByRole('dialog', { name: 'Edit AI Grid cluster' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Edit AI grid cluster' })).not.toBeInTheDocument();
   expect(requests).toHaveLength(1);
   const [req] = requests;
   expect(req.updateMask?.paths).toEqual(['metadata.labels']);
@@ -401,8 +404,8 @@ it.each([
   [
     'the only ingress cluster (FailedPrecondition)',
     Code.FailedPrecondition,
-    'Cluster "no-role" is the only AI Grid cluster that serves ingress, and users reach models through ingress clusters. Give another cluster the ingress or combined role first.',
-    'Cluster "no-role" is the only AI Grid cluster that serves ingress, and users reach models through ingress clusters. Give another cluster the ingress or combined role first.',
+    'Cluster "no-role" is the only AI grid cluster that serves ingress, and users reach models through ingress clusters. Give another cluster the ingress or combined role first.',
+    'Cluster "no-role" is the only AI grid cluster that serves ingress, and users reach models through ingress clusters. Give another cluster the ingress or combined role first.',
   ],
   [
     'the cluster list refused (PermissionDenied)',
@@ -416,7 +419,7 @@ it.each([
     'the catalog unreadable (Unavailable)',
     Code.Unavailable,
     'read catalog: git fetch: dial tcp 192.0.2.1:443: connection refused',
-    'The AI Grid backend is unavailable. Try again.',
+    'The AI grid backend is unavailable. Try again.',
   ],
 ])('shows the backend refusing for %s, and keeps the form', async (_case, code, sent, shown) => {
   const user = userEvent.setup();
@@ -444,7 +447,7 @@ it('says so on a backend without the update', async () => {
   const dialog = await openEdit(user, 'paris-1');
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
-  expect(await within(dialog).findByText('Editing a cluster is not available on this AI Grid backend.')).toBeVisible();
+  expect(await within(dialog).findByText('Editing a cluster is not available on this AI grid backend.')).toBeVisible();
 });
 
 it('loads the cluster again after a conflict, keeps the edit, and saves it at the new version', async () => {
@@ -501,13 +504,13 @@ it('edits from the cluster page and shows the result there', async () => {
   renderAt('/clusters/no-role', new MockConsoleService(), transport);
   await user.click(await screen.findByRole('button', { name: 'Actions for no-role' }));
   await user.click(await findVisible('menuitem', 'Edit'));
-  const dialog = await screen.findByRole('dialog', { name: 'Edit AI Grid cluster' });
+  const dialog = await screen.findByRole('dialog', { name: 'Edit AI grid cluster' });
   await selectRole(user, dialog, 'Ingress and inference');
   await enter(user, dialog, 'Location label', 'eu-central');
   await user.click(save(dialog));
   expect(await screen.findByText('Changes to cluster no-role saved')).toBeVisible();
   expect(requests[0].updateMask?.paths).toEqual(['metadata.labels']);
-  const aiGrid = screen.getByLabelText('AI Grid membership');
+  const aiGrid = screen.getByLabelText('AI grid membership');
   expect(aiGrid).toHaveTextContent('eu-central');
   expect(aiGrid).toHaveTextContent('Ingress and inference');
 });

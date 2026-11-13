@@ -19,8 +19,8 @@ it.each<[string, unknown, boolean]>([
   ['a failed fetch, unwrapped', new TypeError('Failed to fetch'), true],
   ['an aborted fetch, unwrapped', abortError(), true],
   ['the JSON API: no answer at all', new ServiceError(0, 'Unable to reach the console server.'), true],
-  ['the JSON API: 503', new ServiceError(503, 'The AI Grid backend is unavailable. Try again.'), true],
-  ['the JSON API: 504', new ServiceError(504, 'The AI Grid backend did not respond in time. Try again.'), true],
+  ['the JSON API: 503', new ServiceError(503, 'The AI grid backend is unavailable. Try again.'), true],
+  ['the JSON API: 504', new ServiceError(504, 'The AI grid backend did not respond in time. Try again.'), true],
   // Definite: the backend (or the BFF in front of it) answered and refused.
   ['a refused value (invalid_argument)', new ConnectError('bad uri', Code.InvalidArgument), false],
   ['a taken name (already_exists)', new ConnectError('exists', Code.AlreadyExists), false],

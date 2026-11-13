@@ -236,20 +236,20 @@ export const clustersBackend = (service: ClusterSource & Writes) =>
       };
       const wasMember = stored?.aiGridEnabled ?? false;
       const updated = await call(async () => {
-        // Added to AI Grid: a labels update that sets ai-grid/enabled on a cluster outside it.
+        // Added to AI grid: a labels update that sets ai-grid/enabled on a cluster outside it.
         if (labels?.['ai-grid/enabled'] === 'true' && !wasMember && service.enrollCluster) {
           return service.enrollCluster(cluster, {
             location: labels.location ?? '',
             role: labels['ai-grid/role'] as GridMembership['role'],
           });
         }
-        // Removed from AI Grid: a labels update without ai-grid/enabled.
+        // Removed from AI grid: a labels update without ai-grid/enabled.
         if (labels && labels['ai-grid/enabled'] !== 'true' && service.removeClusterFromGrid) {
           return service.removeClusterFromGrid(cluster);
         }
         // Anything else is an edit: the labels as the backend stores them.
         if (service.updateCluster) return service.updateCluster(cluster, cluster.labels);
-        throw new ServiceError(501, 'The AI Grid backend does not support this operation.');
+        throw new ServiceError(501, 'The AI grid backend does not support this operation.');
       });
       return { object: toManagedCluster(updated) };
     },

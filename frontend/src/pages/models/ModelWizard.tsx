@@ -48,13 +48,16 @@ import {
   acceleratorLabel,
   acceleratorsText,
   envWithHardware,
+  defaultHardware,
   hardwareEnv,
   knownAccelerators,
   matchingHardware,
   wholeCount,
   mayUseDefaultImage,
+  imageNameOf,
   runtimeImageHelp,
 } from './modelHardware';
+import { RuntimeImageValue } from './RuntimeImageValue';
 import { DEFAULT_REPLICAS, sameSet, updateRequestOf, type ModelInput } from './modelRequests';
 import { titleOf, type ModelView } from './modelView';
 import { OlderServedNameAlert } from './OlderServedNameAlert';
@@ -63,6 +66,7 @@ import { useBackgroundWrites } from '../../notifications/useBackgroundWrites';
 import { useModelWrites, usePlacementClusters } from './useModels';
 import { deploymentNameFromUri, modelPath } from './modelUtils';
 import { useClusterList } from '../clusters/useClusters';
+import type { ModelHardware } from '../../api/types';
 import { roleOf } from '../clusters/roles';
 import type { ClusterView } from '../clusters/clusterView';
 import { listOf } from '../../notifications/writeText';
@@ -119,10 +123,10 @@ const Help: React.FC<{ children: React.ReactNode; error?: string; id?: string }>
 );
 
 const notAvailable = (err: unknown, what: string) =>
-  err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this AI Grid backend.` : undefined;
+  err instanceof ServiceError && err.isNotImplemented ? `${what} not available on this AI grid backend.` : undefined;
 
 /**
- * Why ListPlacementClusters leaves out an AI Grid cluster, from what Clusters/List says of it: the RPC
+ * Why ListPlacementClusters leaves out an AI grid cluster, from what Clusters/List says of it: the RPC
  * offers the members that are Available (Ready), Compliant with the ready Policy (Provisioned) and
  * whose role is inference or combined (ai_grid.v1 Models.ListPlacementClusters). None for a member
  * that Clusters/List shows meeting all three, which the two reads disagree on only for a moment.
@@ -136,11 +140,11 @@ const notListedReasons = (c: ClusterView) => {
   ].filter((r): r is string => !!r);
 };
 
-/** Which AI Grid clusters the Clusters step lists, as ListPlacementClusters offers them (notListedReasons). */
+/** Which AI grid clusters the Clusters step lists, as ListPlacementClusters offers them (notListedReasons). */
 const listedClustersRule = (
   <>
     This list includes only clusters that have the <strong>Ready</strong> cluster status, the{' '}
-    <strong>Provisioned</strong> AI Grid status, and the <strong>Inference</strong> or{' '}
+    <strong>Provisioned</strong> AI grid status, and the <strong>Inference</strong> or{' '}
     <strong>Ingress and inference</strong> role.
   </>
 );
@@ -160,7 +164,7 @@ const goneClustersError = (names: string[]) =>
     ? undefined
     : `${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} no longer available. Remove ${names.length === 1 ? 'it' : 'them'} to continue.`;
 
-type ReviewItem = { term: string; value?: string };
+type ReviewItem = { term: string; value?: React.ReactNode };
 
 /**
  * The Review step: an alert about the choices or the model first, if there is one, spaced as the
@@ -232,7 +236,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     error: placementClustersError,
     refresh: reloadPlacementClusters,
   } = usePlacementClusters();
-  const { data: clusters, refresh: reloadClusters } = useClusterList();
+  const { data: clusters, loaded: clustersLoaded, error: clustersError, refresh: reloadClusters } = useClusterList();
   // Each offered cluster's site and region, the description under its name.
   const clusterDescriptions = useMemo(
     () =>
@@ -244,7 +248,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       ),
     [clusters],
   );
-  // AI Grid members ListPlacementClusters doesn't offer: not Available, not Compliant, or not a cluster
+  // AI grid members ListPlacementClusters doesn't offer: not Available, not Compliant, or not a cluster
   // that serves models (role inference or combined).
   const unlistedMembers = clusters.filter((c) => c.aiGridEnabled && !placementClusters.includes(c.name));
   const [clusterNames, setClusterNames] = useState<string[]>(start.clusterNames);
@@ -272,7 +276,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const [removePresets, setRemovePresets] = useState(false);
   const presets = model?.baseRefs.join(', ');
   const presetsKept = !!presets && !removePresets;
-  // The hardware a new model runs on: the first in the console's list until the user selects
+  // The hardware a new model runs on: defaultHardware until the user selects
   // another. An edit starts on the entry the model runs on (matchingHardware), or on none, and
   // looks again once its presets are removed; the user can select another. A reopened draft starts
   // on the hardware it was submitted with.
@@ -281,7 +285,17 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   const matchedHardware = model
     ? matchingHardware({ ...model, baseRefs: removePresets ? [] : model.baseRefs }, hardwareList)
     : undefined;
-  const hardware = selectedHardware ?? (model ? matchedHardware : hardwareList[0]);
+  // A new model's default (defaultHardware) is worked out once, when the clusters have loaded, and
+  // kept, so a later reload never moves a selection the user is working with; until then it is the
+  // first entry. A failed load is not a load: `loaded` is also true after an error, and working the
+  // default out from no clusters would keep the first entry for good, so the next successful poll
+  // works it out instead.
+  const [latchedDefault, setLatchedDefault] = useState<ModelHardware>();
+  const computedDefault =
+    !model && clustersLoaded && !clustersError && !latchedDefault ? defaultHardware(hardwareList, clusters) : undefined;
+  if (computedDefault) setLatchedDefault(computedDefault);
+  const defaultHw = latchedDefault ?? computedDefault ?? hardwareList[0];
+  const hardware = selectedHardware ?? (model ? matchedHardware : defaultHw);
   const accelerator = hardware?.accelerator;
   // The model whose own image, environment and resources an edit shows: a matched entry is only
   // preselected and changes none of them. Selecting another entry applies that one; selecting the
@@ -297,6 +311,11 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   // replaces an edited one with its own (or none, for the cluster's default). Keeping the presets
   // again selects no hardware, so it changes none of them: a typed image stays.
   const [imageInput, setRuntimeImage] = useState<string | undefined>(draft?.values.image);
+  // An edit to a hardware-derived value pins the hardware shown, so a default that arrives later
+  // (the clusters were still loading) cannot change it under the edit.
+  const pinHardware = () => {
+    if (!model) setHardwareId((id) => id ?? hardware?.id);
+  };
   const selectHardware = (id: string) => {
     setHardwareId(id);
     setRuntimeImage(undefined);
@@ -353,7 +372,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
     ? updateRequestOf(model, edited) !== undefined
     : [modelUri, nameDescData.name, nameDescData.description].some((v) => v !== '') ||
       [imageInput, cpuInput, memoryInput, acceleratorsInput].some((v) => v !== undefined) ||
-      (hardwareId !== undefined && hardwareId !== hardwareList[0]?.id) ||
+      (hardwareId !== undefined && hardwareId !== defaultHw?.id) ||
       replicas !== defaults.replicas ||
       runtimeArgs.enabled ||
       clusterNames.length > 0;
@@ -518,7 +537,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
           reason={
             model?.placed
               ? "This model's placement selects clusters by more than their names, so its clusters cannot be edited here."
-              : 'This model is not deployed to any AI Grid cluster.'
+              : 'This model is not deployed to any AI grid cluster.'
           }
         />
       );
@@ -547,7 +566,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
               {listedClustersRule} {notListedText(unlistedMembers)}
             </>
           ) : (
-            'A cluster appears here when it is an AI Grid cluster that serves models, and is Ready and Provisioned.'
+            'A cluster appears here when it is an AI grid cluster that serves models, and is Ready and Provisioned.'
           )}
         </Alert>
       );
@@ -583,7 +602,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
           isDisabled={saving}
         />
         <Help>
-          Select the AI Grid clusters where the model will run. {listedClustersRule}
+          Select the AI grid clusters where the model will run. {listedClustersRule}
           {unlistedMembers.length > 0 && ` ${notListedText(unlistedMembers)}`}
         </Help>
       </FormGroup>
@@ -667,6 +686,8 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
       : [];
   // A new URI changes what users of the model are served, under the same name.
   const uriChanged = !!model && input.modelUri !== (model.modelUri ?? '');
+  // The hardware's name for its image, while the image is still the hardware's.
+  const imageName = imageNameOf(hardware, runtimeImage);
   const review = [
     {
       title: 'Source',
@@ -686,7 +707,14 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
         { term: 'Description', value: nameDescData.description },
         ...hardwareItems,
         // An empty image with presets runs theirs; without presets, the cluster's default.
-        { term: 'Runtime image', value: runtimeImage.trim() || (presetsKept ? undefined : DEFAULT_IMAGE) },
+        {
+          term: 'Runtime image',
+          value: imageName ? (
+            <RuntimeImageValue name={imageName} image={runtimeImage} />
+          ) : (
+            runtimeImage.trim() || (presetsKept ? undefined : DEFAULT_IMAGE)
+          ),
+        },
         { term: 'Replicas', value: replicasEditable ? replicas : 'Autoscaled' },
         { term: 'CPU', value: cpu },
         { term: 'Memory', value: memory },
@@ -709,8 +737,16 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
   return (
     <>
       <PageHeader
-        title={model ? `Edit ${titleOf(model)}` : 'Deploy model'}
-        description={model ? "Edit the model's settings and clusters." : 'Deploy a model to AI Grid clusters.'}
+        title={model ? 'Edit model' : 'Deploy model'}
+        description={
+          model ? (
+            <>
+              Make changes to the configuration of the <strong>{titleOf(model)}</strong> model.
+            </>
+          ) : (
+            'Deploy a model to AI grid clusters.'
+          )
+        }
         breadcrumb={
           <Breadcrumb>
             <BreadcrumbItem>
@@ -836,7 +872,10 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   id="runtime-image"
                   aria-describedby="runtime-image-help"
                   value={runtimeImage}
-                  onChange={(_event, value) => setRuntimeImage(value)}
+                  onChange={(_event, value) => {
+                    pinHardware();
+                    setRuntimeImage(value);
+                  }}
                   onBlur={() => touch('runtimeImage')}
                   validated={runtimeImageError ? 'error' : 'default'}
                   isRequired={imageRequired}
@@ -845,7 +884,7 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   {presetsKept
                     ? 'Leave empty to use the image the presets set.'
                     : !own
-                      ? runtimeImageHelp(hardware)
+                      ? runtimeImageHelp(hardware, runtimeImage)
                       : mayUseDefaultImage(imageAccelerator)
                         ? DEFAULT_IMAGE_HELP
                         : "Enter a vLLM image for the model's hardware."}
@@ -881,7 +920,10 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   id="deployment-cpu"
                   aria-describedby="deployment-cpu-help"
                   value={cpu}
-                  onChange={(_event, value) => setCpu(value)}
+                  onChange={(_event, value) => {
+                    pinHardware();
+                    setCpu(value);
+                  }}
                   onBlur={() => touch('cpu')}
                   validated={cpuError ? 'error' : 'default'}
                   isRequired={cpuRequired}
@@ -895,7 +937,10 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                   id="deployment-memory"
                   aria-describedby="deployment-memory-help"
                   value={memory}
-                  onChange={(_event, value) => setMemory(value)}
+                  onChange={(_event, value) => {
+                    pinHardware();
+                    setMemory(value);
+                  }}
                   onBlur={() => touch('memory')}
                   validated={memoryError ? 'error' : 'default'}
                   isRequired={memoryRequired}
@@ -914,7 +959,10 @@ export const ModelWizard: React.FC<Props> = ({ model }) => {
                     min={1}
                     max={MAX_ACCELERATORS}
                     value={accelerators}
-                    onChange={setAccelerators}
+                    onChange={(value) => {
+                      pinHardware();
+                      setAccelerators(value);
+                    }}
                     onBlur={() => touch('accelerators')}
                     describedBy="deployment-accelerators-help"
                     validated={acceleratorsError ? 'error' : 'default'}

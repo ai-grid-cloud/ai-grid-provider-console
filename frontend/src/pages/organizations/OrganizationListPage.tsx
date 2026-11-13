@@ -164,7 +164,7 @@ export const OrganizationListPage: React.FC = () => {
     <>
       <PageStateSection
         title="Organizations"
-        description="Manage organizations and their identity providers."
+        description="Manage organizations that can access models in the AI grid. An organization contains users who all sign in through the same identity provider."
         loaded={loaded}
         error={error}
         onRetry={() => void refresh()}

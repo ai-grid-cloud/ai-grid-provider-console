@@ -35,7 +35,7 @@ export default defineConfig<object, { bffURL: string }>({
     // form's short wait plus an assertion's, as a user sees it confirmed; run beside another spec's
     // catalog reads and writes, it queued behind them past both (the deploy flow failed so in CI).
     // Alone, each write takes the time the backend needs for it. Some specs change a fixture
-    // cluster and put it back (cluster-membership adds site4 to AI Grid and removes it;
+    // cluster and put it back (cluster-membership adds site4 to AI grid and removes it;
     // cluster-edit edits site2's location label and sets site3's role; models gives site1 a role
     // for its run), so the fixture clusters the writers change are theirs for the run.
     // bffURL: each page comes from the stack's BFF, with the console's page headers (e2e/fixtures.ts).

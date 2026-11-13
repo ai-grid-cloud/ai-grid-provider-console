@@ -12,9 +12,11 @@
 // team's Loki dashboards and not yet tried against a Loki: the hub's Perses has none. Its queries
 // draw in the time series, stat and table panels. Not the logs table (@perses-dev/logs-table-plugin
 // 0.3): it imports an ansiColors.css its package doesn't ship. The static list variable offers the
-// values its dashboard lists, as text in Perses's variable select.
+// values its dashboard lists, as text in Perses's variable select. One plugin is the console's own:
+// the relabeled list variable (relabeledVariable.ts), which names the organization IDs the Usage
+// dashboard filters by.
 import { dynamicImportPluginLoader, getPluginModuleCompoundKey } from '@perses-dev/plugin-system';
-import type { PluginModuleResource } from '@perses-dev/plugin-system';
+import type { PluginModuleResource, VariablePlugin } from '@perses-dev/plugin-system';
 import * as bar from '@perses-dev/bar-chart-plugin';
 import * as gauge from '@perses-dev/gauge-chart-plugin';
 import * as loki from '@perses-dev/loki-plugin';
@@ -25,43 +27,68 @@ import * as stat from '@perses-dev/stat-chart-plugin';
 import * as staticList from '@perses-dev/static-list-variable-plugin';
 import * as table from '@perses-dev/table-plugin';
 import * as timeseries from '@perses-dev/timeseries-chart-plugin';
+import { RELABELED_LIST_VARIABLE, relabeledListVariable } from './relabeledVariable';
 
 type PluginPackage = { getPluginModule: () => PluginModuleResource } & Record<string, unknown>;
+
+/** The plugins of a module, keyed by the registry's compound key as well as by their name. */
+const keyed = (resource: PluginModuleResource, mod: Record<string, unknown>) => {
+  const out: Record<string, unknown> = { ...mod };
+  for (const { kind, spec } of resource.spec.plugins) {
+    const key = getPluginModuleCompoundKey({
+      kind,
+      name: spec.name,
+      registry: resource.metadata.registry,
+      version: resource.metadata.version,
+    });
+    out[key] = mod[spec.name];
+  }
+  return out;
+};
 
 /**
  * The registry finds a plugin by its compound key (kind, name, registry, version), so each module's
  * exports are also keyed that way, as odh-dashboard's persesPluginsLoader does.
  */
-const bundled = (pkg: unknown) => {
-  const mod = pkg as PluginPackage;
-  const resource = mod.getPluginModule();
-  return {
-    resource,
-    importPlugin: async () => {
-      const out: Record<string, unknown> = { ...mod };
-      for (const { kind, spec } of resource.spec.plugins) {
-        const key = getPluginModuleCompoundKey({
-          kind,
-          name: spec.name,
-          registry: resource.metadata.registry,
-          version: resource.metadata.version,
-        });
-        out[key] = mod[spec.name];
-      }
-      return out;
-    },
-  };
+const bundled = (pkg: PluginPackage) => {
+  const resource = pkg.getPluginModule();
+  return { resource, importPlugin: async () => keyed(resource, pkg) };
 };
 
-export const pluginLoader = dynamicImportPluginLoader([
-  bundled(prometheus),
-  bundled(loki),
-  bundled(staticList),
-  bundled(timeseries),
-  bundled(stat),
-  bundled(bar),
-  bundled(table),
-  bundled(gauge),
-  bundled(pie),
-  bundled(markdown),
-]);
+const packages = [
+  prometheus,
+  loki,
+  staticList,
+  timeseries,
+  stat,
+  bar,
+  table,
+  gauge,
+  pie,
+  markdown,
+] as unknown as PluginPackage[];
+
+/** A bundled variable plugin by its kind, such as LokiLabelValuesVariable. */
+const variablePlugin = (kind: string): VariablePlugin | undefined => {
+  const pkg = packages.find((p) =>
+    p.getPluginModule().spec.plugins.some((plugin) => plugin.kind === 'Variable' && plugin.spec.name === kind),
+  );
+  return pkg?.[kind] as VariablePlugin | undefined;
+};
+
+/** The console's own plugins, as one module. */
+const consolePlugins = (() => {
+  const resource: PluginModuleResource = {
+    kind: 'PluginModule',
+    metadata: { name: 'ai-grid-provider-console', version: '0.0.0' },
+    spec: {
+      plugins: [
+        { kind: 'Variable', spec: { name: RELABELED_LIST_VARIABLE, display: { name: 'Relabeled list variable' } } },
+      ],
+    },
+  };
+  const mod = { [RELABELED_LIST_VARIABLE]: relabeledListVariable(variablePlugin) };
+  return { resource, importPlugin: async () => keyed(resource, mod) };
+})();
+
+export const pluginLoader = dynamicImportPluginLoader([...packages.map(bundled), consolePlugins]);

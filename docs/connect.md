@@ -9,7 +9,7 @@ when the API has to change. The backend's side of the same rules is its
 
 The Clusters area (the list, a cluster's page, Add, Edit and Remove), the Models area (the list, a
 model's page, the Deploy model wizard, its edit and delete), the Subscriptions area, the
-Organizations area and the AI Grid map are on it; each move deleted that area's draft RPCs, fake
+Organizations area and the AI grid map are on it; each move deleted that area's draft RPCs, fake
 data, BFF handlers and hand-written frontend types, and the console's draft proto and fake
 backend are gone. What still reads the BFF's JSON API is the shell (`/api/v1/user`,
 `/api/v1/config`, the BFF's own answers), which calls no backend, and Monitoring reads the hub's
@@ -152,10 +152,12 @@ called inside that provider would get Perses's query client instead.
   claims `ManagedClusterStatus.cluster_claims` names, and `capacity["nvidia.com/gpu"]` as a number.
   The GPU sections read `status.gpus` as generated. The Models and Subscriptions pages take their
   site names from the same list.
-- **Status messages.** On the Clusters list, a status with a non-empty `state_message` is a compact
-  filled label that opens an informational dialog, including Ready. The hub message renders as text;
-  statuses without a message stay noninteractive, and AI Grid membership stays outline. The
-  selected cluster is resolved by identity as the list refreshes, preserving list controls.
+- **Status messages.** On the Clusters list, a status with a non-empty `state_message`, and every
+  Unavailable status, is a compact filled label that opens a popover (`ClusterStatusLabel`),
+  including Ready. The hub message renders as text; Unavailable shows a "Cannot reach API server"
+  warning instead, and the cluster's page keeps the hub message in its status tooltip. Other
+  statuses without a message stay noninteractive, and AI grid membership stays outline. An open
+  popover follows its row as the list refreshes, preserving list controls.
 - **Writes.** Add and Remove call `Clusters/Update` (in the relay's allowlist): the labels map as
   read with `ai-grid/enabled`, `ai-grid/role` and `location` set (or `ai-grid/enabled` dropped),
   `update_mask: metadata.labels`, `metadata.version` with `lock: true`. Aborted is the conflict
@@ -180,12 +182,12 @@ called inside that provider would get Perses's query client instead.
 - **The backend's role rules.** The pinned backend checks every `Clusters/Update`, after the
   version, and answers the first rule that refuses (its `docs/UI_API_REFERENCE.md`, "Roles"):
   InvalidArgument for an `ai-grid/role` the update sets or changes to anything but `ingress`,
-  `inference` or `combined`; then, for an AI Grid member whose role changes or that leaves AI
+  `inference` or `combined`; then, for an AI grid member whose role changes or that leaves AI
   Grid, FailedPrecondition when it stops serving ingress while any subscription exists, when it
   stops serving ingress and no other member does (the last member may leave), and when it stops
   serving inference, or leaves whatever its role, while models are placed on it; Unavailable when
-  the Git catalog can't be read for those checks. A cluster joining AI Grid isn't checked. So a
-  cluster that is AI Grid's only ingress cluster stays in it until another cluster serves ingress,
+  the Git catalog can't be read for those checks. A cluster joining AI grid isn't checked. So a
+  cluster that is AI grid's only ingress cluster stays in it until another cluster serves ingress,
   or until it is the last member. Edit and Remove show each refusal in the dialog, in the
   backend's words, with the form kept; Unavailable reads as the console's own text.
 - **Edit** (`EditClusterModal.tsx`, `gridSettings.ts`, its words in `editClusterText.ts`), for AI
@@ -194,7 +196,7 @@ called inside that provider would get Perses's query client instead.
   value that isn't one of the three). A role a cluster has is shown read-only: changing it isn't
   supported, because the hub doesn't fully remove what the old role installed (leaving
   inference uninstalls the GPU operators, leaving ingress leaves objects behind, its database
-  credentials among them, and adding ingress needs per-cluster config in Git). Add to AI Grid
+  credentials among them, and adding ingress needs per-cluster config in Git). Add to AI grid
   shows a role the cluster kept after Remove read-only in the same way. Selecting a role
   shows, before Save, what Save sets, what the hub then installs, and that the cluster shows
   Provisioning until it finishes, in an info alert that is a live region, so a screen reader
@@ -262,7 +264,7 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
   Argo CD applied the model, not that it serves, so only Ready is green. Saved to Git, Syncing and Partially ready open `ModelStatusModal`: the design's sentence
   for the Git states (its Sync now button waits until after the 11-06 freeze), or each cluster's
   status for Partially ready. **Availability** is `status.maas` (`availabilityOf`): Available;
-  Pending with Awaiting subscription, Configuring routing or Awaiting subscription and backend;
+  Pending with Awaiting subscription, Configuring route or Awaiting subscription and backend;
   Unavailable (no cluster serves it, or its deployment serves a name other than its id, while MaaS
   publishes or routes it); Failed. The label and its reason open a dialog with the design's copy, MaaS's own
   message for each ingress cluster (`status.ingress`), and a link to Subscriptions where a subscription is
@@ -294,7 +296,7 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
   or Pending with no cluster entry; while a placed cluster is Syncing, Synced or Starting; or while
   MaaS is still routing the model, or hasn't reported it, and a cluster serves it. Ready, Failed and
   Stopped stay so until someone acts, and a cluster drifting from Git while it serves reads Ready.
-  A cluster whose Application is gone (it left AI Grid after the model was placed) reads Pending
+  A cluster whose Application is gone (it left AI grid after the model was placed) reads Pending
   sync for good. Fast polling is capped (`useLoadOptions`, `UNSETTLED_WINDOW_MS`): after 5 minutes
   in which the status words of what is changing stay the same (`changingOf`: the model's state and
   phase, each cluster's state, phase, sync and deployment, each ingress cluster's MaaS word; never
@@ -472,10 +474,10 @@ instead of the Policy's compliance string, and typed `openshift_version`, `conso
   longer worded as a conflict. A write drops the Tenants answers no page shows, and an update
   keeps its answer as the organization's `Get`, so the page the form returns to shows the write.
 - **No identity provider.** The backend reports `spec.identity_provider` only for a provider it
-  created (its own organization attribute), so an organization without one has none in AI Grid,
+  created (its own organization attribute), so an organization without one has none in AI grid,
   but may have one set up in Keycloak directly, as the realm export's example organizations do.
   The pages say only what the API knows: the list's Identity provider cell says "No identity
-  provider configured in AI Grid" with a warning icon and, in its tooltip, that unless one was
+  provider configured in AI grid" with a warning icon and, in its tooltip, that unless one was
   set up directly in Keycloak its users cannot log in, as the Clusters list shows a cluster
   without a role (`MissingLabel`); the organization page and the wizard's Review show the same
   words as the section's empty state (`SectionEmptyState`; `NO_IDENTITY_PROVIDER` and
@@ -617,7 +619,7 @@ subscription) are sent from the app root, never from the form (`frontend/src/not
   storage and outcome ids as the watches above (`watchCluster`, a `cluster` record of stage
   `ready`), reading `Clusters/Get` every 30 s for up to 60 minutes (an OpenShift AI install is
   slow):
-  - Add to AI Grid, or an Edit that sets the role a cluster lacked: "Cluster <name> added to AI
+  - Add to AI grid, or an Edit that sets the role a cluster lacked: "Cluster <name> added to AI
     Grid" (or "Changes to cluster <name> saved") with "The hub is installing what its <Role> role
     needs. You'll be notified when it's provisioned.", then, once the cluster is a member whose
     `status.provisioning` is `Compliant` (what the pages show as Provisioned), "Cluster <name> is
@@ -630,19 +632,19 @@ subscription) are sent from the app root, never from the form (`frontend/src/not
     read failed or no read found a status, with a link to the cluster. An empty `provisioning`
     (the Policy doesn't list the cluster, or can't be read) follows the subscriptions' rule: three
     in a row before any status stop the watch without a word, and a failed read ends the run.
-  - Remove from AI Grid: "Cluster <name> removed from AI Grid", then "Cluster <name> left AI
+  - Remove from AI grid: "Cluster <name> removed from AI grid", then "Cluster <name> left AI
     Grid" once the cluster is no longer a member and the ready Policy no longer lists it
     (`provisioning` empty). Membership alone wouldn't do: the backend reads `ai_grid_member` from
     the `ai-grid/enabled` label the write removed, so the write's own answer already says it,
     while the Policy lets the cluster go once the hub's placement does. After 60 minutes, "Cluster
-    <name> hasn't left AI Grid yet" (or "Unable to confirm ...").
+    <name> hasn't left AI grid yet" (or "Unable to confirm ...").
   - An Edit of the location label alone: "Changes to cluster <name> saved", and no watch.
   - One watch per cluster: an Add, a role set or a Remove replaces the cluster's earlier watch; a
     location-only edit leaves it running, since it changes neither what the hub installs nor the
-    name (clusters can't be renamed). A cluster that leaves AI Grid during a provisioning watch,
+    name (clusters can't be renamed). A cluster that leaves AI grid during a provisioning watch,
     joins it again during a remove watch, or is gone from the hub stops the watch without a word.
   - Every status change a cluster watch sees, and every end, invalidates the Clusters queries
-    (the list, a cluster's page and the AI Grid map), as the model and subscription watches do.
+    (the list, a cluster's page and the AI grid map), as the model and subscription watches do.
   - On the backend's fake hub (`make dev-fake`), the ready Policy is computed from the
     clusters: one added without an `ai-grid/provisioned` fixture label reads Pending for 5 s,
     NonCompliant until 20 s, then Compliant, and one with the label keeps what it says (in the

@@ -3,7 +3,7 @@ import { useClusterList } from '../clusters/useClusters';
 import { GridPage } from './GridPage';
 
 /**
- * The AI Grid map at /ai-grid: the members among the clusters of Clusters/List (over Connect, as
+ * The AI grid map at /ai-grid: the members among the clusters of Clusters/List (over Connect, as
  * the Clusters page shows them), by name, placed where the backend's `status.location` says.
  */
 export const AiGridPage: React.FC = () => {

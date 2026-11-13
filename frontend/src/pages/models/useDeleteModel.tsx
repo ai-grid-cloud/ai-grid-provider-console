@@ -8,7 +8,7 @@ import { useModelWrites } from './useModels';
 
 const deleteErrorOf = (err: unknown) =>
   err instanceof ServiceError && err.isNotImplemented
-    ? new Error('Deleting models is not available on this AI Grid backend.')
+    ? new Error('Deleting models is not available on this AI grid backend.')
     : err instanceof Error
       ? err
       : new Error('Unable to delete the model.');

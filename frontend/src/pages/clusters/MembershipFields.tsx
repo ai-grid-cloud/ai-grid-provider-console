@@ -1,4 +1,4 @@
-// The fields Add to AI Grid and Edit share, so both dialogs draw, validate and word a cluster's
+// The fields Add to AI grid and Edit share, so both dialogs draw, validate and word a cluster's
 // location label and role the same way.
 import {
   ClipboardCopy,
@@ -92,24 +92,26 @@ type RoleFieldProps = {
   onBlur: () => void;
   error?: string;
   isDisabled?: boolean;
+  /** Shown directly under the field's helper text: Add's note that the role is set once. */
+  note?: React.ReactNode;
 };
 
 /** The roles' help beside a Role label, editable or not. */
 const roleHelp = (
-  <Popover headerContent="Cluster roles" bodyContent={<ClusterRolesList />}>
+  <Popover aria-label="Cluster roles" bodyContent={<ClusterRolesList />}>
     <FormGroupLabelHelp aria-label="More info for the role field" />
   </Popover>
 );
 
 /**
  * Why neither dialog changes a role a cluster has: the hub doesn't fully remove what the old role
- * installed (GLOSSARY.md, "Role"; editClusterText.ts). Under a read-only role, and in Add above an
- * editable one.
+ * installed (GLOSSARY.md, "Role"; editClusterText.ts). Under a read-only role, and in Add under an
+ * editable one's helper text.
  */
-export const roleFixedText = "A cluster's role cannot be changed once it has been added to the AI Grid.";
+export const roleFixedText = "A cluster's role cannot be changed once it has been added to the AI grid.";
 
 /**
- * A role the dialog shows but doesn't change, with why under it: Edit's for an AI Grid cluster, and
+ * A role the dialog shows but doesn't change, with why under it: Edit's for an AI grid cluster, and
  * Add's for a cluster that kept its role when it was removed.
  */
 export const ReadOnlyRoleField: React.FC<{ role: ClusterRole }> = ({ role }) => (
@@ -123,7 +125,7 @@ export const ReadOnlyRoleField: React.FC<{ role: ClusterRole }> = ({ role }) => 
 );
 
 /** The `ai-grid/role` label: one of the three roles, with their help beside the label. */
-export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, error, isDisabled }) => (
+export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, error, isDisabled, note }) => (
   <FormGroup label="Role" fieldId="cluster-role" isRequired labelHelp={roleHelp}>
     <TypeaheadSelect
       id="cluster-role"
@@ -141,11 +143,12 @@ export const RoleField: React.FC<RoleFieldProps> = ({ value, onChange, onBlur, e
     <FormHelperText>
       <HelperText id="cluster-role-help">
         <HelperTextItem>
-          Select the role this cluster will perform in the AI Grid. Components needed to perform the assigned role will
+          Select the role this cluster will perform in the AI grid. Components needed to perform the assigned role will
           be installed on the cluster.
         </HelperTextItem>
         {error && <HelperTextItem variant="error">{error}</HelperTextItem>}
       </HelperText>
     </FormHelperText>
+    {note}
   </FormGroup>
 );

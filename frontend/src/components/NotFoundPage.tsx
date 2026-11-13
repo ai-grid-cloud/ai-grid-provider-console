@@ -10,9 +10,9 @@ export const NotFoundPage: React.FC = () => {
       <NotFoundState
         what="Page"
         headingLevel="h1"
-        body="Check the address, or go to the AI Grid page."
+        body="Check the address, or go to the AI grid page."
         listPath="/ai-grid"
-        listLabel="AI Grid"
+        listLabel="AI grid"
       />
     </PageSection>
   );

@@ -36,9 +36,9 @@ describe('App', () => {
         <TestApp service={new MockConsoleService()} />
       </MemoryRouter>,
     );
-    await screen.findByRole('heading', { level: 1, name: 'AI Grid' });
+    await screen.findByRole('heading', { level: 1, name: 'AI grid' });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getAllByRole('heading')[0]).toHaveTextContent('AI Grid');
+    expect(screen.getAllByRole('heading')[0]).toHaveTextContent('AI grid');
     expect(screen.getByText('Cloud Provider Admin Console')).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Cloud Provider Admin Console' })).not.toBeInTheDocument();
   });
@@ -50,7 +50,7 @@ describe('App', () => {
         <TestApp service={new MockConsoleService()} />
       </MemoryRouter>,
     );
-    await screen.findByRole('heading', { level: 1, name: 'AI Grid' });
+    await screen.findByRole('heading', { level: 1, name: 'AI grid' });
     await user.tab();
     const skip = screen.getByRole('link', { name: 'Skip to content' });
     expect(skip).toHaveFocus();
@@ -58,13 +58,13 @@ describe('App', () => {
     expect(screen.getByRole('main')).toHaveAttribute('id', 'console-main');
   });
 
-  it('has one h1 on the AI Grid map, which has no visible page heading', async () => {
+  it('has one h1 on the AI grid map, which has no visible page heading', async () => {
     render(
       <MemoryRouter initialEntries={['/ai-grid']}>
         <TestApp service={new MockConsoleService()} />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole('heading', { level: 1, name: 'AI Grid' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'AI grid' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
@@ -198,7 +198,7 @@ describe('App', () => {
     );
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
-    expect(await screen.findByText('Organizations are not available on this AI Grid backend')).toBeInTheDocument();
+    expect(await screen.findByText('Organizations are not available on this AI grid backend')).toBeInTheDocument();
     expect(screen.queryByText('Unable to load organizations')).not.toBeInTheDocument();
   });
 
@@ -216,7 +216,7 @@ describe('App', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Organizations' }));
 
     expect(await screen.findByText('Unable to load organizations')).toBeInTheDocument();
-    expect(screen.getByText('The AI Grid backend failed to process the request.')).toBeInTheDocument();
+    expect(screen.getByText('The AI grid backend failed to process the request.')).toBeInTheDocument();
   });
 });
 
@@ -449,7 +449,7 @@ describe('an ended session', () => {
     await waitFor(() => expect(navigation.assign).toHaveBeenCalledWith(signOut));
   });
 
-  it('does not redirect when the config could not be loaded, and offers Try again and Reload', async () => {
+  it('does not redirect when the config could not be loaded, and offers Log in only', async () => {
     const service = expiredService();
     service.getConfig = async () => {
       throw new ServiceError(503, 'unavailable');
@@ -461,8 +461,8 @@ describe('an ended session', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Session expired' })).toBeInTheDocument();
     expectFullPage();
     expect(navigation.assign).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Reload' }));
-    expect(navigation.reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Your session timed out. To continue working, log in.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Reload' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Log in' }));
     expect(navigation.assign).toHaveBeenCalledWith(signOut);
     expect(navigation.assign).toHaveBeenCalledTimes(1);

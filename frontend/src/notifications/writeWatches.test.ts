@@ -140,6 +140,31 @@ describe('readBack', () => {
     });
   });
 
+  describe('a subscription create, which the backend may name with a suffix only its answer carries', () => {
+    const sent = { displayName: 'Team A' };
+    const created = { ...subscription('create'), expected: sent };
+    const unknown = {
+      status: NotificationResponseStatus.WARNING,
+      title: 'Unable to confirm subscription Team A',
+      message:
+        "The AI grid backend's answer was lost, and the backend may have added a suffix to the subscription's name, so it's unknown whether the subscription was saved to Git. Check the Subscriptions list before you create it again.",
+      actions: [{ title: 'Go to Subscriptions', to: '/subscriptions' }],
+    };
+
+    it('is unknown, not "not done", when the requested id never shows', async () => {
+      expect(await readBack(created, SENT, reads(undefined), before)).toEqual({
+        status: NotificationResponseStatus.REPOLL,
+      });
+      expect(await readBack(created, SENT, reads(undefined), after)).toEqual(unknown);
+      expect(await readBack(created, SENT, reads(new Error('unavailable')), after)).toEqual(unknown);
+    });
+
+    it("is unknown, not someone else's, when the requested id holds something else", async () => {
+      const answer = { version: 1, fields: { displayName: 'Other team' } };
+      expect(await readBack(created, SENT, reads(answer), before)).toEqual(unknown);
+    });
+  });
+
   it('says an update failed when its object is gone', async () => {
     expect(await readBack(model('update', 3), SENT, reads(undefined), before)).toMatchObject({
       status: NotificationResponseStatus.ERROR,
@@ -888,7 +913,7 @@ describe('watchCluster', () => {
     });
   });
 
-  it('stops when the cluster leaves AI Grid or the hub, rather than say anything of it', async () => {
+  it('stops when the cluster leaves AI grid or the hub, rather than say anything of it', async () => {
     const stop = { status: NotificationResponseStatus.STOP };
     expect(await watchCluster(added, SINCE, reads(cluster(false, 'Compliant')), during)).toEqual(stop);
     expect(await watchCluster(added, SINCE, reads(undefined), during)).toEqual(stop);
@@ -934,14 +959,14 @@ describe('watchCluster', () => {
     });
     expect(await watchCluster(removed, SINCE, reads(cluster(false, '')), during)).toMatchObject({
       status: NotificationResponseStatus.SUCCESS,
-      title: 'Cluster site-b left AI Grid',
+      title: 'Cluster site-b left AI grid',
     });
     expect(await watchCluster(removed, SINCE, reads(cluster(false, 'Compliant')), late)).toMatchObject({
       status: NotificationResponseStatus.WARNING,
-      title: "Cluster site-b hasn't left AI Grid yet",
+      title: "Cluster site-b hasn't left AI grid yet",
     });
     expect(await watchCluster(removed, SINCE, reads(new Error('unavailable')), late)).toMatchObject({
-      title: 'Unable to confirm cluster site-b left AI Grid',
+      title: 'Unable to confirm cluster site-b left AI grid',
     });
   });
 });

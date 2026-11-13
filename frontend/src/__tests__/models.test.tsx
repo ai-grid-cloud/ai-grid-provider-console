@@ -372,7 +372,7 @@ it('keeps chosen clusters visible when the reload offers none', async () => {
   expect(await screen.findByText('No clusters available')).toBeVisible();
 });
 
-it('names the AI Grid members the Clusters step leaves out, and why', async () => {
+it('names the AI grid members the Clusters step leaves out, and why', async () => {
   const hint = /Not listed:/;
   const clusters = seedClusters();
   // site2 offline and still provisioning; site3 ingress only.
@@ -385,7 +385,7 @@ it('names the AI Grid members the Clusters step leaves out, and why', async () =
   await fillModel(user);
   await screen.findByRole('combobox', { name: 'Clusters' });
   expect(await screen.findByText(hint)).toHaveTextContent(
-    'Select the AI Grid clusters where the model will run. This list includes only clusters that have the Ready cluster status, the Provisioned AI Grid status, and the Inference or Ingress and inference role. Not listed: site2 (not Ready, not Provisioned) and site3 (Ingress role).',
+    'Select the AI grid clusters where the model will run. This list includes only clusters that have the Ready cluster status, the Provisioned AI grid status, and the Inference or Ingress and inference role. Not listed: site2 (not Ready, not Provisioned) and site3 (Ingress role).',
   );
   // Once the backend offers every member, there is nothing to explain.
   models.placementClusters = async () => ['site1', 'site2', 'site3'];
@@ -424,7 +424,7 @@ it('shows the not-available state when the backend has no Models/List', async ()
     throw new ConnectError('no such method', Code.Unimplemented);
   });
   renderAt('/models', service);
-  expect(await screen.findByText('Models are not available on this AI Grid backend')).toBeVisible();
+  expect(await screen.findByText('Models are not available on this AI grid backend')).toBeVisible();
   expect(screen.queryByTestId('model-deployments-table')).not.toBeInTheDocument();
 });
 
@@ -680,21 +680,21 @@ it('sends the URI trimmed and refuses other schemes', async () => {
   expect(create.mock.calls[0][0].object?.spec?.model?.uri).toBe('hf://org/widget');
 });
 
-it.each(['/models/granite-research', '/models/granite-research/edit'])(
-  'offers Retry when a model fails to load: %s',
-  async (path) => {
-    const service = new MockConsoleService();
-    const models = modelsOf(service);
-    const get = vi.spyOn(models, 'get').mockImplementationOnce(unavailable);
-    const user = userEvent.setup();
-    renderAt(path, service);
-    expect(await screen.findByRole('heading', { name: 'Unable to load model' })).toBeVisible();
-    get.mockRestore();
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('heading', { level: 1, name: /Granite research endpoint/ })).toBeVisible();
-    expect(screen.queryByTestId('error-state')).not.toBeInTheDocument();
-  },
-);
+it.each([
+  ['/models/granite-research', /Granite research endpoint/],
+  ['/models/granite-research/edit', 'Edit model'],
+])('offers Retry when a model fails to load: %s', async (path, heading) => {
+  const service = new MockConsoleService();
+  const models = modelsOf(service);
+  const get = vi.spyOn(models, 'get').mockImplementationOnce(unavailable);
+  const user = userEvent.setup();
+  renderAt(path, service);
+  expect(await screen.findByRole('heading', { name: 'Unable to load model' })).toBeVisible();
+  get.mockRestore();
+  await user.click(screen.getByRole('button', { name: 'Retry' }));
+  expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeVisible();
+  expect(screen.queryByTestId('error-state')).not.toBeInTheDocument();
+});
 
 describe('a background poll', () => {
   beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
@@ -1084,7 +1084,7 @@ it("opens a model page with its configuration, its endpoint and each cluster's s
   expect(screen.getByText('v3-6-0-kserve-config-llm-template-cpu')).toBeVisible();
   const section = screen.getByTestId('model-clusters');
   expect(within(section).getByRole('grid', { name: 'Clusters of Granite 3.3 8B Instruct' })).toBeVisible();
-  expect(within(section).getByRole('link', { name: 'View on the AI Grid map' })).toHaveAttribute(
+  expect(within(section).getByRole('link', { name: 'View on the AI grid map' })).toHaveAttribute(
     'href',
     '/ai-grid?model=granite-3-8b',
   );
@@ -1183,6 +1183,7 @@ it('keeps an emptied Replicas or GPUs field empty and says it is required', asyn
 describe('the hardware', () => {
   const cpuImage =
     'registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9';
+  const cpuImageName = 'vLLM CPU 0.18.0 (OpenShift AI 3.6)';
   const defaultImageHelp = "Leave empty to use the cluster's default vLLM image for NVIDIA GPUs.";
 
   /** Fills the source step, opens Deployment, and returns the Models/Create spy. */
@@ -1231,6 +1232,16 @@ describe('the hardware', () => {
     expect(spec?.main?.env).toEqual([]);
   });
 
+  it('keeps naming CPU only’s image when the field only gains surrounding spaces', async () => {
+    const user = userEvent.setup();
+    await openDeployment(user);
+    await selectHardware(user, 'CPU only');
+    await user.type(field(/Runtime image/), ' ');
+    expect(field(/Runtime image/)).toHaveAccessibleDescription(
+      `Set by CPU only: ${cpuImageName}. Replace it to use another vLLM image.`,
+    );
+  });
+
   it('fills in CPU only’s image and resources, and sends its environment with the runtime arguments', async () => {
     const user = userEvent.setup();
     const create = await openDeployment(user);
@@ -1238,7 +1249,7 @@ describe('the hardware', () => {
     expect(screen.queryByRole('spinbutton', { name: 'GPUs' })).not.toBeInTheDocument();
     expect(field(/Runtime image/)).toHaveValue(cpuImage);
     expect(field(/Runtime image/)).toHaveAccessibleDescription(
-      'Set by the selected hardware. Replace it to use another vLLM image.',
+      `Set by CPU only: ${cpuImageName}. Replace it to use another vLLM image.`,
     );
     expect(field(/^CPU/)).toHaveValue('4');
     expect(field(/^Memory/)).toHaveValue('8Gi');
@@ -1247,7 +1258,7 @@ describe('the hardware', () => {
     await user.paste('--max-model-len 4096');
     const review = await toReview(user, false);
     expect(review).toHaveTextContent('HardwareCPU only');
-    expect(review).toHaveTextContent(`Runtime image${cpuImage}`);
+    expect(review).toHaveTextContent(`Runtime image${cpuImageName}${cpuImage}`);
     expect(within(review).queryByText('GPUs')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Deploy' }));
     await waitFor(() => expect(create).toHaveBeenCalled());
@@ -1280,7 +1291,7 @@ describe('the hardware', () => {
     await selectHardware(user, 'CPU only');
     expect(field(/Runtime image/)).toHaveValue(cpuImage);
     expect(field(/Runtime image/)).toHaveAccessibleDescription(
-      'Set by the selected hardware. Replace it to use another vLLM image.',
+      `Set by CPU only: ${cpuImageName}. Replace it to use another vLLM image.`,
     );
     expect(field(/^CPU/)).toHaveValue('3');
     expect(field(/^Memory/)).toHaveValue('12Gi');
@@ -1290,6 +1301,69 @@ describe('the hardware', () => {
     expect(field(/^CPU/)).toHaveValue('3');
     expect(field(/^Memory/)).toHaveValue('12Gi');
     expect(screen.getByRole('spinbutton', { name: 'GPUs' })).toHaveValue(2);
+  });
+
+  it('shows the image name on Review with the digest as secondary text, and the raw image once it is edited', async () => {
+    const user = userEvent.setup();
+    await openDeployment(user);
+    await selectHardware(user, 'CPU only');
+    let review = await toReview(user, false);
+    const runtime = within(review).getByText('Runtime image').closest('div') as HTMLElement;
+    expect(within(runtime).getByText(cpuImageName)).toBeVisible();
+    expect(within(runtime).getByText(cpuImage)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await setImage(user, 'registry.example/vllm-cpu:mine');
+    // The name belongs to the hardware's image, not to one typed over it.
+    expect(field(/Runtime image/)).toHaveAccessibleDescription(
+      'Set by the selected hardware. Replace it to use another vLLM image.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    review = await screen.findByTestId('model-review');
+    expect(review).toHaveTextContent('Runtime imageregistry.example/vllm-cpu:mine');
+    expect(review).not.toHaveTextContent(cpuImageName);
+  });
+
+  describe('on the model details page', () => {
+    /** A model "widget" whose runtime image is this one, opened at its page. */
+    const openWidget = (image: string) => {
+      const service = new MockConsoleService();
+      const models = widget(service);
+      models.models[models.models.length - 1].spec!.main!.image = image;
+      renderAt('/models/widget', service);
+    };
+
+    it('names the image the hardware list names, with its digest to copy', async () => {
+      openWidget(` ${cpuImage} `);
+      const term = await screen.findByText('Runtime image');
+      const row = term.closest('div') as HTMLElement;
+      expect(row).toHaveTextContent(`Runtime image${cpuImageName} ${cpuImage}`);
+      expect(within(row).getByRole('button', { name: 'Copy the runtime image' })).toBeVisible();
+    });
+
+    it('shows an image the list does not have as it is', async () => {
+      openWidget('registry.example/runtime:test');
+      const row = (await screen.findByText('Runtime image')).closest('div') as HTMLElement;
+      expect(row).toHaveTextContent('Runtime imageregistry.example/runtime:test');
+      expect(row).not.toHaveTextContent(cpuImageName);
+      expect(within(row).queryByRole('button', { name: 'Copy the runtime image' })).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows the raw image for hardware without an image name', async () => {
+    const user = userEvent.setup();
+    const service = new MockConsoleService();
+    service.config = {
+      ...service.config,
+      models: { hardware: [{ id: 'gaudi', label: 'Intel Gaudi', accelerator: 'habana.ai/gaudi', image: 'r/gaudi:1' }] },
+    };
+    await openDeployment(user, service);
+    expect(field(/Runtime image/)).toHaveAccessibleDescription(
+      'Set by the selected hardware. Replace it to use another vLLM image.',
+    );
+    const review = await toReview(user, false);
+    expect(review).toHaveTextContent('Runtime imager/gaudi:1');
   });
 
   it('names the accelerator field after the accelerator, and requests it by its resource', async () => {
@@ -1354,6 +1428,105 @@ describe('the hardware', () => {
     await setImage(user, '');
     expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
     expect(field(/Runtime image/)).not.toBeRequired();
+  });
+
+  describe('on a grid whose serving clusters have no GPUs', () => {
+    const cpuOnlyService = () => {
+      const clusters = seedClusters().map((c) => ({ ...c, gpuCapacity: 0 }));
+      return new MockConsoleService(undefined, clusters);
+    };
+
+    it('starts on CPU only and deploys it with no accelerator and the CPU image', async () => {
+      const user = userEvent.setup();
+      const create = await openDeployment(user, cpuOnlyService());
+      expect(await screen.findByRole('radio', { name: 'CPU only' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'NVIDIA GPU' })).not.toBeChecked();
+      expect(field(/Runtime image/)).toHaveValue(cpuImage);
+      await toReview(user);
+      await waitFor(() => expect(create).toHaveBeenCalled());
+      const spec = create.mock.calls[0][0].object?.spec;
+      expect(spec?.main?.image).toBe(cpuImage);
+      expect(spec?.main?.requests).toEqual({ cpu: '4', memory: '8Gi' });
+    });
+
+    it('keeps CPU only, not moving to NVIDIA GPU, when a later poll finds a GPU cluster', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const service = cpuOnlyService();
+        await openDeployment(user, service);
+        expect(await screen.findByRole('radio', { name: 'CPU only' })).toBeChecked();
+        service.clusters = seedClusters();
+        await act(() => vi.advanceTimersByTimeAsync(30000));
+        expect(screen.getByRole('radio', { name: 'CPU only' })).toBeChecked();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('starts on CPU only once a poll succeeds after the first cluster load failed', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const service = cpuOnlyService();
+        const list = service.listClusters;
+        service.listClusters = unavailable;
+        await openDeployment(user, service);
+        expect(await screen.findByRole('radio', { name: 'NVIDIA GPU' })).toBeChecked();
+        service.listClusters = list;
+        await act(() => vi.advanceTimersByTimeAsync(30000));
+        await waitFor(() => expect(screen.getByRole('radio', { name: 'CPU only' })).toBeChecked());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps a selection made while the cluster load was failing', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const service = cpuOnlyService();
+        const list = service.listClusters;
+        service.listClusters = unavailable;
+        await openDeployment(user, service);
+        await selectHardware(user, 'CPU only');
+        await selectHardware(user, 'NVIDIA GPU');
+        const answered = vi.fn(list);
+        service.listClusters = answered;
+        await act(() => vi.advanceTimersByTimeAsync(30000));
+        await waitFor(() => expect(answered).toHaveBeenCalled());
+        await act(() => vi.advanceTimersByTimeAsync(0));
+        expect(screen.getByRole('radio', { name: 'NVIDIA GPU' })).toBeChecked();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps NVIDIA GPU and an edit made before the clusters loaded', async () => {
+      const user = userEvent.setup();
+      const service = cpuOnlyService();
+      const slow = deferred<void>();
+      const list = service.listClusters;
+      service.listClusters = async () => {
+        await slow.promise;
+        return list();
+      };
+      const create = await openDeployment(user, service);
+      await user.click(field(/^CPU/));
+      await user.clear(field(/^CPU/));
+      await user.paste('6');
+      expect(screen.getByRole('radio', { name: 'NVIDIA GPU' })).toBeChecked();
+      slow.resolve();
+      await toReview(user, false);
+      // Only the loaded clusters say site1 has no GPUs, and only NVIDIA GPU makes that a mismatch:
+      // the hint shows the clusters have loaded and the hardware held.
+      expect(await screen.findByTestId('model-hardware-mismatch')).toHaveTextContent(
+        "site1 reports no NVIDIA GPUs, so the model can't run there",
+      );
+      await user.click(screen.getByRole('button', { name: 'Deploy' }));
+      await waitFor(() => expect(create).toHaveBeenCalled());
+      expect(create.mock.calls[0][0].object?.spec?.main?.requests?.cpu).toBe('6');
+    });
   });
 
   it('requires an image for CPU only: the cluster’s default is for NVIDIA GPUs', async () => {
@@ -1613,7 +1786,20 @@ describe('editing a model deployment', () => {
     renderAt('/models/granite-3-8b', service);
     await user.click(await screen.findByRole('button', { name: 'Actions for Granite 3.3 8B Instruct' }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
-    expect(await screen.findByRole('heading', { name: 'Edit Granite 3.3 8B Instruct' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Edit model' })).toBeVisible();
+    // The title is the action; the description names the model, and the breadcrumb keeps its name.
+    expect(
+      screen.getByText((_, el) =>
+        el?.tagName === 'P'
+          ? el.textContent === 'Make changes to the configuration of the Granite 3.3 8B Instruct model.'
+          : false,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('Granite 3.3 8B Instruct', { selector: 'strong' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Granite 3.3 8B Instruct' })).toHaveAttribute(
+      'href',
+      '/models/granite-3-8b',
+    );
     expect(screen.getByRole('textbox', { name: /^Model URI/ })).not.toHaveAttribute('readonly');
     expect(screen.getByRole('textbox', { name: /^Model URI/ })).toHaveValue('hf://example-org/granite-3-8b');
     expect(screen.getByRole('textbox', { name: 'Model name in requests' })).toHaveAttribute('readonly');
@@ -1955,7 +2141,7 @@ describe('editing a model deployment', () => {
     await user.click(await screen.findByRole('button', { name: 'Actions for Granite 3.3 8B Instruct' }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['View details', 'Edit', 'Delete']);
     await user.click(screen.getByRole('menuitem', { name: 'Edit' }));
-    expect(await screen.findByRole('heading', { name: 'Edit Granite 3.3 8B Instruct' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Edit model' })).toBeVisible();
   });
 });
 
@@ -2686,7 +2872,7 @@ describe('each cluster of a placed model (status.clusters, proposal P13)', () =>
       const title = await screen.findByRole('heading', { name: 'Warning alert: Unable to load clusters' });
       const alert = title.closest('.pf-v6-c-alert') as HTMLElement;
       expect(alert).toHaveTextContent('Site and Region show a dash until the clusters load.');
-      expect(alert).toHaveTextContent('The AI Grid backend is unavailable. Try again.');
+      expect(alert).toHaveTextContent('The AI grid backend is unavailable. Try again.');
       // The page's own content stays.
       expect(screen.getAllByText('Mistral 7B Instruct')[0]).toBeVisible();
       clusters.mockRestore();
@@ -2874,24 +3060,25 @@ describe('the deployment and MaaS statuses', () => {
     }
   });
 
-  it('links to the model from the Availability dialog on the list, and not on its own page', async () => {
+  it('links to the model details from the status dialog on the list, and not on its own page', async () => {
     const user = userEvent.setup();
     const service = running();
     modelsOf(service).find('smollm2').status!.maas = ModelMaasState.AWAITING_SUBSCRIPTION_AND_BACKEND;
     renderAt('/models', service);
     await user.click(await screen.findByRole('button', { name: 'Pending availability of smollm2' }));
     const dialog = await screen.findByRole('dialog', { name: 'smollm2 availability' });
+    expect(within(dialog).getByText('Model status')).toBeVisible();
     expect(dialog).toHaveTextContent(
       'No users can access this model. To grant users access, add this model to a subscription, and make sure it has the Ready status.',
     );
-    await user.click(within(dialog).getByRole('link', { name: 'Go to the model' }));
+    await user.click(within(dialog).getByRole('link', { name: 'View model details' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'smollm2' })).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // On the model's page, the same dialog has nowhere else to go but Subscriptions.
     await user.click(screen.getByRole('button', { name: 'Pending availability of smollm2' }));
     const again = await screen.findByRole('dialog', { name: 'smollm2 availability' });
     expect(within(again).getByRole('link', { name: 'Go to Subscriptions' })).toBeVisible();
-    expect(within(again).queryByRole('link', { name: 'Go to the model' })).not.toBeInTheDocument();
+    expect(within(again).queryByRole('link', { name: 'View model details' })).not.toBeInTheDocument();
   });
 
   it('words every MaaS state as the design does', async () => {
@@ -2901,7 +3088,7 @@ describe('the deployment and MaaS statuses', () => {
     const cell = async () => within(await rowOf('smollm2')).getByTestId('model-availability-smollm2');
     for (const [state, text] of [
       [ModelMaasState.AVAILABLE, /^Available availability of smollm2$/],
-      [ModelMaasState.CONFIGURING_ROUTING, /^Pending availability of smollm2Configuring routing: smollm2$/],
+      [ModelMaasState.CONFIGURING_ROUTING, /^Pending availability of smollm2Configuring route: smollm2$/],
       [
         ModelMaasState.AWAITING_SUBSCRIPTION_AND_BACKEND,
         /^Pending availability of smollm2Awaiting subscription and backend: smollm2$/,

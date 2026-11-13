@@ -2,7 +2,7 @@
 // confirms an unknown outcome; for a model, a watch until it is ready on its clusters (a deploy)
 // or while its changes roll out (an edit); for a subscription, a watch until it is active on the
 // ingress clusters (a create) or while its changes are applied (an edit); for a cluster, a watch
-// until the hub has provisioned it (added to AI Grid, or given a role) or let it go (removed).
+// until the hub has provisioned it (added to AI grid, or given a role) or let it go (removed).
 // Each is one call of a NotificationWatcherCallback; the provider (BackgroundWritesProvider) polls
 // it.
 import type { ModelView } from '../pages/models/modelView';
@@ -33,6 +33,7 @@ import {
   subscriptionUnconfirmedText,
   succeededText,
   unconfirmedText,
+  unknownCreatedNameText,
   type WriteSubject,
   type WriteTarget,
 } from './writeText';
@@ -72,7 +73,7 @@ export const CLUSTER_MS = CLUSTER_MINUTES * 60_000;
 export const CLUSTER_POLL_MS = 30_000;
 
 /**
- * A cluster as its watches read it from Clusters/Get: whether it is an AI Grid member
+ * A cluster as its watches read it from Clusters/Get: whether it is an AI grid member
  * (`status.ai_grid_member`, the `ai-grid/enabled` label itself) and its `status.provisioning`, the
  * hub's ready Policy's compliance for it: Compliant, NonCompliant, Pending, or empty when the
  * Policy doesn't list the cluster (its placement no longer selects it, or the Policy can't be
@@ -206,6 +207,15 @@ const error = (text: Text) => ({ status: NotificationResponseStatus.ERROR, ...te
 const warning = (text: Text) => ({ status: NotificationResponseStatus.WARNING, ...text }) as const;
 
 /**
+ * A subscription create, which the backend may name with a suffix that only its answer carries
+ * (backend PR 89): a read of the requested id confirms it only when it finds what was sent there
+ * (a backend that keeps the id); anything else, another subscription by that name or none, says
+ * nothing about whether this one was created, so it ends as unknown (unknownCreatedNameText),
+ * never "not done" or someone else's.
+ */
+const namesMayChange = (target: WriteTarget) => target.subject === 'subscription' && target.op === 'create';
+
+/**
  * Whether a write whose answer never came landed. A create is confirmed when the object exists and
  * holds what it sent; an update when its version moved on from the one sent and the object holds
  * what it sent; a delete when the object is gone. An object that exists, or moved on, with other
@@ -225,9 +235,8 @@ export const readBack = async (
     switch (target.op) {
       case 'create':
         if (answer) {
-          return holdsSent(target.expected, answer.fields)
-            ? success(succeededText(target))
-            : warning(mismatchText(target));
+          if (holdsSent(target.expected, answer.fields)) return success(succeededText(target));
+          return warning(namesMayChange(target) ? unknownCreatedNameText(target) : mismatchText(target));
         }
         break;
       case 'update':
@@ -246,6 +255,7 @@ export const readBack = async (
     readFailed = true;
   }
   if (now() < sentAt + READBACK_MS) return repoll;
+  if (namesMayChange(target)) return warning(unknownCreatedNameText(target));
   return readFailed ? warning(unconfirmedText(target)) : error(notConfirmedText(target));
 };
 
@@ -472,7 +482,7 @@ export const watchSubscriptionChanges = async (
  * A cluster after its write landed, until the hub has done what the write asked, read from
  * Clusters/Get:
  *
- * - Added to AI Grid, or given the role it lacked (`op` add, or update with a role): until it is
+ * - Added to AI grid, or given the role it lacked (`op` add, or update with a role): until it is
  *   provisioned, a member whose `status.provisioning` is Compliant (as toClusterView in
  *   clusterView.ts reads Provisioned). The ready check behind it confirms OpenShift AI, never MaaS
  *   (clusterProvisionedText). Anything else is checked again until `since` plus CLUSTER_MS; then a
@@ -482,7 +492,7 @@ export const watchSubscriptionChanges = async (
  *   watch silently, as they stop a subscription's (watchActive): a hub without the ready Policy, or
  *   one the backend can't read, which no write changes. A cluster that is no longer a member
  *   (someone removed it) stops the watch.
- * - Removed from AI Grid (`op` remove): until it has left, no longer a member and no longer listed
+ * - Removed from AI grid (`op` remove): until it has left, no longer a member and no longer listed
  *   by the ready Policy (`status.provisioning` empty), which happens once the hub's placement lets
  *   it go. Membership alone is the label the write removed, so the write's own answer already says
  *   it. After CLUSTER_MS, a warning that it hasn't left, or that the console couldn't confirm it.

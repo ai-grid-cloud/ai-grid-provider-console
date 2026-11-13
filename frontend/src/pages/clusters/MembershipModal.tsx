@@ -34,7 +34,7 @@ const defaultRole = (cluster: ClusterView): ClusterRole | '' => {
 };
 
 /**
- * The role a cluster kept when it was removed from AI Grid (Remove drops only `ai-grid/enabled`),
+ * The role a cluster kept when it was removed from AI grid (Remove drops only `ai-grid/enabled`),
  * which Add shows read-only, as Edit shows the role of a cluster that has one (canSetRole).
  */
 const keptRole = (cluster: ClusterView) => roleOf(cluster.labels)?.value;
@@ -47,13 +47,13 @@ const receivesRequests = (cluster: ClusterView) => {
 
 const errorMessage = (err: unknown, join: boolean) => {
   if (err instanceof ServiceError && err.isNotImplemented) {
-    return `${join ? 'Adding clusters to' : 'Removing clusters from'} AI Grid is not available on this AI Grid backend.`;
+    return `${join ? 'Adding clusters to' : 'Removing clusters from'} the AI grid is not available on this AI grid backend.`;
   }
   if (err instanceof ClusterChangedError) return changedMessage(err);
   return err instanceof Error ? err.message : 'Unable to update the cluster.';
 };
 
-/** Confirms adding a cluster to AI Grid, with its location label and role, or removing it, and keeps a failure in view. */
+/** Confirms adding a cluster to AI grid, with its location label and role, or removing it, and keeps a failure in view. */
 export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onClose }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -62,7 +62,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
   const [fixedRole, setFixedRole] = useState(keptRole(cluster));
   const [touched, setTouched] = useState({ location: false, role: false });
   // Add is a form, titled as one; Remove is a confirmation, so a question (frontend/AGENTS.md, Wording).
-  const title = join ? 'Add cluster to AI Grid' : `Remove ${cluster.name} from AI Grid?`;
+  const title = join ? 'Add cluster to AI grid' : `Remove ${cluster.name} from AI grid?`;
   const locationInvalid = locationError(location.trim());
   const shownLocationError = touched.location ? locationInvalid : undefined;
   const shownRoleError = touched.role && !role ? 'Required' : undefined;
@@ -114,7 +114,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
           if (!busy) onClose();
         }}
         error={error === undefined ? undefined : new Error(error)}
-        errorTitle="Unable to remove cluster from AI Grid"
+        errorTitle="Unable to remove cluster from AI grid"
         testId="cluster-membership-modal"
       >
         <Stack hasGutter>
@@ -129,16 +129,16 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
           {/* Every cluster but the hub's own also leaves the cross-cluster network (Submariner):
               ai-grid-env-setup's network Placement selects local-cluster plus the members.
               Models stay running: the hub deletes the cluster's model application with
-              preserveResourcesOnDeletion, as it does the OpenShift AI one, so AI Grid only stops
+              preserveResourcesOnDeletion, as it does the OpenShift AI one, so AI grid only stops
               managing them (ai-grid-cluster-gitops' catalog ApplicationSets). */}
           <p>
             {cluster.name === 'local-cluster'
-              ? 'AI Grid stops managing this cluster, and models are no longer deployed to it.'
-              : 'AI Grid stops managing this cluster, and models are no longer deployed to it. The cluster is also disconnected from the other AI Grid clusters.'}
+              ? 'The AI grid stops managing this cluster, and models are no longer deployed to it.'
+              : 'The AI grid stops managing this cluster, and models are no longer deployed to it. The cluster is also disconnected from the other AI grid clusters.'}
           </p>
           <p>
-            OpenShift AI and the models running on it are not uninstalled, but AI Grid no longer manages them. Move its
-            models to other clusters first.
+            OpenShift AI and the models running on it are not uninstalled, but the AI grid no longer manages them. Move
+            its models to other clusters first.
           </p>
         </Stack>
       </DeleteModal>
@@ -158,8 +158,8 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         title={title}
         description={
           <>
-            Configure the location and role of the <strong>{cluster.name}</strong> cluster within the AI Grid. AI Grid
-            manages model deployment and request routing across multiple clusters.
+            Configure the <strong>{cluster.name}</strong> cluster for the AI grid. The AI grid manages model deployment
+            and request routing across multiple clusters.
           </>
         }
       />
@@ -178,24 +178,22 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
             {fixedRole ? (
               <ReadOnlyRoleField role={fixedRole} />
             ) : (
-              <>
-                <RoleField
-                  value={role}
-                  error={shownRoleError}
-                  isDisabled={busy}
-                  onChange={(value) => {
-                    setTouched((t) => ({ ...t, role: true }));
-                    setRole(value);
-                  }}
-                  onBlur={() => setTouched((t) => ({ ...t, role: true }))}
-                />
-                {/* Add only: Edit sets a role only on a cluster without one, and says what that installs. */}
-                <Alert isInline variant="info" title={roleFixedText} />
-              </>
+              <RoleField
+                value={role}
+                error={shownRoleError}
+                isDisabled={busy}
+                onChange={(value) => {
+                  setTouched((t) => ({ ...t, role: true }));
+                  setRole(value);
+                }}
+                onBlur={() => setTouched((t) => ({ ...t, role: true }))}
+                // Add only: Edit sets a role only on a cluster without one, and says what that installs.
+                note={<Alert isInline variant="info" title={roleFixedText} />}
+              />
             )}
           </Form>
           {error && (
-            <Alert isInline variant="danger" title="Unable to add cluster to AI Grid">
+            <Alert isInline variant="danger" title="Unable to add cluster to AI grid">
               {error}
             </Alert>
           )}

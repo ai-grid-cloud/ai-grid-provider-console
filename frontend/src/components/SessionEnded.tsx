@@ -37,8 +37,8 @@ export const SessionEnded: React.FC<Props> = ({ state, onTryAgain, onReload }) =
               Log in
             </Button>
           )}
-          {(state === 'fake' || state === 'unknown') && (
-            <Button variant={state === 'fake' ? 'primary' : 'secondary'} onClick={onReload}>
+          {state === 'fake' && (
+            <Button variant="primary" onClick={onReload}>
               Reload
             </Button>
           )}
@@ -47,7 +47,7 @@ export const SessionEnded: React.FC<Props> = ({ state, onTryAgain, onReload }) =
     >
       {state === 'fake'
         ? "The fake backend has no login, so the console can't sign you in again. Reload to try again with the token the dev server sends."
-        : 'Your session is no longer valid. To continue working, log in.'}
+        : 'Your session timed out. To continue working, log in.'}
     </FullPageState>
   );
 };

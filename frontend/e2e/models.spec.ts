@@ -5,7 +5,7 @@ import { callBackend as call, createModel, tryBackend, writeConfirmed } from './
 // The backend's own Models API on its fakes (the backend's fixtures/poc), through the BFF's
 // Connect relay. site1 is an Available member, Compliant with the ready Policy; the fixtures give
 // no cluster an ai-grid/role, so Models/ListPlacementClusters offers none until one serves models.
-// This spec gives site1 the inference role for its run, as Add to AI Grid writes it, and puts its
+// This spec gives site1 the inference role for its run, as Add to AI grid writes it, and puts its
 // labels back afterwards: its project in playwright.config.ts runs one test at a time.
 const CLUSTER = 'site1';
 
@@ -101,7 +101,7 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   // sends Models/Update with the changed path and the version the page loaded.
   await page.getByRole('button', { name: `Actions for ${unique}` }).click();
   await page.getByRole('menuitem', { name: 'Edit' }).click();
-  await expect(page.getByRole('heading', { name: `Edit ${unique}` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Edit model' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: /^Model URI/ })).toHaveValue(`hf://e2e/${unique}`);
   await expect(page.getByRole('textbox', { name: 'Model name in requests' })).toHaveAttribute('readonly', '');
   await page.getByRole('button', { name: 'Deployment', exact: true }).click();
@@ -112,19 +112,20 @@ test('deploys a model to a cluster, edits it in the same wizard, and deletes it'
   await expect(page.getByRole('heading', { level: 1, name: unique, exact: true })).toBeVisible();
   await expect(page.getByLabel('Deployment', { exact: true })).toContainText(/Replicas\s*2/);
 
-  // While the model is placed on the cluster, the backend refuses to remove the cluster from AI Grid
+  // While the model is placed on the cluster, the backend refuses to remove the cluster from AI grid
   // (docs/connect.md, "The backend's role rules"): the dialog says so in its words and keeps the
   // typed name.
   await page.goto('/clusters');
   await page.getByRole('button', { name: `Actions for ${CLUSTER}` }).click();
-  await page.getByRole('menuitem', { name: 'Remove from AI Grid' }).click();
-  const remove = page.getByRole('dialog', { name: `Remove ${CLUSTER} from AI Grid?` });
+  await page.getByRole('menuitem', { name: 'Remove from AI grid' }).click();
+  const remove = page.getByRole('dialog', { name: `Remove ${CLUSTER} from AI grid?` });
   const typed = remove.getByRole('textbox', { name: `Type ${CLUSTER} to confirm:` });
   await typed.fill(CLUSTER);
   await remove.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(
-    remove.getByRole('heading', { name: 'Danger alert: Unable to remove cluster from AI Grid' }),
+    remove.getByRole('heading', { name: 'Danger alert: Unable to remove cluster from AI grid' }),
   ).toBeVisible();
+  // The backend's own message, which still writes "AI Grid".
   await expect(remove).toContainText(
     `Cluster "${CLUSTER}" has 1 model placed on it (${unique}). Move it to another cluster before removing it from AI Grid.`,
   );
@@ -211,7 +212,7 @@ test('confirms a deploy whose answer was lost instead of calling it failed', asy
       contentType: 'application/json',
       body: JSON.stringify({
         code: 'deadline_exceeded',
-        message: 'The AI Grid backend did not respond in time. Try again.',
+        message: 'The AI grid backend did not respond in time. Try again.',
       }),
     });
   });
@@ -250,7 +251,7 @@ test("edits a deployed model's URI, CPU and memory, and shows them on its page",
   await createModel(page.request, unique, unique);
   try {
     await page.goto(`/models/${unique}/edit`);
-    await expect(page.getByRole('heading', { name: `Edit ${unique}` })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Edit model' })).toBeVisible();
 
     // Source: the URI is editable; the name users send is the model's id, fixed.
     const uri = page.getByRole('textbox', { name: /^Model URI/ });

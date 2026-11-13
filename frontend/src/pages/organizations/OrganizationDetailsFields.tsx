@@ -88,7 +88,7 @@ export const OrganizationDetailsFields: React.FC<Props> = ({
             validated={error('name') ? 'error' : 'default'}
             onChange={(_event, name) => onChange({ ...value, name })}
           />
-          <Help error={error('name')}>Use lowercase letters, numbers, and hyphens.</Help>
+          <Help error={error('name')}>Valid characters include lowercase letters, numbers, and hyphens (-).</Help>
         </FormGroup>
       ) : (
         <ReadOnlyField

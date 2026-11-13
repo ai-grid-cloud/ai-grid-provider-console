@@ -5,7 +5,7 @@ export const ORGANIZATION_CHANGED = 'This organization was changed by another us
 
 /** An edit whose outcome the backend couldn't confirm (Unavailable, DeadlineExceeded): it may have been saved. */
 export const ORGANIZATION_MAYBE_SAVED =
-  'The AI Grid backend could not confirm the save, so the changes may have been saved. Reload the page to check, then try again if they are missing.';
+  'The AI grid backend could not confirm the save, so the changes may have been saved. Reload the page to check, then try again if they are missing.';
 
 /**
  * Added to ORGANIZATION_MAYBE_SAVED when the edit sent a new issuer: if it landed, Keycloak already

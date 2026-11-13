@@ -33,7 +33,7 @@ const placeOn = (service: MockConsoleService, id: string, clusters: string[], di
 // Exercise the page and drawer without a browser map renderer or external tiles.
 vi.mock('../pages/grid/GridFleetMap', () => ({
   GridFleetMap: ({ clusters, onSelect }: { clusters: Array<{ name: string }>; onSelect: (name: string) => void }) => (
-    <div aria-label="AI Grid map of clusters">
+    <div aria-label="AI grid map of clusters">
       {clusters.map((c) => (
         <button key={c.name} onClick={() => onSelect(c.name)}>{`Map pin ${c.name}`}</button>
       ))}
@@ -45,7 +45,7 @@ it('uses the reference map-and-drawer layout and opens cluster details from a pi
   const service = new MockConsoleService();
   const user = userEvent.setup();
   renderAt('/ai-grid', service);
-  const summary = await screen.findByLabelText('AI Grid summary');
+  const summary = await screen.findByLabelText('AI grid summary');
   expect(summary).toBeVisible();
   expect(within(summary).getByText('Sites')).toBeVisible();
   expect(screen.queryByText(/simulated/)).not.toBeInTheDocument();
@@ -88,7 +88,7 @@ it('filters the drawer and map by availability while retaining inventory summari
   expect(screen.getByRole('button', { name: 'View site2 details' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'View site3 details' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Map pin site3' })).not.toBeInTheDocument();
-  expect(screen.getByLabelText('AI Grid summary')).toBeVisible();
+  expect(screen.getByLabelText('AI grid summary')).toBeVisible();
 });
 
 it('switches between clusters and models and follows placement cross-links', async () => {
@@ -157,12 +157,12 @@ it('shows the not-available page, like Models, when the backend has no Clusters/
   // A backend whose Clusters service has no List: every Clusters method answers Unimplemented.
   renderAt('/ai-grid', service, fakeClients({}).transport);
   expect(
-    await screen.findByRole('heading', { name: 'The AI Grid map is not available on this AI Grid backend' }),
+    await screen.findByRole('heading', { name: 'The AI grid map is not available on this AI grid backend' }),
   ).toBeVisible();
-  expect(screen.getByRole('heading', { level: 1, name: 'AI Grid' })).toBeVisible();
+  expect(screen.getByRole('heading', { level: 1, name: 'AI grid' })).toBeVisible();
   // No map, no summary, and nothing to refresh or switch to.
-  expect(screen.queryByRole('region', { name: 'AI Grid summary' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: 'AI Grid map and drawer' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'AI grid summary' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'AI grid map and drawer' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'View monitoring' })).not.toBeInTheDocument();
 });
@@ -172,37 +172,37 @@ it('drops the map for the not-available page when a later answer is Unimplemente
   const list = service.listClusters;
   const user = userEvent.setup();
   renderAt('/ai-grid', service);
-  expect(await screen.findByRole('region', { name: 'AI Grid map and drawer' })).toBeVisible();
+  expect(await screen.findByRole('region', { name: 'AI grid map and drawer' })).toBeVisible();
   service.listClusters = () =>
-    Promise.reject(new ServiceError(501, 'The AI Grid backend does not support this operation.'));
+    Promise.reject(new ServiceError(501, 'The AI grid backend does not support this operation.'));
   await user.click(screen.getByRole('button', { name: 'Refresh' }));
   expect(
-    await screen.findByRole('heading', { name: 'The AI Grid map is not available on this AI Grid backend' }),
+    await screen.findByRole('heading', { name: 'The AI grid map is not available on this AI grid backend' }),
   ).toBeVisible();
-  expect(screen.queryByRole('region', { name: 'AI Grid map and drawer' })).not.toBeInTheDocument();
-  expect(screen.queryByRole('region', { name: 'AI Grid summary' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'AI grid map and drawer' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'AI grid summary' })).not.toBeInTheDocument();
   service.listClusters = list;
 });
 
 it('shows the backend error, not the not-available page, when the clusters fail otherwise', async () => {
   const service = new MockConsoleService();
   vi.spyOn(service, 'listClusters').mockRejectedValue(
-    new ServiceError(503, 'The AI Grid backend is unavailable. Try again.'),
+    new ServiceError(503, 'The AI grid backend is unavailable. Try again.'),
   );
   renderAt('/ai-grid', service);
-  expect(await screen.findByText('Unable to load AI Grid clusters')).toBeVisible();
-  expect(screen.getByText('The AI Grid backend is unavailable. Try again.')).toBeVisible();
-  expect(screen.queryByText('The AI Grid map is not available on this AI Grid backend')).not.toBeInTheDocument();
+  expect(await screen.findByText('Unable to load AI grid clusters')).toBeVisible();
+  expect(screen.getByText('The AI grid backend is unavailable. Try again.')).toBeVisible();
+  expect(screen.queryByText('The AI grid map is not available on this AI grid backend')).not.toBeInTheDocument();
   // Nothing to switch to or refresh from the header: the error's Retry loads again.
   expect(screen.queryByRole('link', { name: 'View monitoring' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
 });
 
-it('shows only the AI Grid members, and when the console read them', async () => {
+it('shows only the AI grid members, and when the console read them', async () => {
   const service = new MockConsoleService();
   renderAt('/ai-grid', service);
   expect(await screen.findByRole('button', { name: 'View site1 details' })).toBeVisible();
-  // site4 is on the hub with coordinates, but not an AI Grid member.
+  // site4 is on the hub with coordinates, but not an AI grid member.
   expect(screen.queryByRole('button', { name: 'Map pin site4' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'View site4 details' })).not.toBeInTheDocument();
   expect(screen.getByText(/^Updated/)).toBeVisible();
@@ -264,7 +264,7 @@ it('keeps the map, its selection and its models when a refresh fails', async () 
     throw new ConnectError('Service unavailable.', Code.Unavailable);
   });
   await user.click(screen.getByRole('button', { name: 'Refresh' }));
-  expect(await screen.findByText('Showing the last loaded AI Grid clusters')).toBeVisible();
+  expect(await screen.findByText('Showing the last loaded AI grid clusters')).toBeVisible();
   expect(screen.getByText('Unable to load models')).toBeVisible();
   expect(screen.getByRole('heading', { name: 'site1' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Map pin site1' })).toBeVisible();
@@ -294,7 +294,7 @@ it('names the page like every other page, with no status chips over the map', as
   const service = new MockConsoleService();
   service.clusters[1] = { ...service.clusters[1], status: 'Unavailable' };
   renderAt('/ai-grid', service);
-  expect(await screen.findByRole('heading', { name: 'AI Grid', level: 1 })).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'AI grid', level: 1 })).toBeVisible();
   expect(screen.queryByText('site2: Unavailable')).not.toBeInTheDocument();
 });
 
@@ -312,8 +312,8 @@ it('does not call a failed model available for subscriptions', async () => {
 
 it('exposes the map area and the fleet summary as named regions', async () => {
   renderAt('/ai-grid', new MockConsoleService());
-  expect(await screen.findByRole('region', { name: 'AI Grid map and drawer' })).toBeVisible();
-  expect(screen.getByRole('region', { name: 'AI Grid summary' })).toBeVisible();
+  expect(await screen.findByRole('region', { name: 'AI grid map and drawer' })).toBeVisible();
+  expect(screen.getByRole('region', { name: 'AI grid summary' })).toBeVisible();
 });
 
 it('keeps the URL in step with the drawer, and clears it when the drawer closes', async () => {
@@ -347,9 +347,9 @@ it("links to the selected cluster's details page, as the Clusters list does", as
 });
 
 it.each([
-  ['clusters', 'The total number of OpenShift clusters in the AI Grid.'],
-  ['sites', 'The number of different sites or cloud regions where clusters in the AI Grid are located.'],
-  ['models', 'The total number of models in the AI Grid.'],
+  ['clusters', 'The total number of OpenShift clusters in the AI grid.'],
+  ['sites', 'The number of different sites or cloud regions where clusters in the AI grid are located.'],
+  ['models', 'The total number of models in the AI grid.'],
 ])('says what the %s count counts in a help popover', async (card, help) => {
   const user = userEvent.setup();
   renderAt('/ai-grid', new MockConsoleService());
@@ -357,11 +357,11 @@ it.each([
   expect(await screen.findByText(help)).toBeVisible();
 });
 
-it('closes the drawer when the AI Grid nav link drops the cluster from the URL', async () => {
+it('closes the drawer when the AI grid nav link drops the cluster from the URL', async () => {
   const user = userEvent.setup();
   renderAt('/ai-grid?cluster=site2', new MockConsoleService());
   expect(await screen.findByRole('heading', { name: 'site2' })).toBeVisible();
-  await user.click(screen.getByRole('link', { name: 'AI Grid' }));
+  await user.click(screen.getByRole('link', { name: 'AI grid' }));
   expect(screen.queryByRole('heading', { name: 'site2' })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'View site2 details' })).toBeVisible();
 });

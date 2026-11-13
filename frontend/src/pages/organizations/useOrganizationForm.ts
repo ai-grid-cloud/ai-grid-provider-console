@@ -33,7 +33,7 @@ import { useOrganizationWrites } from './useOrganizations';
 const saveErrorMessage = (err: unknown, editing: boolean, issuerChanged: boolean) => {
   const { kind, code, message } = describeError(err);
   if (kind === 'notAvailable') {
-    return 'Saving organizations is not available on this AI Grid backend.';
+    return 'Saving organizations is not available on this AI grid backend.';
   }
   if (editing && kind === 'conflict') {
     return ORGANIZATION_CHANGED;

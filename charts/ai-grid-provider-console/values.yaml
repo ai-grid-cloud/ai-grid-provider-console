@@ -73,7 +73,7 @@ providerAdmins:
 console:
   # GET /api/v1/config.
   gridConsumerUrl: ""
-  # The AI Grid map's tile server, a Leaflet URL template; empty draws a bundled land outline. A path
+  # The AI grid map's tile server, a Leaflet URL template; empty draws a bundled land outline. A path
   # on the console or an http(s) URL of a host name (its first label may be {s}): the console's
   # Content-Security-Policy allows images from that host only, and the BFF refuses any other form.
   mapTileUrl: ""
@@ -116,6 +116,9 @@ console:
     #   image        optional: the runtime image, with no spaces. None leaves the wizard's field empty:
     #                for nvidia.com/gpu that runs the cluster's default vLLM image, which is for
     #                NVIDIA GPUs; for any other hardware the user must enter one
+    #   imageName    optional, only with an image: what the wizard shows for it, such as
+    #                "vLLM CPU 0.18.0 (OpenShift AI 3.6)"; no leading or trailing spaces. The image
+    #                is still what a model gets
     #   env          optional: environment variables for the model's container, as name: value;
     #                not VLLM_ADDITIONAL_ARGS, which the wizard's runtime arguments set
     #   defaults     optional: the resources the wizard starts from: accelerators (1 to 64, only
@@ -135,7 +138,9 @@ console:
       - id: cpu
         label: CPU only
         description: For x86_64 clusters without GPUs.
+        # When you bump the image digest, bump imageName to the new version.
         image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9
+        imageName: vLLM CPU 0.18.0 (OpenShift AI 3.6)
         env: { OMP_NUM_THREADS: "4", VLLM_CPU_KVCACHE_SPACE: "4" }
         defaults: { cpu: "4", memory: 8Gi }
   resources:
@@ -147,7 +152,7 @@ backend:
   # Created by hack/deploy.sh or bootstrap/60-console.sh. The container does not start without it,
   # which keeps the backend off its built-in default credentials.
   keycloakSecretName: ai-grid-backend-keycloak
-  # Let the backend patch ManagedClusters (Add to AI Grid, Edit and Remove in the console). This
+  # Let the backend patch ManagedClusters (Add to AI grid, Edit and Remove in the console). This
   # installs a ValidatingAdmissionPolicy that limits the backend's writes to the ai-grid/* and
   # location labels and the ai-grid/* annotations. Off: the backend only reads clusters.
   clusterWrites: false

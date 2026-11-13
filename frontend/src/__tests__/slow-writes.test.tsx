@@ -105,7 +105,7 @@ const widget = (service: MockConsoleService) => {
 };
 
 const lostAnswer = () =>
-  new ConnectError('The AI Grid backend did not respond in time. Try again.', Code.DeadlineExceeded);
+  new ConnectError('The AI grid backend did not respond in time. Try again.', Code.DeadlineExceeded);
 
 /** A toast by its title: PatternFly's toast group is a live region of alerts. */
 const toast = (title: string) => screen.findByRole('heading', { name: new RegExp(`alert: ${title}$`) });
@@ -204,7 +204,7 @@ describe('deploying a model', () => {
     renderConsole('/models/deploy', service, formWaits().formWait, storage);
     await fillWizard(user);
     await user.click(screen.getByRole('button', { name: 'Deploy' }));
-    expect(await screen.findByText('The AI Grid backend is unavailable. Try again.')).toBeVisible();
+    expect(await screen.findByText('The AI grid backend is unavailable. Try again.')).toBeVisible();
     expect(screen.getByRole('heading', { level: 1, name: 'Deploy model' })).toBeVisible();
     expect(screen.queryByText(/Saving model/)).not.toBeInTheDocument();
     expect(storage.values.get(WATCHES)).toBeUndefined();

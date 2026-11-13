@@ -1,4 +1,4 @@
-// What Edit reads from an AI Grid cluster and writes back with Clusters/Update: the `location` label,
+// What Edit reads from an AI grid cluster and writes back with Clusters/Update: the `location` label,
 // and the `ai-grid/role` label only while the cluster has none. The backend decides what a value
 // means and refuses what it won't store; the form only checks what it can show as field errors
 // before sending, and the backend's answer stays the one that counts.

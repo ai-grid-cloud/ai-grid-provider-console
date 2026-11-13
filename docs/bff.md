@@ -267,7 +267,7 @@ paths under `/ai_grid.v1.`, to the backend at `BACKEND_ADDRESS`, which serves Co
 gRPC-Web on its gRPC port over HTTP/1.1 and h2c. It is transport and nothing else: it compiles
 against no contract and never reads a body. A new RPC needs no transport implementation;
 until backend authorization lands it requires review for the procedure allowlist. The Clusters
-pages, the AI Grid map and the Models, Subscriptions and Organizations pages use it; the
+pages, the AI grid map and the Models, Subscriptions and Organizations pages use it; the
 `/api/v1` routes that remain only read and are the BFF's own (`/user`, `/config`).
 
 What the relay owns is the boundary:
@@ -388,7 +388,7 @@ through.
   caller with the caller's own token and reads nothing.
 - No session handling. The proxy owns login and cookies.
 - No billing data. Nothing in the platform stores it (confirmed 2026-10-14) and
-  whether AI Grid gets a cost or spend view is an open product question. `billingUrl` in
+  whether AI grid gets a cost or spend view is an open product question. `billingUrl` in
   `/api/v1/config` is a plain external link that stays empty until a page exists.
 - No metering. Praxis AI's `external_metering` filter emits CloudEvents to a metering
   service; nothing on the dev hub receives them yet.

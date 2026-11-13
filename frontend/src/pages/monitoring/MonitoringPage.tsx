@@ -17,7 +17,7 @@ const PersesDashboardView = lazy(() => import('./PersesDashboardView'));
 
 type Props = { service: ConsoleService };
 
-const description = 'View monitoring dashboards for the AI Grid clusters.';
+const description = 'View monitoring dashboards for the AI grid clusters.';
 
 /**
  * The hub's Perses dashboards as tabs, when the BFF relays to a Perses (docs/bff.md, "The

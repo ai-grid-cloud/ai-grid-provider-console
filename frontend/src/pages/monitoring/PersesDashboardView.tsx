@@ -32,8 +32,11 @@ import {
 } from '@perses-dev/dashboards';
 import { QueryParamProvider } from 'use-query-params';
 import { ReactRouter6Adapter } from 'use-query-params/adapters/react-router-6';
+import { PageLoading } from '../../components/PageLoading';
 import { ClusterDetailsVariables } from './ClusterDetailsVariables';
 import { useClusterLookup } from './useClusterLookup';
+import { useOrganizationNames } from './useOrganizationNames';
+import { hasOrganizationVariable, organizationLabels, withOrganizationNames } from './organizationVariable';
 import { clusterDetailsVariables, type ClusterLookup } from './clusterDetails';
 import { type PageTheme, usePageTheme } from './pageTheme';
 import { RelayDatasourceApi } from './persesDatasourceApi';
@@ -157,6 +160,17 @@ const PersesDashboardView: React.FC<Props> = ({ dashboard }) => {
   // Here, outside Perses's query client: Clusters/List is the console's own query.
   const clusterDetails = useMemo(() => clusterDetailsVariables(dashboard), [dashboard]);
   const clusterLookup = useClusterLookup(clusterDetails.length > 0);
+  // Tenants/List too, for a dashboard that filters by organization ID: its select shows names.
+  const byOrganization = useMemo(() => hasOrganizationVariable(dashboard), [dashboard]);
+  const organizations = useOrganizationNames(byOrganization);
+  const named = useMemo(() => withOrganizationNames(dashboard, organizations.data), [dashboard, organizations.data]);
+  // Perses reads a dashboard's variables once, when its variable provider mounts, so the dashboard
+  // waits for the first answer (or failure: then the select shows IDs), and mounts again when the
+  // names change, keeping its time range and variables, which are in the URL.
+  const names = useMemo(() => JSON.stringify(organizationLabels(organizations.data)), [organizations.data]);
+  if (byOrganization && !organizations.loaded) {
+    return <PageLoading label="Loading dashboard" />;
+  }
   return (
     <QueryClientProvider client={queryClient}>
       <QueryParamProvider adapter={ReactRouter6Adapter}>
@@ -165,7 +179,14 @@ const PersesDashboardView: React.FC<Props> = ({ dashboard }) => {
             <SnackbarProvider anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="default">
               <PluginRegistry pluginLoader={pluginLoader}>
                 <PanelFocusProvider>
-                  <DashboardBody dashboard={dashboard} clusterDetails={clusterDetails} clusterLookup={clusterLookup} />
+                  {/* A changed organization name remounts the body; selections live in the URL and survive, but
+                      Perses's in-memory state (panel focus, time zone) resets. */}
+                  <DashboardBody
+                    key={names}
+                    dashboard={named}
+                    clusterDetails={clusterDetails}
+                    clusterLookup={clusterLookup}
+                  />
                 </PanelFocusProvider>
               </PluginRegistry>
             </SnackbarProvider>

@@ -766,7 +766,7 @@ func hangUpListener(t *testing.T) string {
 func TestBackendUnreachable(t *testing.T) {
 	t.Parallel()
 	rec := serve(newRelay(t, backend.Config{Address: hangUpListener(t)}), asCaller(t, http.MethodPost, list, strings.NewReader(`{}`), nil))
-	if code, msg := connectError(t, rec); rec.Code != http.StatusBadGateway || code != "unavailable" || msg != "the AI Grid backend could not be reached; try again" {
+	if code, msg := connectError(t, rec); rec.Code != http.StatusBadGateway || code != "unavailable" || msg != "the AI grid backend could not be reached; try again" {
 		t.Fatalf("got %d %s %q, want 502 unavailable", rec.Code, code, msg)
 	}
 }

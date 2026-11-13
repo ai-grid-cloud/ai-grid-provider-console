@@ -240,7 +240,7 @@ test('real Perses panels remain compatible with the shared Query runtime', async
   expect(errors).toEqual([]);
 });
 
-// The AI Grid cluster dashboard's shape (ai-grid-cluster-gitops
+// The AI grid cluster dashboard's shape (ai-grid-cluster-gitops
 // apps/ai-grid-o11y/manifests/perses-dashboard-cluster.yaml): a multi-select cluster variable with
 // All, and hidden CLUSTER_DETAILS_* text variables that its Markdown panel prints in a PatternFly
 // horizontal description list, written as HTML with PatternFly's classes.
@@ -367,7 +367,7 @@ test("fills in the cluster details panel from the selected cluster's claims", as
   expect(errors).toEqual([]);
 });
 
-// A bar chart as the AI Grid model dashboard's "Response time distribution" draws one: a bar per
+// A bar chart as the AI grid model dashboard's "Response time distribution" draws one: a bar per
 // series, named from a label value, which here holds characters HTML gives a meaning to.
 const bucketName = '<b>p99</b> & Fast <1s';
 const barDashboard = {

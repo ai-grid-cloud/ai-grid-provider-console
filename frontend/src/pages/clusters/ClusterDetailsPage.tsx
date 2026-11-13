@@ -94,7 +94,7 @@ const hubConnection = (c: ClusterView) => {
 };
 
 /**
- * The cluster as the hub sees it, its connection first, as the peer of the AI Grid card's status.
+ * The cluster as the hub sees it, its connection first, as the peer of the AI grid card's status.
  * ACM sets the OpenShift version only on OpenShift clusters (the version.openshift.io claim), so
  * another product, such as EKS, has no such row rather than an empty one.
  */
@@ -311,7 +311,7 @@ const Section: React.FC<{ title: string; help?: React.ReactNode; children: React
   </Card>
 );
 
-/** A cluster at /clusters/:name: its AI Grid membership, what the hub knows about it, and its health. */
+/** A cluster at /clusters/:name: its AI grid membership, what the hub knows about it, and its health. */
 export const ClusterDetailsPage: React.FC = () => {
   const { name = '' } = useParams();
   const { followWrite } = useBackgroundWrites();
@@ -319,7 +319,7 @@ export const ClusterDetailsPage: React.FC = () => {
   const writes = useMembershipWrites();
   const { user } = useConsoleSession();
   const [change, setChange] = useState<MembershipChange>();
-  // The AI Grid cluster whose Edit dialog is open.
+  // The AI grid cluster whose Edit dialog is open.
   const [editing, setEditing] = useState<ClusterView>();
   // The cluster as Add, Remove or Edit returned it, shown until a load started after that change
   // succeeds: a slow or failed reload can't bring back the membership (or the version) from before
@@ -337,7 +337,7 @@ export const ClusterDetailsPage: React.FC = () => {
   };
 
   /**
-   * Adds the cluster to AI Grid or removes it, then reloads it; throws for the modal to show. The
+   * Adds the cluster to AI grid or removes it, then reloads it; throws for the modal to show. The
    * notification center says it was done and follows what the hub does next.
    */
   const applyChange = async (change: MembershipChange, membership?: GridMembership) => {
@@ -410,10 +410,10 @@ export const ClusterDetailsPage: React.FC = () => {
       <Grid hasGutter>
         <GridItem md={6}>
           <Section
-            title="AI Grid"
-            help="The AI Grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
+            title="AI grid"
+            help="The AI grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
           >
-            <DetailsList items={aiGridItems(cluster)} aria-label="AI Grid membership" />
+            <DetailsList items={aiGridItems(cluster)} aria-label="AI grid membership" />
           </Section>
         </GridItem>
         <GridItem md={6}>

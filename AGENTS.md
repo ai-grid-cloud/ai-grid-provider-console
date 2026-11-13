@@ -120,7 +120,7 @@ behaviour and points at its source (a file, a function or an upstream commit), n
 
 The console calls the backend's RPCs from the browser over Connect (ADRs 0002 and 0004),
 through one provider at the app root. The Clusters, Models, Subscriptions and Organizations
-pages and the AI Grid map read and write through it (`docs/connect.md`, "The Clusters area",
+pages and the AI grid map read and write through it (`docs/connect.md`, "The Clusters area",
 "The Models area", "The Subscriptions area" and "The Organizations area"), and Monitoring reads
 the hub's Perses through the BFF's Perses relay:
 

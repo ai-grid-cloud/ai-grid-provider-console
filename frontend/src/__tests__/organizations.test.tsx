@@ -70,14 +70,14 @@ const snapshot = (service: object): Tenant[] => tenantsOf(service).tenants.map((
 
 const unavailable = () => new ConnectError('keycloak is unreachable', Code.Unavailable);
 /** The console's words for Unavailable (describeError): the backend's own message isn't shown. */
-const UNAVAILABLE = 'The AI Grid backend is unavailable. Try again.';
+const UNAVAILABLE = 'The AI grid backend is unavailable. Try again.';
 
-const NO_IDP = 'No identity provider configured in AI Grid';
+const NO_IDP = 'No identity provider configured in AI grid';
 const NO_IDP_REASON =
   "Unless an identity provider was set up directly in Keycloak, this organization's users cannot log in.";
 
 const MAYBE_SAVED =
-  'The AI Grid backend could not confirm the save, so the changes may have been saved. Reload the page to check, then try again if they are missing.';
+  'The AI grid backend could not confirm the save, so the changes may have been saved. Reload the page to check, then try again if they are missing.';
 const ISSUER_MAYBE_SAVED =
   'If the new issuer was saved, users already log in through it, so test logging in only after the reloaded page shows the new issuer.';
 
@@ -122,14 +122,20 @@ it('onboards organization details then IdP, saves only after review and orders n
   const user = userEvent.setup();
   renderAt('/organizations', service);
   expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeVisible();
+  expect(
+    screen.getByText(
+      'Manage organizations that can access models in the AI grid. An organization contains users who all sign in through the same identity provider.',
+    ),
+  ).toBeVisible();
   const nav = screen.getByRole('navigation', { name: 'Console sections' });
   expect(
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['AI Grid', 'Monitoring', 'Clusters', 'Organizations', 'Models', 'Subscriptions']);
+  ).toEqual(['AI grid', 'Monitoring', 'Clusters', 'Organizations', 'Models', 'Subscriptions']);
   await user.click(await screen.findByRole('link', { name: 'Create organization' }));
   const name = await screen.findByRole('textbox', { name: 'Name' });
+  expect(screen.getByText('Valid characters include lowercase letters, numbers, and hyphens (-).')).toBeVisible();
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   await user.click(name);
   await user.paste('tenant1');
@@ -538,9 +544,9 @@ it('shows the not-available state when the backend cannot delete organizations y
   await user.paste('initech-labs');
   await user.click(within(modal).getByRole('button', { name: 'Delete' }));
   expect(
-    await within(modal).findByText('Deleting organizations is not available on this AI Grid backend.'),
+    await within(modal).findByText('Deleting organizations is not available on this AI grid backend.'),
   ).toBeVisible();
-  expect(within(modal).queryByText('The AI Grid backend does not support this operation.')).not.toBeInTheDocument();
+  expect(within(modal).queryByText('The AI grid backend does not support this operation.')).not.toBeInTheDocument();
 });
 
 it('shows one pagination, in the toolbar, for a single page', async () => {
@@ -825,7 +831,7 @@ it('lists the identity provider by title, warns without one, and shows no status
   expect(acme).toHaveTextContent('Acme Robotics SSO');
   expect(acme).not.toHaveTextContent('https://sso.example.com/realms/acme-robotics');
   const umbrella = screen.getByRole('row', { name: /^umbrella-biotech / });
-  // AI Grid has none, so the cell says so, as a cluster without a role does, with what that means
+  // AI grid has none, so the cell says so, as a cluster without a role does, with what that means
   // unless one was set up in Keycloak directly, which the backend doesn't report.
   const missing = within(umbrella).getByTestId('missing-idp-umbrella-biotech');
   expect(missing).toHaveTextContent(NO_IDP);

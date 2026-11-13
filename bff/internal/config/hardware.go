@@ -29,6 +29,10 @@ type ModelHardware struct {
 	// Image is the runtime image a new model gets. Empty: the cluster's default
 	// vLLM image, which is for NVIDIA GPUs.
 	Image string `json:"image,omitempty"`
+	// ImageName is what the wizard shows for Image, such as "vLLM CPU 0.18.0
+	// (OpenShift AI 3.6)", where the digest alone says nothing; Image still is
+	// what a model gets. Only with an Image; no leading or trailing whitespace.
+	ImageName string `json:"imageName,omitempty"`
 	// Env is added to the model's main container.
 	Env map[string]string `json:"env,omitempty"`
 	// Defaults are the resources the wizard starts from.
@@ -66,8 +70,12 @@ var (
 
 // cpuImage is the vLLM CPU image of OpenShift AI 3.6: kserve-llm-d-cpu in
 // config/overlays/odh/params.env (version 0.18.0+rhaiv.11) on
-// red-hat-data-services/kserve rhoai-3.6 at 71b7da3.
+// red-hat-data-services/kserve rhoai-3.6 at 71b7da3. When you bump the digest,
+// bump cpuImageName to the new version, here and in the chart's values.yaml.
 const cpuImage = "registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9"
+
+// cpuImageName is what the wizard shows for cpuImage: its version, as above.
+const cpuImageName = "vLLM CPU 0.18.0 (OpenShift AI 3.6)"
 
 // DefaultModelHardware is the list the console offers when MODEL_HARDWARE is
 // empty or unset, as in a local run: a copy of the chart's default
@@ -96,6 +104,7 @@ func DefaultModelHardware() []ModelHardware {
 			Label:       "CPU only",
 			Description: "For x86_64 clusters without GPUs.",
 			Image:       cpuImage,
+			ImageName:   cpuImageName,
 			Env:         map[string]string{"VLLM_CPU_KVCACHE_SPACE": "4", "OMP_NUM_THREADS": "4"},
 			Defaults:    &HardwareDefaults{CPU: "4", Memory: "8Gi"},
 		},
@@ -155,6 +164,12 @@ func (hw ModelHardware) problems() []string {
 	}
 	if strings.ContainsFunc(hw.Image, unicode.IsSpace) {
 		out = append(out, fmt.Sprintf("image %q must not contain whitespace", hw.Image))
+	}
+	if hw.ImageName != "" && hw.Image == "" {
+		out = append(out, "imageName needs an image")
+	}
+	if hw.ImageName != strings.TrimSpace(hw.ImageName) {
+		out = append(out, fmt.Sprintf("imageName %q must not start or end with whitespace", hw.ImageName))
 	}
 	for name := range hw.Env {
 		switch {

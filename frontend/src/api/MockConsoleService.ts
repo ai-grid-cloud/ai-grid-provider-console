@@ -138,6 +138,7 @@ export const builtInModelHardware = (): ModelHardware[] => [
     description: 'For x86_64 clusters without GPUs.',
     image:
       'registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9',
+    imageName: 'vLLM CPU 0.18.0 (OpenShift AI 3.6)',
     env: { OMP_NUM_THREADS: '4', VLLM_CPU_KVCACHE_SPACE: '4' },
     defaults: { cpu: '4', memory: '8Gi' },
   },

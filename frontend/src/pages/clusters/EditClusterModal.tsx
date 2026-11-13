@@ -26,7 +26,7 @@ import {
 import { LocationLabelField, ReadOnlyRoleField, RoleField } from './MembershipFields';
 
 type Props = {
-  /** An AI Grid cluster, as loaded; after a conflict the page passes it as loaded again. */
+  /** An AI grid cluster, as loaded; after a conflict the page passes it as loaded again. */
   cluster: ClusterView;
   /** Saves the labels; the modal closes once it resolves and shows the error if it throws. */
   onConfirm: (labels: Record<string, string>) => Promise<void>;
@@ -38,7 +38,7 @@ type Touched = Partial<Record<GridSettingsField, boolean>>;
 const sameSettings = (a: GridSettings, b: GridSettings) => a.role === b.role && a.location === b.location;
 
 /**
- * Edits an AI Grid cluster's location label, and sets its role when it has none (a role it has is
+ * Edits an AI grid cluster's location label, and sets its role when it has none (a role it has is
  * shown read-only): one Clusters/Update of its labels. Setting a role says first what the hub
  * installs; it only adds, so it asks for no typed name.
  */
@@ -101,7 +101,7 @@ export const EditClusterModal: React.FC<Props> = ({ cluster, onConfirm, onClose 
         title={editText.title}
         description={
           <>
-            Edit the AI Grid configuration of the <strong>{cluster.name}</strong> cluster.
+            Make changes to the configuration of the <strong>{cluster.name}</strong> cluster for the AI grid.
           </>
         }
       />

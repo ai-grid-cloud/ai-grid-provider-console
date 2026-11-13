@@ -22,7 +22,7 @@ const row = (label: string) => {
 it('says what the console is under its name', async () => {
   renderAbout({ config: await baseConfig(), user: admin });
   expect(screen.getByRole('dialog', { name: 'Cloud Provider Admin Console' })).toHaveTextContent(
-    'Manages AI Grid on this ACM hub: its clusters, the organizations and subscriptions that use it, and the models it serves.',
+    'Manages the AI grid on this ACM hub: its clusters, the organizations and subscriptions that use it, and the models it serves.',
   );
 });
 
@@ -71,7 +71,7 @@ describe('the config rows', () => {
 
   it('say what the console talks to', async () => {
     const { rerender } = renderAbout({ config: { ...(await baseConfig()), fakeBackend: false } });
-    expect(row('Data')).toHaveTextContent(/^AI Grid backend$/);
+    expect(row('Data')).toHaveTextContent(/^AI grid backend$/);
     rerender(<AboutConsoleModal isOpen onClose={() => {}} config={{ ...(await baseConfig()), fakeBackend: true }} />);
     expect(row('Data')).toHaveTextContent(/^Fake backend: fixture data; nothing you change reaches a cluster$/);
   });

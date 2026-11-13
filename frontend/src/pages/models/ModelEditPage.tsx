@@ -23,7 +23,7 @@ export const ModelEditPage: React.FC = () => {
   }
   return (
     <PageStateSection
-      title={`Edit ${id}`}
+      title="Edit model"
       breadcrumb={
         <Breadcrumb>
           <BreadcrumbItem>

@@ -187,6 +187,7 @@
           ]
         },
         "image": { "description": "Empty: the cluster's default vLLM image, for NVIDIA GPUs.", "type": "string", "pattern": "^[^\\s\\v\\x{85}\\p{Z}]*$" },
+        "imageName": { "description": "What the wizard shows for the image; only with an image.", "type": "string", "pattern": "^([^\\s\\v\\x{85}\\p{Z}](.*[^\\s\\v\\x{85}\\p{Z}])?)?$" },
         "env": {
           "type": "object",
           "propertyNames": { "pattern": "^[-._a-zA-Z][-._a-zA-Z0-9]*$", "not": { "const": "VLLM_ADDITIONAL_ARGS" } },
@@ -202,8 +203,16 @@
           }
         }
       },
-      "if": { "not": { "required": ["accelerator"], "properties": { "accelerator": { "minLength": 1 } } } },
-      "then": { "properties": { "defaults": { "not": { "required": ["accelerators"] } } } }
+      "allOf": [
+        {
+          "if": { "not": { "required": ["accelerator"], "properties": { "accelerator": { "minLength": 1 } } } },
+          "then": { "properties": { "defaults": { "not": { "required": ["accelerators"] } } } }
+        },
+        {
+          "if": { "required": ["imageName"], "properties": { "imageName": { "minLength": 1 } } },
+          "then": { "required": ["image"], "properties": { "image": { "minLength": 1 } } }
+        }
+      ]
     },
     "quantities": {
       "type": "object",

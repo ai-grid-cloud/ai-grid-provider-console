@@ -32,6 +32,7 @@ func TestParseModelHardwareDefault(t *testing.T) {
 	wantEnv := map[string]string{"VLLM_CPU_KVCACHE_SPACE": "4", "OMP_NUM_THREADS": "4"}
 	if cpu.ID != "cpu" || cpu.Label != "CPU only" || cpu.Accelerator != "" ||
 		cpu.Image != "registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9" ||
+		cpu.ImageName != "vLLM CPU 0.18.0 (OpenShift AI 3.6)" ||
 		!reflect.DeepEqual(cpu.Env, wantEnv) || cpu.Defaults == nil || cpu.Defaults.Accelerators != nil || cpu.Defaults.CPU != "4" || cpu.Defaults.Memory != "8Gi" {
 		t.Errorf("CPU only: %+v %+v", cpu, cpu.Defaults)
 	}
@@ -52,7 +53,7 @@ func TestParseModelHardwareList(t *testing.T) {
 	t.Parallel()
 	hub := "--hub-api-url=https://hub.example"
 	amd := `[{"id":"amd-gpu","label":"AMD GPU","description":"For clusters with AMD Instinct GPUs.","accelerator":"amd.com/gpu",
-		"image":"quay.io/example/vllm-rocm:1.0","env":{"VLLM_USE_TRITON_FLASH_ATTN":"0"},"defaults":{"accelerators":2,"cpu":"500m","memory":"32Gi"}},
+		"image":"quay.io/example/vllm-rocm:1.0","imageName":"vLLM ROCm 1.0","env":{"VLLM_USE_TRITON_FLASH_ATTN":"0"},"defaults":{"accelerators":2,"cpu":"500m","memory":"32Gi"}},
 		{"id":"cpu","label":"CPU only"}]`
 	cfg, err := Parse([]string{hub}, lookup(map[string]string{"MODEL_HARDWARE": amd}))
 	if err != nil {
@@ -62,7 +63,7 @@ func TestParseModelHardwareList(t *testing.T) {
 	want := []ModelHardware{
 		{
 			ID: "amd-gpu", Label: "AMD GPU", Description: "For clusters with AMD Instinct GPUs.", Accelerator: "amd.com/gpu",
-			Image: "quay.io/example/vllm-rocm:1.0", Env: map[string]string{"VLLM_USE_TRITON_FLASH_ATTN": "0"},
+			Image: "quay.io/example/vllm-rocm:1.0", ImageName: "vLLM ROCm 1.0", Env: map[string]string{"VLLM_USE_TRITON_FLASH_ATTN": "0"},
 			Defaults: &HardwareDefaults{Accelerators: &two, CPU: "500m", Memory: "32Gi"},
 		},
 		{ID: "cpu", Label: "CPU only"},
@@ -103,6 +104,10 @@ func TestParseModelHardwareRefuses(t *testing.T) {
 		{"an accelerator in kubernetes.io", `[{"id":"gpu","label":"GPU","accelerator":"kubernetes.io/gpu"}]`, `accelerator "kubernetes.io/gpu" must be an extended resource name`},
 		{"an image with a space", `[{"id":"cpu","label":"CPU","image":"quay.io/vllm cpu:1"}]`, "must not contain whitespace"},
 		{"an image with a tab", `[{"id":"cpu","label":"CPU","image":"quay.io/vllm\tcpu:1"}]`, "must not contain whitespace"},
+		{"an image name without an image", `[{"id":"cpu","label":"CPU","imageName":"vLLM CPU"}]`, "imageName needs an image"},
+		{"an image name with leading space", `[{"id":"cpu","label":"CPU","image":"quay.io/vllm:1","imageName":" vLLM CPU"}]`, "must not start or end with whitespace"},
+		{"an image name with trailing space", `[{"id":"cpu","label":"CPU","image":"quay.io/vllm:1","imageName":"vLLM CPU\n"}]`, "must not start or end with whitespace"},
+		{"an unknown field", `[{"id":"cpu","label":"CPU","imageLabel":"vLLM CPU"}]`, "not a JSON list"},
 		{"a bad env name", `[{"id":"cpu","label":"CPU","env":{"1THREADS":"4"}}]`, `env name "1THREADS"`},
 		{"the runtime arguments' env", `[{"id":"cpu","label":"CPU","env":{"VLLM_ADDITIONAL_ARGS":"--x"}}]`, "must not set VLLM_ADDITIONAL_ARGS"},
 		{"accelerators without an accelerator", `[{"id":"cpu","label":"CPU","defaults":{"accelerators":1}}]`, "defaults.accelerators needs an accelerator"},

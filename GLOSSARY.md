@@ -1,6 +1,6 @@
 # AI Grid Provider Console
 
-The administrative interface a cloud provider uses to run an AI Grid: enrolling clusters,
+The administrative interface a cloud provider uses to run an AI grid: enrolling clusters,
 onboarding organizations, deploying models across clusters, and watching the result. It is
 one of three faces of the product, alongside the organization administrator's and the end user's.
 
@@ -8,10 +8,11 @@ one of three faces of the product, alongside the organization administrator's an
 
 ### The product
 
-**AI Grid**:
+**AI grid**:
 A set of OpenShift clusters in different locations, serving models as one logical service
-behind a shared gateway. The name stays "AI Grid" (capital G). Running sentences say "the AI Grid";
-labels and action names have no article ("Add to AI Grid", "AI Grid cluster").
+behind a shared gateway. Written "AI grid", with a lowercase g (UXD, 2026-11-12), in sentences,
+titles and labels alike. Running sentences say "the AI grid"; labels and action names have no
+article ("Add to AI grid", "AI grid cluster").
 _Avoid_: the grid, fleet, mesh
 
 **Provider admin**:
@@ -22,7 +23,7 @@ _Avoid_: cluster admin, superuser, operator
 
 **Hub administrator**:
 Whoever administers the hub cluster itself and grants access to it, including provider admin
-access. Not the same as a provider admin: a provider admin runs AI Grid through the console, and
+access. Not the same as a provider admin: a provider admin runs the AI grid through the console, and
 asks the hub administrator for that access. The console says "your hub administrator".
 _Avoid_: administrator (alone), cluster admin
 
@@ -34,13 +35,13 @@ _Avoid_: location, geo, zone
 
 **Site**:
 The name a hub administrator gives a cluster's place (annotation `ai-grid/site-name`), shown as Site on
-the Clusters pages and the AI Grid map; empty when the annotation isn't set,
+the Clusters pages and the AI grid map; empty when the annotation isn't set,
 never the region. The cluster's `ai-grid/site` label is its Site ID. The console doesn't edit it:
 a hub administrator sets it, and the map position, with `oc annotate`.
 _Avoid_: data center, location
 
 **Location label**:
-The cluster's `location` label, which Add to AI Grid and Edit write. Nothing in delivery or routing
+The cluster's `location` label, which Add to AI grid and Edit write. Nothing in delivery or routing
 reads it; models are placed on clusters by name. Whether it becomes the grid's region is open.
 _Avoid_: location (alone)
 
@@ -57,11 +58,11 @@ _Avoid_: ManagedCluster, GridCluster, managed cluster, node, location; Offline (
 **Grid member**:
 A cluster that has been enrolled in the grid and provisioned for it. The distinction matters:
 the console lists every cluster the hub manages, but only members can host models. The UI says
-"AI Grid cluster", and "member" only in code: in UI text it would read as a person.
+"AI grid cluster", and "member" only in code: in UI text it would read as a person.
 _Avoid_: enrolled cluster, participating cluster, active cluster
 
 **Role**:
-What a Grid member does in AI Grid, from its `ai-grid/role` label. There are three. MaaS and
+What a Grid member does in the AI grid, from its `ai-grid/role` label. There are three. MaaS and
 KServe are the tools the roles use; they are not the roles' names.
 - **Ingress** (`ingress`): the cluster receives requests via Models-as-a-Service and routes those
   requests to inference clusters.
@@ -70,7 +71,7 @@ KServe are the tools the roles use; they are not the roles' names.
 - **Ingress and inference** (`combined`): the cluster receives requests via Models-as-a-Service and
   serves models via KServe. The label was Combined; the value stays `combined`.
 
-A provider admin sets a cluster's role with Add to AI Grid or Edit, while the cluster has none.
+A provider admin sets a cluster's role with Add to AI grid or Edit, while the cluster has none.
 The console doesn't change a role a cluster has: the hub doesn't yet fully remove what the old role
 installed. Remove keeps the role, so Add shows it read-only, as Edit does.
 

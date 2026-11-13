@@ -1,7 +1,7 @@
 // Every text of Edit, in one place so the wording can be reviewed together (frontend/AGENTS.md,
 // "Wording"): the action, the dialog, and what setting a role does to the cluster.
 //
-// Edit changes an AI Grid cluster's location label, and its role only while it has none. What a
+// Edit changes an AI grid cluster's location label, and its role only while it has none. What a
 // role installs is what the hub's GitOps delivers for it (ai-grid-cloud/ai-grid-cluster-gitops, one
 // OpenShift AI application per cluster from its role), as checked on a live hub: ingress gets MaaS,
 // the consumer gateway, the MaaS portal and the MaaS database replica; inference gets KServe, the
@@ -38,11 +38,11 @@ export const roleSet = (role: ClusterRole): RoleSet => ({
 
 /** The dialog's other texts. */
 export const editText = {
-  /** The row and page action, for AI Grid clusters only. */
+  /** The row and page action, for AI grid clusters only. */
   action: 'Edit',
-  title: 'Edit AI Grid cluster',
+  title: 'Edit AI grid cluster',
   errorTitle: 'Unable to update cluster',
-  notAvailable: 'Editing a cluster is not available on this AI Grid backend.',
+  notAvailable: 'Editing a cluster is not available on this AI grid backend.',
   changedByOther:
     "Another user changed this cluster's location label or role after this dialog opened. Their values are now shown. Review them and try again.",
   /** The No role warning's tooltip, which points to the action. */

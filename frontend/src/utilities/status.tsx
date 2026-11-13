@@ -20,7 +20,7 @@ export type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
 /** Every status word the console shows, by tone. A word missing here reads as neutral. */
 const tones: Record<string, StatusTone> = {
-  // Clusters (GridCluster.status) and AI Grid provisioning.
+  // Clusters (GridCluster.status) and AI grid provisioning.
   // A cluster whose agent reports it unavailable (the backend's OFFLINE, for example its API server
   // is down) is Unavailable, in the warning tone below: it may still serve. One the hub can't reach
   // (UNKNOWN) is Unknown.
@@ -31,7 +31,7 @@ const tones: Record<string, StatusTone> = {
   Provisioned: 'success',
   Provisioning: 'info',
   'Not provisioned': 'neutral',
-  // A cluster outside AI Grid (no ai-grid/enabled label).
+  // A cluster outside AI grid (no ai-grid/enabled label).
   'Not added': 'neutral',
   // Models (the Models pages' phase words) and subscriptions (their phase as reported).
   Active: 'success',
@@ -97,7 +97,7 @@ export const statusLabelProps = (status: string | undefined): Pick<LabelProps, '
   if (
     status === 'Pending sync' ||
     status === 'Awaiting subscription' ||
-    status === 'Configuring routing' ||
+    status === 'Configuring route' ||
     status === 'Awaiting subscription and backend'
   ) {
     return { color: 'purple', icon: <PendingIcon /> };

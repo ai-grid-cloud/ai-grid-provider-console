@@ -2,7 +2,7 @@ import { create, fromJsonString, toJsonString } from '@bufbuild/protobuf';
 import { ModelsListResponseSchema } from '../src/gen/ai_grid/v1/models_service_pb';
 import { ModelClusterStatusSchema, ModelState, ModelStatusSchema } from '../src/gen/ai_grid/v1/model_type_pb';
 import { expect, test } from './fixtures';
-import { createModel, tryBackend, writeConfirmed } from './backend';
+import { createModel, createdSubscriptionId, tryBackend, writeConfirmed } from './backend';
 
 // On the backend's own fakes (playwright.config.ts, "backend fakes"): the pages read and write the
 // backend's Subscriptions API over Connect. The organization is the PoC's in the backend's fake
@@ -32,6 +32,8 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     }
     await route.fulfill({ response, body: toJsonString(ModelsListResponseSchema, answer) });
   });
+  // The id the backend gives the subscription: `unique`, or `unique` with a suffix (backend PR 89).
+  let id = unique;
   try {
     await page.goto('/subscriptions');
     await page.getByRole('link', { name: 'Create subscription' }).click();
@@ -62,7 +64,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     await expect(addModels).toBeVisible();
     await expect(statusTrigger).toBeFocused();
     await expect(addModels.getByRole('checkbox', { name: `Select ${MODEL}` })).toBeChecked();
-    await addModels.getByRole('button', { name: 'Add models' }).click();
+    await addModels.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: `Partially ready for ${MODEL}`, exact: true }).click();
     await expect(statusDialog).toBeVisible();
     await statusDialog.getByRole('button', { name: 'Close' }).click();
@@ -71,7 +73,9 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     const limits = page.getByRole('dialog', { name: 'Edit token limits' });
     await limits.getByRole('spinbutton', { name: 'Tokens' }).fill('5000');
     await limits.getByRole('button', { name: 'Save' }).click();
+    const created = createdSubscriptionId(page);
     await page.getByRole('button', { name: 'Create subscription' }).click();
+    id = (await created) ?? unique;
     await expect(writeConfirmed(page, `Subscription ${unique} saved to Git`)).toBeVisible();
 
     // The phase is the backend's: Pending while a cluster's catalog Application doesn't list the
@@ -81,7 +85,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     await expect(row.getByTestId('phase-label')).toHaveText('Pending');
 
     // The view page opens directly and survives a reload.
-    await page.goto(`/subscriptions/view/${unique}`);
+    await page.goto(`/subscriptions/view/${id}`);
     await expect(page.getByRole('heading', { level: 1, name: unique, exact: true })).toBeVisible();
     await expect(page.getByText(ORGANIZATION).first()).toBeVisible();
     await page.reload();
@@ -92,7 +96,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
     // Edit the priority.
     await page.getByRole('button', { name: `Actions for ${unique}` }).click();
     await page.getByRole('menuitem', { name: 'Edit' }).click();
-    await expect(page).toHaveURL(new RegExp(`/subscriptions/edit/${unique}$`));
+    await expect(page).toHaveURL(new RegExp(`/subscriptions/edit/${id}$`));
     await page.getByRole('spinbutton', { name: 'Priority' }).fill('42');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(writeConfirmed(page, `Changes to subscription ${unique} saved to Git`)).toBeVisible();
@@ -107,7 +111,7 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
   } finally {
     // Whatever step failed, the catalog is left as it was: the subscription, if it is still there
     // (zero skips the version check), then the model.
-    await tryBackend(page.request, 'Subscriptions/Delete', { id: unique });
+    await tryBackend(page.request, 'Subscriptions/Delete', { id });
     await tryBackend(page.request, 'Models/Delete', { id: modelId });
   }
 });
@@ -116,6 +120,9 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
 // team-a-policy active on site3, the PoC's one ingress cluster, and every other subscription not
 // there yet (fixtures/poc/applications.json in the backend), so a subscription created as team-a
 // reads Active as soon as it is in Git: the notification center's watch says so on its first read.
+// A backend that adds a suffix to the name (backend PR 89) answers team-a-<suffix>, which these
+// fixtures don't report; the watch follows the answered id, so this test needs fixtures that report
+// that name before the console moves to such a backend.
 const ACTIVE_ID = 'team-a';
 
 test('says a created subscription is active once the ingress clusters report it', async ({ page }) => {
@@ -125,6 +132,7 @@ test('says a created subscription is active once the ingress clusters report it'
   // A team-a a failed run left behind would refuse the create.
   await tryBackend(page.request, 'Subscriptions/Delete', { id: ACTIVE_ID });
   await createModel(page.request, modelId, MODEL);
+  let id = ACTIVE_ID;
   try {
     await page.goto('/subscriptions/create');
     await page.getByRole('textbox', { name: 'Name', exact: true }).fill(ACTIVE_ID);
@@ -136,10 +144,12 @@ test('says a created subscription is active once the ingress clusters report it'
     await page.getByRole('button', { name: 'Add models' }).click();
     const addModels = page.getByRole('dialog');
     await addModels.getByRole('checkbox', { name: `Select ${MODEL}` }).check();
-    await addModels.getByRole('button', { name: 'Add models' }).click();
+    await addModels.getByRole('button', { name: 'Add', exact: true }).click();
     await page.getByRole('button', { name: 'Add token limit' }).click();
     await page.getByRole('dialog', { name: 'Edit token limits' }).getByRole('button', { name: 'Save' }).click();
+    const created = createdSubscriptionId(page);
     await page.getByRole('button', { name: 'Create subscription' }).click();
+    id = (await created) ?? ACTIVE_ID;
     await expect(writeConfirmed(page, `Subscription ${ACTIVE_ID} saved to Git`)).toBeVisible();
 
     // The toast, wherever the admin is, and the drawer's entry, unread, with the organization's name.
@@ -156,7 +166,7 @@ test('says a created subscription is active once the ingress clusters report it'
     const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: ACTIVE_ID, exact: true }) });
     await expect(row.getByTestId('phase-label')).toHaveText('Active');
   } finally {
-    await tryBackend(page.request, 'Subscriptions/Delete', { id: ACTIVE_ID });
+    await tryBackend(page.request, 'Subscriptions/Delete', { id });
     await tryBackend(page.request, 'Models/Delete', { id: modelId });
   }
 });

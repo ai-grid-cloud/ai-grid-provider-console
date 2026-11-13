@@ -51,9 +51,9 @@ its repository, then run `make dev` here; without a cluster, `make dev-fake` (th
 ## Pages
 
 The console has pages for clusters (`/clusters`), organizations (`/organizations`), models
-(`/models`), subscriptions (`/subscriptions`), and the AI Grid map and Monitoring
+(`/models`), subscriptions (`/subscriptions`), and the AI grid map and Monitoring
 (`/ai-grid`, `/monitoring`). They are ported from the cloud provider PoC; `NOTICE` lists
-the attributions. On the Clusters pages, Edit changes an AI Grid cluster's location label, and
+the attributions. On the Clusters pages, Edit changes an AI grid cluster's location label, and
 its role only while it has none; a role a cluster has, the site name and the map position aren't
 edited in the console (a hub admin sets the latter two with `oc annotate`, as the backend's README
 describes). Run them all without a cluster with `make dev-fake`, as `docs/dev-setup.md`
@@ -63,8 +63,8 @@ describes.
 
 The BFF serves login, user, config and the Connect and Perses relays, with readiness tied to the
 backend's gRPC health service. The Clusters, Organizations, Models and Subscriptions pages and
-the AI Grid map call the backend's own API over Connect (`docs/connect.md`), and Monitoring shows
+the AI grid map call the backend's own API over Connect (`docs/connect.md`), and Monitoring shows
 the hub's Perses dashboards; the shipped `ai-grid-backend` serves clusters (list, get, and the
-update behind Add to AI Grid, Edit and Remove), tenants, the console's organizations (list, get,
+update behind Add to AI grid, Edit and Remove), tenants, the console's organizations (list, get,
 create, update, delete), models and subscriptions. `/user` and `/config` work on any backend
 (neither calls it). See `docs/bff.md`.

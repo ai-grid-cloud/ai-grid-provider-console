@@ -135,7 +135,7 @@ keeps a copy of the same two (`config.DefaultModelHardware`) for a local run wit
 A hub's list, in its GitOps repository, replaces the default one whole, and its first entry is the
 wizard's default. Repeat the default entries you keep. `values.schema.json` refuses an entry the
 BFF would refuse at start (an unknown or misspelled field, an id that isn't a DNS label, an
-accelerator that isn't a Kubernetes extended resource name, an image with spaces, a CPU or memory
+accelerator that isn't a Kubernetes extended resource name, an image with spaces, an `imageName` without an image or with leading or trailing spaces, a CPU or memory
 the wizard doesn't take, accelerators without an accelerator), and the template refuses an id used
 twice. Changing the list restarts the console's pod, since the BFF reads it at start; models already
 deployed keep what they were deployed with. Editing a model starts on the entry it runs on (its
@@ -168,6 +168,7 @@ console:
         label: CPU only
         description: For x86_64 clusters without GPUs.
         image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:0ec0f5ff9a5ff263f58db0cfb19e3d7eef24b94c2d8629fe5145f5a8747e28c9
+        imageName: vLLM CPU 0.18.0 (OpenShift AI 3.6)  # shown in the wizard; bump it with the digest
         env: { VLLM_CPU_KVCACHE_SPACE: "4", OMP_NUM_THREADS: "4" }
         defaults: { cpu: "4", memory: 8Gi }
 ```

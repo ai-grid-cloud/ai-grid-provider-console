@@ -53,7 +53,7 @@ export const useOrganization = (id: string | undefined): Loaded<OrganizationView
  * the user can only resolve by reloading.
  */
 const answered = (object: Parameters<typeof toOrganizationView>[0] | undefined): OrganizationView => {
-  if (!object) throw new Error('The AI Grid backend did not return the organization. Refresh the page and try again.');
+  if (!object) throw new Error('The AI grid backend did not return the organization. Refresh the page and try again.');
   return toOrganizationView(object);
 };
 

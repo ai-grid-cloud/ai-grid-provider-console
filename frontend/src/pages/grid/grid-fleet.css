@@ -1,4 +1,4 @@
-/* The AI Grid map. Layout comes from PatternFly (Stack, Gallery, Card, Drawer, Flex); these rules
+/* The AI grid map. Layout comes from PatternFly (Stack, Gallery, Card, Drawer, Flex); these rules
    only size the Leaflet map and place what sits on top of it, with PatternFly's tokens. */
 
 /* The card's rounded corners clip the map. */

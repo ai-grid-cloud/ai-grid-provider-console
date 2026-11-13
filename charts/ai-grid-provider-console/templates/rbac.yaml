@@ -16,7 +16,7 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 # ai-grid-backend reads ManagedClusters with the pod's ServiceAccount, and with
-# backend.clusterWrites patches their labels (Add to AI Grid, Edit and Remove; admission.yaml limits
+# backend.clusterWrites patches their labels (Add to AI grid, Edit and Remove; admission.yaml limits
 # which). These rules are the console's part of deploy/openshift/rbac.yaml in the backend
 # repository; grow them there first when the backend needs more. The backend also reads the
 # ai-grid-policies/ai-grid-ready Policy to report a cluster's provisioning. This chart does not

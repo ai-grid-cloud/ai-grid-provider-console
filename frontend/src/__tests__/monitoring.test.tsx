@@ -95,7 +95,7 @@ it("says when the caller can't read the dashboards", async () => {
   service.listMonitoringDashboards = () => Promise.reject(new ServiceError(403, 'forbidden: project ai-grid'));
   renderAt('/monitoring', service);
   expect(await screen.findByRole('heading', { name: 'No access' })).toBeVisible();
-  expect(screen.getByText('forbidden: project ai-grid')).toBeVisible();
+  expect(screen.queryByText('forbidden: project ai-grid')).not.toBeInTheDocument();
   expect(
     screen.getByText(
       "You don't have permission to view dashboards. To request permission, contact your hub administrator.",

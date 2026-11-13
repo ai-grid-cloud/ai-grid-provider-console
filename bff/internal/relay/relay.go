@@ -360,10 +360,10 @@ func (r *Relay) errorHandler(w http.ResponseWriter, req *http.Request, err error
 		w.WriteHeader(499)
 	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
 		r.logger.Warn("backend call timed out", "path", req.URL.Path, "timeout", r.boundFor(req.URL.Path).timeout, "error", err)
-		WriteError(w, http.StatusGatewayTimeout, "The AI Grid backend did not respond in time. Try again.")
+		WriteError(w, http.StatusGatewayTimeout, "The AI grid backend did not respond in time. Try again.")
 	default:
 		r.logger.Warn("backend call failed", "path", req.URL.Path, "error", err)
-		WriteError(w, http.StatusBadGateway, "the AI Grid backend could not be reached; try again")
+		WriteError(w, http.StatusBadGateway, "the AI grid backend could not be reached; try again")
 	}
 }
 

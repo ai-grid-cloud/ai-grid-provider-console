@@ -23,7 +23,7 @@ import type { NotificationLink } from './useNotifications';
 import type { WriteFields } from './writeFields';
 
 export type WriteSubject = 'model' | 'subscription' | 'cluster';
-/** `add` and `remove` put a cluster into AI Grid and take it out; the others are Git writes. */
+/** `add` and `remove` put a cluster into AI grid and take it out; the others are Git writes. */
 export type WriteOp = 'create' | 'update' | 'delete' | 'add' | 'remove';
 
 /** A write the notification center follows: what it changes and the name the pages show. */
@@ -42,7 +42,7 @@ export type WriteTarget = {
   /** For a created subscription: its organization's name, when the form had it. */
   organization?: string;
   /**
-   * For a cluster added to AI Grid, or edited to set the role it lacked: that role, whose
+   * For a cluster added to AI grid, or edited to set the role it lacked: that role, whose
    * installation the notification center then follows. A cluster edit without one changed only
    * the location label.
    */
@@ -84,7 +84,7 @@ const subjects: Record<
     createPath: getSubscriptionCreateUrl(),
     createAction: 'Create subscription',
   },
-  // A cluster is edited in a dialog on its page, and added to AI Grid from the Clusters list.
+  // A cluster is edited in a dialog on its page, and added to AI grid from the Clusters list.
   cluster: {
     object: 'cluster',
     Object: 'Cluster',
@@ -203,6 +203,21 @@ export const notConfirmedText = (t: WriteTarget): Text => {
   return { title: unable(t), message, actions: [t.op === 'create' ? listAction(t) : viewAction(t)] };
 };
 
+/**
+ * A subscription create whose answer never came, and which the read-back didn't confirm: the backend
+ * may have added a suffix to the requested name (backend PR 89), which only the lost answer carried,
+ * so neither a read of the requested name nor its absence says whether it was created. Creating it
+ * again could make a second one, so the list is the place to check first.
+ */
+export const unknownCreatedNameText = (t: WriteTarget): Text => {
+  const s = subjects[t.subject];
+  return {
+    title: `Unable to confirm ${s.object} ${t.name}`,
+    message: `The AI grid backend's answer was lost, and the backend may have added a suffix to the ${s.object}'s name, so it's unknown whether the ${s.object} was saved to Git. Check the ${s.list} list before you create it again.`,
+    actions: [listAction(t)],
+  };
+};
+
 /** The checks themselves failed until the end: nobody can say whether the write landed. */
 export const unconfirmedText = (t: WriteTarget): Text => {
   const s = subjects[t.subject];
@@ -214,7 +229,7 @@ export const unconfirmedText = (t: WriteTarget): Text => {
         : `the ${s.object} was saved to Git`;
   return {
     title: `Unable to confirm ${s.object} ${t.name}`,
-    message: `The AI Grid backend didn't answer for ${READBACK_MINUTES} minutes, so it's unknown whether ${what}. Check the ${s.list} list.`,
+    message: `The AI grid backend didn't answer for ${READBACK_MINUTES} minutes, so it's unknown whether ${what}. Check the ${s.list} list.`,
     actions: [listAction(t)],
   };
 };
@@ -386,7 +401,7 @@ export const subscriptionUnconfirmedText = (t: WriteTarget): Text => ({
 });
 
 /**
- * How long a cluster is watched after it is added to AI Grid or given a role, until it is
+ * How long a cluster is watched after it is added to AI grid or given a role, until it is
  * provisioned, and after it is removed, until it has left: an OpenShift AI installation takes a
  * while.
  */
@@ -397,7 +412,7 @@ const viewCluster = (t: WriteTarget): NotificationLink => ({ title: 'View cluste
 const roleLabel = (role: ClusterRole) => clusterRoles.find((r) => r.value === role)?.label ?? role;
 
 /**
- * A cluster's write, answered by the backend: added to AI Grid, removed from it, or edited (the
+ * A cluster's write, answered by the backend: added to AI grid, removed from it, or edited (the
  * role it lacked set, or only its location label changed). What the hub then does is followed
  * after an add, a role set and a remove (clusterProvisionedText, clusterLeftText); a location label
  * changes nothing on the cluster.
@@ -405,8 +420,8 @@ const roleLabel = (role: ClusterRole) => clusterRoles.find((r) => r.value === ro
 export const clusterSavedText = (t: WriteTarget): Text => {
   if (t.op === 'remove') {
     return {
-      title: `Cluster ${t.name} removed from AI Grid`,
-      message: "You'll be notified when the hub no longer includes it in AI Grid.",
+      title: `Cluster ${t.name} removed from AI grid`,
+      message: "You'll be notified when the hub no longer includes it in the AI grid.",
       actions: [viewCluster(t)],
     };
   }
@@ -414,15 +429,19 @@ export const clusterSavedText = (t: WriteTarget): Text => {
     ? `The hub is installing what its ${roleLabel(t.role)} role needs. You'll be notified when it's provisioned.`
     : undefined;
   return {
-    title: t.op === 'add' ? `Cluster ${t.name} added to AI Grid` : `Changes to cluster ${t.name} saved`,
+    title: t.op === 'add' ? `Cluster ${t.name} added to AI grid` : `Changes to cluster ${t.name} saved`,
     ...(message ? { message } : {}),
     actions: [viewCluster(t)],
   };
 };
 
-/** When the watch of a cluster began, in words: "it was added to AI Grid". */
+/** When the watch of a cluster began, in words: "it was added to AI grid". */
 const clusterSince = (t: WriteTarget) =>
-  t.op === 'remove' ? 'it was removed from AI Grid' : t.op === 'add' ? 'it was added to AI Grid' : 'its role was set';
+  t.op === 'remove'
+    ? 'it was removed from the AI grid'
+    : t.op === 'add'
+      ? 'it was added to the AI grid'
+      : 'its role was set';
 
 const OUTSIDE_THE_CHECK =
   "Whether users can reach models through it depends on MaaS, which the hub's check doesn't cover.";
@@ -464,22 +483,22 @@ export const clusterProvisionedUnconfirmedText = (t: WriteTarget): Text => ({
   actions: [viewCluster(t)],
 });
 
-/** A removed cluster that the hub no longer includes in AI Grid. */
+/** A removed cluster that the hub no longer includes in AI grid. */
 export const clusterLeftText = (t: WriteTarget): Text => ({
-  title: `Cluster ${t.name} left AI Grid`,
+  title: `Cluster ${t.name} left AI grid`,
   actions: [viewCluster(t)],
 });
 
 /** A removed cluster that the hub still includes after CLUSTER_MINUTES: a warning. */
 export const clusterNotLeftText = (t: WriteTarget): Text => ({
-  title: `Cluster ${t.name} hasn't left AI Grid yet`,
-  message: `The hub still includes it in AI Grid ${CLUSTER_MINUTES} minutes after it was removed. Open the cluster to check its status.`,
+  title: `Cluster ${t.name} hasn't left AI grid yet`,
+  message: `The hub still includes it in the AI grid ${CLUSTER_MINUTES} minutes after it was removed. Open the cluster to check its status.`,
   actions: [viewCluster(t)],
 });
 
 /** A removed cluster's watch reached CLUSTER_MINUTES with its last read failed. */
 export const clusterLeftUnconfirmedText = (t: WriteTarget): Text => ({
-  title: `Unable to confirm cluster ${t.name} left AI Grid`,
+  title: `Unable to confirm cluster ${t.name} left AI grid`,
   message: clusterUnreadStatus(t),
   actions: [viewCluster(t)],
 });
