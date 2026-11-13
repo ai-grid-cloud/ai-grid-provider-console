@@ -423,6 +423,40 @@ describe('subscriptions', () => {
     );
   });
 
+  it('sends the same request_token for each submit from one form, so a first send that landed is not created twice', async () => {
+    const service = new MockConsoleService();
+    const subscriptions = seedSubscriptionsOf(service);
+    // The first submit's answer, within the form's wait, is Unavailable: the form shows it.
+    subscriptions.before.create = () => {
+      delete subscriptions.before.create;
+      throw new ConnectError('The AI grid backend is unavailable.', Code.Unavailable);
+    };
+    const { formWait } = formWaits();
+    const user = userEvent.setup();
+    renderConsole('/subscriptions/create', service, formWait);
+    await user.click(await screen.findByRole('combobox', { name: 'Organization' }));
+    await user.click(screen.getByRole('option', { name: 'acme-robotics' }));
+    await user.click(screen.getByTestId('subscription-name-desc-name'));
+    await user.paste('Test team');
+    await user.click(screen.getByRole('combobox', { name: 'Groups' }));
+    await user.paste('engineering');
+    const option = await screen.findByRole('option', { name: 'Add group "engineering"' });
+    await user.click(option.querySelector('button') ?? option);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByTestId('add-models-button'));
+    await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
+    await user.click(screen.getByTestId('confirm-add-models'));
+    await user.click(screen.getByTestId('add-token-limit-0'));
+    await user.click(screen.getByTestId('save-rate-limits'));
+    await user.click(screen.getByTestId('create-subscription-button'));
+    expect(await screen.findByText(/backend is unavailable/)).toBeVisible();
+    await user.click(screen.getByTestId('create-subscription-button'));
+    expect(await toast('Subscription Test team saved to Git')).toBeVisible();
+    const tokens = subscriptions.sent('create').map((r) => r.requestToken);
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0]).toBe(tokens[1]);
+  });
+
   it("says a retried create's token went with something else when the backend answers AlreadyExists", async () => {
     const service = new MockConsoleService();
     const subscriptions = seedSubscriptionsOf(service);

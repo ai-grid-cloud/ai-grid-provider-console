@@ -154,6 +154,10 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
   const statusModel = availableModels.find((model) => model.id === statusModelId);
   const { data: organizations, known: organizationsKnown, error: organizationsError } = useOrganizations();
   const { createSubscription, updateSubscription } = useSubscriptionWrites();
+  // One Subscriptions/Create request_token for every submit from this form: a submit whose answer
+  // the form couldn't tell (Unavailable) may have created the subscription, and submitting again
+  // with the same token returns it instead of creating a second.
+  const requestToken = useRef(crypto.randomUUID()).current;
   const isEditing = !!subscriptionInfo?.object;
   const subscription = subscriptionInfo?.object;
   // What the fields start from: the subscription being edited, or a refused create's draft.
@@ -347,6 +351,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
           shownName,
           toJson(SubscriptionSchema, create(SubscriptionSchema, object)),
           organization && tenantNameOf(organization),
+          requestToken,
         );
       }
       // A created subscription replaces its create form in history, so Back doesn't land on it, empty.

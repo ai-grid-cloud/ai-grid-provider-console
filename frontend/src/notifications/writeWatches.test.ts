@@ -221,15 +221,44 @@ describe('retryCreate', () => {
     expect(landed).toBeUndefined();
   });
 
-  it("warns when the token went with another payload, and reports any other refusal as the create's", async () => {
+  it('warns when the token went with another payload', async () => {
     const taken = new ConnectError('different payload', Code.AlreadyExists);
     expect((await retryCreate(target, SENT, answers(taken), before)).response.status).toBe(
       NotificationResponseStatus.WARNING,
     );
-    const refused = new ConnectError('bad group', Code.InvalidArgument);
-    const { response } = await retryCreate(target, SENT, answers(refused), before);
+  });
+
+  it.each([Code.InvalidArgument, Code.FailedPrecondition])("reports %s as the create's own refusal", async (code) => {
+    const { response } = await retryCreate(target, SENT, answers(new ConnectError('bad group', code)), before);
     expect(response.status).toBe(NotificationResponseStatus.ERROR);
     expect(JSON.stringify(response)).toContain('bad group');
+  });
+
+  it.each([
+    ['Unauthenticated', new ConnectError('signed out', Code.Unauthenticated)],
+    ['PermissionDenied', new ConnectError('denied', Code.PermissionDenied)],
+    ['Internal', new ConnectError('git push failed', Code.Internal)],
+    ['a plain Error', new Error('bad JSON')],
+  ])('keeps the outcome unknown after %s: retries, then says it is unknown', async (_, err) => {
+    expect((await retryCreate(target, SENT, answers(err), before)).response.status).toBe(
+      NotificationResponseStatus.REPOLL,
+    );
+    const { response } = await retryCreate(target, SENT, answers(err), after);
+    expect(response).toMatchObject({
+      status: NotificationResponseStatus.WARNING,
+      title: 'Unable to confirm subscription Test team',
+    });
+  });
+
+  it('never sends again once the deadline has passed (a record resumed later)', async () => {
+    const resend = vi.fn(answers('test-team-x7k2pq'));
+    const { response, landed } = await retryCreate(target, SENT, resend, after);
+    expect(resend).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      status: NotificationResponseStatus.WARNING,
+      title: 'Unable to confirm subscription Test team',
+    });
+    expect(landed).toBeUndefined();
   });
 });
 

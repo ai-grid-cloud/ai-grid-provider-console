@@ -271,8 +271,9 @@ export type ResendCreate = (request: string) => Promise<string | undefined>;
  * A subscription create whose answer was lost, sent again with the same request_token until
  * `sentAt` plus READBACK_MS: the backend answers with the subscription the first send created, or
  * creates it now, so the answer names it either way (`landed`). AlreadyExists means the token went
- * with another payload, someone else's as far as anyone can tell; another refusal is the create's
- * own. When every send's outcome stayed unknown, so does the create's.
+ * with another payload, someone else's as far as anyone can tell; InvalidArgument and
+ * FailedPrecondition are the create's own refusal. Any other failure leaves the outcome unknown, and
+ * so does the deadline, after which it never sends again.
  */
 export const retryCreate = async (
   target: WriteTarget & { resend: string },
@@ -280,13 +281,19 @@ export const retryCreate = async (
   resend: ResendCreate,
   now: () => number,
 ): Promise<{ response: NotificationWatcherResponse; landed?: WriteTarget }> => {
+  // Past the deadline (a record resumed later), sending again could create a subscription deleted
+  // meanwhile: the backend forgets a token with its subscription.
+  if (now() >= sentAt + READBACK_MS) return { response: warning(unknownCreatedNameText(target)) };
   try {
     const id = await resend(target.resend);
     const landed = id && id !== target.id ? { ...target, id } : target;
     return { response: success(succeededText(landed)), landed };
   } catch (err) {
-    if (!isUnknownOutcome(err)) {
-      if (ConnectError.from(err).code === Code.AlreadyExists) return { response: warning(mismatchText(target)) };
+    const code = ConnectError.from(err).code;
+    if (code === Code.AlreadyExists) return { response: warning(mismatchText(target)) };
+    // Refusals of the request itself, which the first send got too. Anything else (sign-in, access,
+    // a backend or Git failure) says nothing about whether the first send landed: still unknown.
+    if (!isUnknownOutcome(err) && (code === Code.InvalidArgument || code === Code.FailedPrecondition)) {
       return { response: error(failedText(target, describeError(err).message)) };
     }
   }

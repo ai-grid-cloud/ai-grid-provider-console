@@ -116,9 +116,11 @@ export const useSubscriptionWrites = () => {
         name: string,
         draft?: unknown,
         organization?: string,
+        requestToken: string = crypto.randomUUID(),
       ) => {
-        // One token per create, sent again only by a retry of this create whose answer was lost.
-        const sent = createMessage(SubscriptionsCreateRequestSchema, { ...request, requestToken: crypto.randomUUID() });
+        // One token per create: the form passes the same one for each submit (a first send whose
+        // outcome the form couldn't tell may have landed), and a retry of a lost answer resends it.
+        const sent = createMessage(SubscriptionsCreateRequestSchema, { ...request, requestToken });
         return submitWrite(
           {
             subject: 'subscription',
