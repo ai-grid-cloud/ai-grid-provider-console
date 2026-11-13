@@ -1,3 +1,4 @@
+import { Code, ConnectError } from '@connectrpc/connect';
 import type { ModelClusterView, ModelView } from '../pages/models/modelView';
 import { NotificationResponseStatus } from './useNotificationWatcher';
 import {
@@ -8,6 +9,7 @@ import {
   READY_MS,
   nextHistory,
   readBack,
+  retryCreate,
   statusOf,
   watchActive,
   watchChanges,
@@ -184,6 +186,84 @@ describe('readBack', () => {
       title: 'Unable to confirm model Widget',
       actions: [{ title: 'Go to Models', to: '/models' }],
     });
+  });
+});
+
+describe('retryCreate', () => {
+  const target = {
+    subject: 'subscription',
+    op: 'create',
+    id: 'test-team',
+    name: 'Test team',
+    resend: '{"requestToken":"t"}',
+  } as const;
+  const answers = (answer: string | Error) => async () => {
+    if (answer instanceof Error) throw answer;
+    return answer;
+  };
+
+  it('confirms the create under the id the retry answers with', async () => {
+    const resend = vi.fn(answers('test-team-x7k2pq'));
+    const { response, landed } = await retryCreate(target, SENT, resend, before);
+    expect(resend).toHaveBeenCalledWith('{"requestToken":"t"}');
+    expect(response.status).toBe(NotificationResponseStatus.SUCCESS);
+    expect(landed?.id).toBe('test-team-x7k2pq');
+  });
+
+  it('retries while the outcome stays unknown, then says it is unknown', async () => {
+    const lost = new ConnectError('lost', Code.Unavailable);
+    expect((await retryCreate(target, SENT, answers(lost), before)).response.status).toBe(
+      NotificationResponseStatus.REPOLL,
+    );
+    const { response, landed } = await retryCreate(target, SENT, answers(lost), after);
+    expect(response.status).toBe(NotificationResponseStatus.WARNING);
+    expect(response).toMatchObject({ title: 'Unable to confirm subscription Test team' });
+    expect(landed).toBeUndefined();
+  });
+
+  it("warns when the token went with another payload, with the backend's message and the list, not the requested id", async () => {
+    const taken = new ConnectError(
+      'request_token already created Subscription "test-team-x7k2pq" with a different payload',
+      Code.AlreadyExists,
+    );
+    const { response } = await retryCreate(target, SENT, answers(taken), before);
+    expect(response.status).toBe(NotificationResponseStatus.WARNING);
+    expect(JSON.stringify(response)).toContain('test-team-x7k2pq');
+    expect(JSON.stringify(response)).not.toContain('/subscriptions/view/test-team"');
+    expect(response).toMatchObject({ actions: [{ to: '/subscriptions' }] });
+  });
+
+  it.each([Code.InvalidArgument, Code.FailedPrecondition])("reports %s as the create's own refusal", async (code) => {
+    const { response } = await retryCreate(target, SENT, answers(new ConnectError('bad group', code)), before);
+    expect(response.status).toBe(NotificationResponseStatus.ERROR);
+    expect(JSON.stringify(response)).toContain('bad group');
+  });
+
+  it.each([
+    ['Unauthenticated', new ConnectError('signed out', Code.Unauthenticated)],
+    ['PermissionDenied', new ConnectError('denied', Code.PermissionDenied)],
+    ['Internal', new ConnectError('git push failed', Code.Internal)],
+    ['a plain Error', new Error('bad JSON')],
+  ])('keeps the outcome unknown after %s: retries, then says it is unknown', async (_, err) => {
+    expect((await retryCreate(target, SENT, answers(err), before)).response.status).toBe(
+      NotificationResponseStatus.REPOLL,
+    );
+    const { response } = await retryCreate(target, SENT, answers(err), after);
+    expect(response).toMatchObject({
+      status: NotificationResponseStatus.WARNING,
+      title: 'Unable to confirm subscription Test team',
+    });
+  });
+
+  it('never sends again once the deadline has passed (a record resumed later)', async () => {
+    const resend = vi.fn(answers('test-team-x7k2pq'));
+    const { response, landed } = await retryCreate(target, SENT, resend, after);
+    expect(resend).not.toHaveBeenCalled();
+    expect(response).toMatchObject({
+      status: NotificationResponseStatus.WARNING,
+      title: 'Unable to confirm subscription Test team',
+    });
+    expect(landed).toBeUndefined();
   });
 });
 

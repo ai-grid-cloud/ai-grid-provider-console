@@ -5,7 +5,8 @@
 // The console adds the Organization field: required on create, kept on edit. Telemetry is dropped.
 // It writes Subscriptions/Create and Update over Connect.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Code, ConnectError } from '@connectrpc/connect';
 import {
   ActionGroup,
   Alert,
@@ -43,7 +44,7 @@ import {
 import type { SubscriptionsGetResponse } from '../../../gen/ai_grid/v1/subscriptions_service_pb';
 import { useConfirmDiscard } from '../../../hooks/useConfirmDiscard';
 import { formatLocaleNumber } from '../../../utilities/format';
-import { getSectionUrl } from '../../../utilities/maasGovernanceNavigation';
+import { getSectionUrl, getSubscriptionViewUrl } from '../../../utilities/maasGovernanceNavigation';
 import { fieldErrorsOf } from '../../../validation';
 import type { SubscriptionModelEntry } from '../hooks/useSubscriptionModels';
 import { entryKey, entryModelId, useSubscriptionModels } from '../hooks/useSubscriptionModels';
@@ -154,6 +155,10 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
   const statusModel = availableModels.find((model) => model.id === statusModelId);
   const { data: organizations, known: organizationsKnown, error: organizationsError } = useOrganizations();
   const { createSubscription, updateSubscription } = useSubscriptionWrites();
+  // One Subscriptions/Create request_token for every submit from this form: a submit whose answer
+  // the form couldn't tell (Unavailable) may have created the subscription, and submitting again
+  // with the same token returns it instead of creating a second.
+  const requestToken = useRef(crypto.randomUUID()).current;
   const isEditing = !!subscriptionInfo?.object;
   const subscription = subscriptionInfo?.object;
   // What the fields start from: the subscription being edited, or a refused create's draft.
@@ -186,6 +191,10 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
   const [priority, setPriority] = useState<number | undefined>(initial?.spec?.priority ?? 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(draft?.error ?? null);
+  // The subscription an earlier submit from this form created, when a later submit with the same
+  // request_token but other values gets AlreadyExists (backend PR 89): named and linked in plain
+  // words instead of the backend's message.
+  const [createdEarlier, setCreatedEarlier] = useState<string | null>(null);
 
   const [initialModels] = useState<SubscriptionModelEntry[]>(() =>
     initial ? buildInitialModels(initial, availableModels, !!subscription) : [],
@@ -347,6 +356,7 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
           shownName,
           toJson(SubscriptionSchema, create(SubscriptionSchema, object)),
           organization && tenantNameOf(organization),
+          requestToken,
         );
       }
       // A created subscription replaces its create form in history, so Back doesn't land on it, empty.
@@ -354,6 +364,11 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
       navigate(returnTo ?? getSectionUrl('subscriptions'), { replace: !isEditing });
     } catch (e) {
       const error = describeError(e);
+      const taken =
+        !isEditing && e instanceof ConnectError && e.code === Code.AlreadyExists
+          ? /request_token already created Subscription "([^"]+)"/.exec(e.rawMessage)?.[1]
+          : undefined;
+      setCreatedEarlier(taken ?? null);
       setSubmitError(
         error.kind === 'notAvailable'
           ? `${isEditing ? 'Saving' : 'Creating'} subscriptions is not available on this AI grid backend.`
@@ -607,7 +622,15 @@ export const CreateSubscriptionForm: React.FC<Props> = ({
 
         {submitError && (
           <Alert variant="danger" isInline title={`Unable to ${isEditing ? 'update' : 'create'} subscription`}>
-            {submitError}
+            {createdEarlier ? (
+              <>
+                An earlier submit from this form already created subscription{' '}
+                <Link to={getSubscriptionViewUrl(createdEarlier)}>{createdEarlier}</Link>. Open it, or start a new
+                create.
+              </>
+            ) : (
+              submitError
+            )}
           </Alert>
         )}
 

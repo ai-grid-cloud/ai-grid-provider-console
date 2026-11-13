@@ -3,7 +3,7 @@
 // .backend-api-version (internal/servers/subscriptions_server.go and subscriptions_git.go): Active,
 // Pending or no phase; a managed <id>-policy; a model ref joined to its model by model_id; versions
 // from 1, Aborted on a stale one; refs to a model that doesn't exist refused.
-import { clone, create } from '@bufbuild/protobuf';
+import { clone, create, toJsonString } from '@bufbuild/protobuf';
 import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 import { Code, ConnectError } from '@connectrpc/connect';
 import type { FakeBackend } from '../api/connect/testing';
@@ -179,6 +179,11 @@ export class FakeSubscriptions {
    * ("-" and six characters; backend PR 89); none answers the requested id, as today's backend does.
    */
   idSuffix = '';
+  /**
+   * The id each request_token created, as the backend keeps a hash of it (backend PR 89): a retried
+   * Create with the same token answers that subscription instead of creating another.
+   */
+  tokens = new Map<string, { id: string; payload: string }>();
 
   constructor(private readonly fleet: FakeModels) {}
 
@@ -291,6 +296,21 @@ export class FakeSubscriptions {
         const models = await this.enter('create', request);
         const { object } = request;
         if (!object) throw new ConnectError('object is required', Code.InvalidArgument);
+        const payload = toJsonString(SubscriptionSchema, object);
+        const earlier = request.requestToken ? this.tokens.get(request.requestToken) : undefined;
+        if (earlier) {
+          // The backend's answer for a token sent with another payload
+          // (internal/servers/subscriptions_git.go).
+          if (earlier.payload !== payload) {
+            throw new ConnectError(
+              `request_token already created Subscription "${earlier.id}" with a different payload`,
+              Code.AlreadyExists,
+            );
+          }
+          const created = this.find(earlier.id);
+          const policy = this.policies.find((p) => p.id === `${earlier.id}-policy`);
+          return { object: this.joined(created, models), authPolicy: policy };
+        }
         if (this.subscriptions.some((s) => s.id === object.id)) {
           throw new ConnectError(`Subscription "${object.id}" already exists`, Code.AlreadyExists);
         }
@@ -304,6 +324,7 @@ export class FakeSubscriptions {
         });
         subscription.status = undefined;
         this.subscriptions.push(subscription);
+        if (request.requestToken) this.tokens.set(request.requestToken, { id: subscription.id, payload });
         const policy = create(AuthPolicySchema, {
           id: `${subscription.id}-policy`,
           metadata: { name: `${subscription.id}-policy` },

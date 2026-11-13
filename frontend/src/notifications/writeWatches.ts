@@ -5,7 +5,10 @@
 // until the hub has provisioned it (added to AI grid, or given a role) or let it go (removed).
 // Each is one call of a NotificationWatcherCallback; the provider (BackgroundWritesProvider) polls
 // it.
+import { Code, ConnectError } from '@connectrpc/connect';
+import { describeError } from '../api/connect/errors';
 import type { ModelView } from '../pages/models/modelView';
+import { isUnknownOutcome } from './unknownOutcome';
 import { NotificationResponseStatus, type NotificationWatcherResponse } from './useNotificationWatcher';
 import { holdsSent, type WriteFields } from './writeFields';
 import {
@@ -18,6 +21,7 @@ import {
   clusterNotProvisionedText,
   clusterProvisionedText,
   clusterProvisionedUnconfirmedText,
+  failedText,
   goneText,
   mismatchText,
   modelChangesFailedText,
@@ -32,6 +36,7 @@ import {
   subscriptionNotActiveText,
   subscriptionUnconfirmedText,
   succeededText,
+  tokenTakenText,
   unconfirmedText,
   unknownCreatedNameText,
   type WriteSubject,
@@ -211,7 +216,8 @@ const warning = (text: Text) => ({ status: NotificationResponseStatus.WARNING, .
  * (backend PR 89): a read of the requested id confirms it only when it finds what was sent there
  * (a backend that keeps the id); anything else, another subscription by that name or none, says
  * nothing about whether this one was created, so it ends as unknown (unknownCreatedNameText),
- * never "not done" or someone else's.
+ * never "not done" or someone else's. A create that kept its request (WriteTarget.resend) is retried
+ * instead (retryCreate); this covers one kept before the console sent request tokens.
  */
 const namesMayChange = (target: WriteTarget) => target.subject === 'subscription' && target.op === 'create';
 
@@ -257,6 +263,45 @@ export const readBack = async (
   if (now() < sentAt + READBACK_MS) return repoll;
   if (namesMayChange(target)) return warning(unknownCreatedNameText(target));
   return readFailed ? warning(unconfirmedText(target)) : error(notConfirmedText(target));
+};
+
+/** Sends a create again (WriteTarget.resend) and resolves to the id the backend answers with. */
+export type ResendCreate = (request: string) => Promise<string | undefined>;
+
+/**
+ * A subscription create whose answer was lost, sent again with the same request_token until
+ * `sentAt` plus READBACK_MS: the backend answers with the subscription the first send created, or
+ * creates it now, so the answer names it either way (`landed`). AlreadyExists means the token went
+ * with another payload, someone else's as far as anyone can tell; InvalidArgument and
+ * FailedPrecondition are the create's own refusal. Any other failure leaves the outcome unknown, and
+ * so does the deadline, after which it never sends again.
+ */
+export const retryCreate = async (
+  target: WriteTarget & { resend: string },
+  sentAt: number,
+  resend: ResendCreate,
+  now: () => number,
+): Promise<{ response: NotificationWatcherResponse; landed?: WriteTarget }> => {
+  // Past the deadline (a record resumed later), sending again could create a subscription deleted
+  // meanwhile: the backend forgets a token with its subscription.
+  if (now() >= sentAt + READBACK_MS) return { response: warning(unknownCreatedNameText(target)) };
+  try {
+    const id = await resend(target.resend);
+    const landed = id && id !== target.id ? { ...target, id } : target;
+    return { response: success(succeededText(landed)), landed };
+  } catch (err) {
+    const code = ConnectError.from(err).code;
+    if (code === Code.AlreadyExists) {
+      return { response: warning(tokenTakenText(target, describeError(err).message)) };
+    }
+    // Refusals of the request itself, which the first send got too. Anything else (sign-in, access,
+    // a backend or Git failure) says nothing about whether the first send landed: still unknown.
+    if (!isUnknownOutcome(err) && (code === Code.InvalidArgument || code === Code.FailedPrecondition)) {
+      return { response: error(failedText(target, describeError(err).message)) };
+    }
+  }
+  if (now() < sentAt + READBACK_MS) return { response: repoll };
+  return { response: warning(unknownCreatedNameText(target)) };
 };
 
 /**

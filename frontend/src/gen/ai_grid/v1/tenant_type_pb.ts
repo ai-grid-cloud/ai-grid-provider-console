@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file ai_grid/v1/tenant_type.proto.
  */
 export const file_ai_grid_v1_tenant_type: GenFile = /*@__PURE__*/
-  fileDesc("ChxhaV9ncmlkL3YxL3RlbmFudF90eXBlLnByb3RvEgphaV9ncmlkLnYxIowBCgZUZW5hbnQSCgoCaWQYASABKAkSJgoIbWV0YWRhdGEYAiABKAsyFC5haV9ncmlkLnYxLk1ldGFkYXRhEiQKBHNwZWMYAyABKAsyFi5haV9ncmlkLnYxLlRlbmFudFNwZWMSKAoGc3RhdHVzGAQgASgLMhguYWlfZ3JpZC52MS5UZW5hbnRTdGF0dXMiVgoKVGVuYW50U3BlYxIPCgdkb21haW5zGAEgAygJEjcKEWlkZW50aXR5X3Byb3ZpZGVyGAIgASgLMhwuYWlfZ3JpZC52MS5JZGVudGl0eVByb3ZpZGVyIg4KDFRlbmFudFN0YXR1cyKAAQoQSWRlbnRpdHlQcm92aWRlchINCgV0aXRsZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIUCgdlbmFibGVkGAMgASgISACIAQESJgoGY29uZmlnGAQgASgLMhYuYWlfZ3JpZC52MS5PaWRjQ29uZmlnQgoKCF9lbmFibGVkIo0CCgpPaWRjQ29uZmlnEhEKCWNsaWVudF9pZBgBIAEoCRIhChljbGllbnRfc2VjcmV0X3NlY3JldF9uYW1lGAIgASgJEg4KBmlzc3VlchgDIAEoCRIZChFhdXRob3JpemF0aW9uX3VybBgEIAEoCRIRCgl0b2tlbl91cmwYBSABKAkSFgoOZGVmYXVsdF9zY29wZXMYBiABKAkSFQoNdXNlcl9pbmZvX3VybBgHIAEoCRIQCghqd2tzX3VybBgIIAEoCRISCgpsb2dvdXRfdXJsGAkgASgJEh8KEnZhbGlkYXRlX3NpZ25hdHVyZRgKIAEoCEgAiAEBQhUKE192YWxpZGF0ZV9zaWduYXR1cmUicwoMVGVuYW50TWVtYmVyEgoKAmlkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEg0KBWVtYWlsGAMgASgJEhIKCmZpcnN0X25hbWUYBCABKAkSEQoJbGFzdF9uYW1lGAUgASgJEg8KB2VuYWJsZWQYBiABKAhCSlpIZ2l0aHViLmNvbS9vc2FjLXByb2plY3QvYWktZ3JpZC1wcm92aWRlci1iYWNrZW5kL2dlbi9haV9ncmlkL3YxO2FpZ3JpZHYxYgZwcm90bzM", [file_ai_grid_v1_metadata_type]);
+  fileDesc("ChxhaV9ncmlkL3YxL3RlbmFudF90eXBlLnByb3RvEgphaV9ncmlkLnYxIowBCgZUZW5hbnQSCgoCaWQYASABKAkSJgoIbWV0YWRhdGEYAiABKAsyFC5haV9ncmlkLnYxLk1ldGFkYXRhEiQKBHNwZWMYAyABKAsyFi5haV9ncmlkLnYxLlRlbmFudFNwZWMSKAoGc3RhdHVzGAQgASgLMhguYWlfZ3JpZC52MS5UZW5hbnRTdGF0dXMiVgoKVGVuYW50U3BlYxIPCgdkb21haW5zGAEgAygJEjcKEWlkZW50aXR5X3Byb3ZpZGVyGAIgASgLMhwuYWlfZ3JpZC52MS5JZGVudGl0eVByb3ZpZGVyIg4KDFRlbmFudFN0YXR1cyKAAQoQSWRlbnRpdHlQcm92aWRlchINCgV0aXRsZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIUCgdlbmFibGVkGAMgASgISACIAQESJgoGY29uZmlnGAQgASgLMhYuYWlfZ3JpZC52MS5PaWRjQ29uZmlnQgoKCF9lbmFibGVkIo0CCgpPaWRjQ29uZmlnEhEKCWNsaWVudF9pZBgBIAEoCRIhChljbGllbnRfc2VjcmV0X3NlY3JldF9uYW1lGAIgASgJEg4KBmlzc3VlchgDIAEoCRIZChFhdXRob3JpemF0aW9uX3VybBgEIAEoCRIRCgl0b2tlbl91cmwYBSABKAkSFgoOZGVmYXVsdF9zY29wZXMYBiABKAkSFQoNdXNlcl9pbmZvX3VybBgHIAEoCRIQCghqd2tzX3VybBgIIAEoCRISCgpsb2dvdXRfdXJsGAkgASgJEh8KEnZhbGlkYXRlX3NpZ25hdHVyZRgKIAEoCEgAiAEBQhUKE192YWxpZGF0ZV9zaWduYXR1cmUijwEKDFRlbmFudE1lbWJlchIKCgJpZBgBIAEoCRIQCgh1c2VybmFtZRgCIAEoCRINCgVlbWFpbBgDIAEoCRISCgpmaXJzdF9uYW1lGAQgASgJEhEKCWxhc3RfbmFtZRgFIAEoCRIPCgdlbmFibGVkGAYgASgIEhoKEnByZWZlcnJlZF91c2VybmFtZRgHIAEoCUJKWkhnaXRodWIuY29tL29zYWMtcHJvamVjdC9haS1ncmlkLXByb3ZpZGVyLWJhY2tlbmQvZ2VuL2FpX2dyaWQvdjE7YWlncmlkdjFiBnByb3RvMw", [file_ai_grid_v1_metadata_type]);
 
 /**
  * A tenant groups resources and users.
@@ -65,6 +65,8 @@ export const TenantSchema: GenMessage<Tenant> = /*@__PURE__*/
 export type TenantSpec = Message<"ai_grid.v1.TenantSpec"> & {
   /**
    * Email domains associated with this tenant (DNS hostnames, lowercase).
+   * Create and an update of the domains need at least one: Keycloak finds a
+   * user's organization, and so its identity provider, by their email domain.
    *
    * @generated from field: repeated string domains = 1;
    */
@@ -266,7 +268,7 @@ export type TenantMember = Message<"ai_grid.v1.TenantMember"> & {
   id: string;
 
   /**
-   * Login username.
+   * Local Keycloak login username.
    *
    * @generated from field: string username = 2;
    */
@@ -295,6 +297,14 @@ export type TenantMember = Message<"ai_grid.v1.TenantMember"> & {
    * @generated from field: bool enabled = 6;
    */
   enabled: boolean;
+
+  /**
+   * Optional profile label from the upstream identity provider. It can repeat
+   * across members or be empty. Do not use it as a member identity.
+   *
+   * @generated from field: string preferred_username = 7;
+   */
+  preferredUsername: string;
 };
 
 /**

@@ -117,12 +117,11 @@ test('creates, views, edits and deletes a subscription', async ({ page }) => {
 });
 
 // The fake hub's catalog Argo CD Applications report subscription team-a and its policy
-// team-a-policy active on site3, the PoC's one ingress cluster, and every other subscription not
-// there yet (fixtures/poc/applications.json in the backend), so a subscription created as team-a
-// reads Active as soon as it is in Git: the notification center's watch says so on its first read.
-// A backend that adds a suffix to the name (backend PR 89) answers team-a-<suffix>, which these
-// fixtures don't report; the watch follows the answered id, so this test needs fixtures that report
-// that name before the console moves to such a backend.
+// team-a-policy active on site3, the PoC's one ingress cluster (fixtures/poc/applications.json in
+// the backend), and, reading the catalog, every subscription the backend named team-a-<suffix> and
+// its policy the same way (backend PR 89 makes every created name such a one). So a subscription
+// created as team-a reads Active as soon as it is in Git: the notification center's watch, which
+// follows the answered id, says so on its first read.
 const ACTIVE_ID = 'team-a';
 
 test('says a created subscription is active once the ingress clusters report it', async ({ page }) => {
