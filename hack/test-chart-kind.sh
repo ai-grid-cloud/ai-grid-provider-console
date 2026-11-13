@@ -44,7 +44,7 @@ PORT="${LOCAL_PORT:-18443}"
 # 2026-10-28 from opendatahub-io/kube-auth-proxy 099df59, on ubi9/ubi-minimal release 1793050346,
 # whose ca-certificates distrusts eMudhra, CVE-2026-114406). busybox runs netstat for step 2.
 BACKEND_PIN="$(cat "${ROOT}/.backend-api-version")"
-BACKEND_IMAGE="${BACKEND_IMAGE:-ghcr.io/ai-grid-cloud/ai-grid-provider-backend:sha-cd03b7fab706e4e4836eac98f9dd0935ab85e734@sha256:17c591fc78c9acdd2fd99756c3c8f7ee3c9ee8b76958787681df8856ae509763}"
+BACKEND_IMAGE="${BACKEND_IMAGE:-ghcr.io/ai-grid-cloud/ai-grid-provider-backend:sha-9ce96302501c471e92b159a0a8d81db2d5d549dc@sha256:e4db2b78785c43f8c5a5d5bfd353b853d75c213e881042d7e7171c55e75bab50}"
 PROXY_IMAGE="${PROXY_IMAGE:-quay.io/opendatahub/odh-kube-auth-proxy@sha256:5dc37f1a1e30927abe2dffbbfcb5a31ed8692cf498fb2684cca1b747b98b00a0}"
 # The linux/amd64 manifest of busybox:1.36, not the multi-platform index (73aaf090...). With Docker's
 # containerd image store (the default on Docker 29, ubuntu-26.04 runners) an index pulled for one

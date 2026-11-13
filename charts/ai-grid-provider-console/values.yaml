@@ -24,8 +24,8 @@ images:
   # `.backend-api-version`; don't edit by hand.
   backend:
     repository: ghcr.io/ai-grid-cloud/ai-grid-provider-backend
-    tag: sha-cd03b7fab706e4e4836eac98f9dd0935ab85e734
-    digest: sha256:17c591fc78c9acdd2fd99756c3c8f7ee3c9ee8b76958787681df8856ae509763
+    tag: sha-9ce96302501c471e92b159a0a8d81db2d5d549dc
+    digest: sha256:e4db2b78785c43f8c5a5d5bfd353b853d75c213e881042d7e7171c55e75bab50
 imagePullPolicy: ""  # empty: the cluster default
 imagePullSecrets: []
 
