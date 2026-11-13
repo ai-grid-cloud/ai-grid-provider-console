@@ -507,59 +507,86 @@ it('says when the hub has no such cluster', async () => {
   expect(screen.getByRole('link', { name: 'Go to Clusters' })).toHaveAttribute('href', '/clusters');
 });
 
-it('says where the map puts the cluster, from its cloud region, with how to set it', async () => {
-  const transport = fakeClients({
+const clusterAt = (id: string, location: Record<string, unknown>) =>
+  fakeClients({
     clusters: {
       get: async () => ({
-        object: create(ManagedClusterSchema, {
-          id: 'in-region',
-          metadata: { name: 'in-region' },
-          status: {
-            location: {
-              latitude: 40.42,
-              longitude: -82.91,
-              source: ManagedClusterLocationSource.CLOUD_REGION,
-              region: 'us-east-2',
-            },
-          },
-        }),
+        object: create(ManagedClusterSchema, { id, metadata: { name: id }, status: { location } }),
       }),
     },
   }).transport;
-  renderAt('/clusters/in-region', new MockConsoleService(), transport);
+
+const POSITION_HELP = { name: "More about a cluster's map position" };
+
+it('shows only the coordinates from the annotations, with the annotations in the help', async () => {
+  const user = userEvent.setup();
+  const transport = clusterAt('annotated', {
+    latitude: 39.96,
+    longitude: -83,
+    source: ManagedClusterLocationSource.ANNOTATIONS,
+  });
+  renderAt('/clusters/annotated', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
-  expect(position).toHaveTextContent('40.42, -82.91 from the cloud region');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toHaveAttribute(
-    'href',
-    'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
-  );
-  // The cloud region is the Region, not a site.
-  expect(screen.queryByTestId('cluster-site')).not.toBeInTheDocument();
-  expect(screen.getByText('us-east-2')).toBeVisible();
+  expect(position).toHaveTextContent(/^39\.96, -83\s*$/);
+  await user.click(within(position).getByRole('button', POSITION_HELP));
+  expect(await screen.findByText('ai-grid/latitude: 39.96')).toBeVisible();
+  expect(screen.getByText('ai-grid/longitude: -83')).toBeVisible();
 });
 
-it('says what to fix when the coordinate annotations are wrong', async () => {
-  const transport = fakeClients({
-    clusters: {
-      get: async () => ({
-        object: create(ManagedClusterSchema, {
-          id: 'wrong',
-          metadata: { name: 'wrong' },
-          status: {
-            location: {
-              source: ManagedClusterLocationSource.NONE,
-              problem: 'ai-grid/latitude "39,96" is not a decimal number of degrees',
-              region: 'us-east-2',
-            },
-          },
-        }),
-      }),
-    },
-  }).transport;
-  renderAt('/clusters/wrong', new MockConsoleService(), transport);
-  expect(await screen.findByTestId('cluster-map-position')).toHaveTextContent(
-    'Not on the map: ai-grid/latitude "39,96" is not a decimal number of degrees',
+it('shows only the coordinates from the cloud region, with the region in the help', async () => {
+  const user = userEvent.setup();
+  const transport = clusterAt('in-region', {
+    latitude: 40.42,
+    longitude: -82.91,
+    source: ManagedClusterLocationSource.CLOUD_REGION,
+    region: 'us-east-2',
+  });
+  renderAt('/clusters/in-region', new MockConsoleService(), transport);
+  const position = await screen.findByTestId('cluster-map-position');
+  expect(position).toHaveTextContent(/^40\.42, -82\.91\s*$/);
+  await user.click(within(position).getByRole('button', POSITION_HELP));
+  expect(await screen.findByText('region (us-east-2) latitude: 40.42')).toBeVisible();
+  expect(screen.getByText('region (us-east-2) longitude: -82.91')).toBeVisible();
+  // The cloud region is the Region, not a site.
+  expect(screen.queryByTestId('cluster-site')).not.toBeInTheDocument();
+});
+
+it('shows no position when not set, with how to set one in the help', async () => {
+  const user = userEvent.setup();
+  renderAt(
+    '/clusters/unplaced',
+    new MockConsoleService(),
+    clusterAt('unplaced', { source: ManagedClusterLocationSource.NONE }),
   );
+  const position = await screen.findByTestId('cluster-map-position');
+  expect(position).toHaveTextContent(/^—\s*$/);
+  await user.click(within(position).getByRole('button', POSITION_HELP));
+  const help = await screen.findByText(/^Not set\./);
+  expect(help).toHaveTextContent(
+    'Not set. Add the ai-grid/latitude and ai-grid/longitude annotations, or use a cluster whose cloud region the map knows.',
+  );
+});
+
+it('shows no position when the annotations are unusable, with the expected format in the help', async () => {
+  const user = userEvent.setup();
+  renderAt(
+    '/clusters/unplaced',
+    new MockConsoleService(),
+    clusterAt('unplaced', {
+      source: ManagedClusterLocationSource.NONE,
+      problem: 'ai-grid/latitude "39,96" is not a decimal number of degrees',
+      region: 'us-east-2',
+    }),
+  );
+  const position = await screen.findByTestId('cluster-map-position');
+  expect(position).toHaveTextContent(/^—\s*$/);
+  await user.click(within(position).getByRole('button', POSITION_HELP));
+  const help = await screen.findByRole('dialog');
+  expect(help).toHaveTextContent(
+    'Invalid ai-grid/latitude and ai-grid/longitude annotations. Use decimal degrees, such as 40.7128 and -74.006.',
+  );
+  expect(help).not.toHaveTextContent('39,96');
+  expect(screen.queryByText(/^Not set\./)).not.toBeInTheDocument();
 });
 
 it("says in the status tooltip what the hub reports about the cluster's connection", async () => {
