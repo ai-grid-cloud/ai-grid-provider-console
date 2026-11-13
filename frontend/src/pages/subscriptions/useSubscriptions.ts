@@ -4,7 +4,7 @@
 // (useClusters.ts); writes are sent from the app root (useBackgroundWrites), which refetches every
 // Subscriptions query once they land.
 import { useMemo } from 'react';
-import type { MessageInitShape } from '@bufbuild/protobuf';
+import { create as createMessage, toJsonString, type MessageInitShape } from '@bufbuild/protobuf';
 import { callUnaryMethod, useQuery, useTransport } from '@connectrpc/connect-query';
 import { skipToken } from '@tanstack/react-query';
 import { useBackgroundWrites } from '../../notifications/useBackgroundWrites';
@@ -13,7 +13,7 @@ import type { ModelsListResponse } from '../../gen/ai_grid/v1/models_service_pb'
 import { list as listModels } from '../../gen/ai_grid/v1/models_service-Models_connectquery';
 import type { Subscription } from '../../gen/ai_grid/v1/subscription_type_pb';
 import {
-  type SubscriptionsCreateRequestSchema,
+  SubscriptionsCreateRequestSchema,
   type SubscriptionsGetResponse,
   type SubscriptionsListResponse,
   type SubscriptionsUpdateRequestSchema,
@@ -116,8 +116,10 @@ export const useSubscriptionWrites = () => {
         name: string,
         draft?: unknown,
         organization?: string,
-      ) =>
-        submitWrite(
+      ) => {
+        // One token per create, sent again only by a retry of this create whose answer was lost.
+        const sent = createMessage(SubscriptionsCreateRequestSchema, { ...request, requestToken: crypto.randomUUID() });
+        return submitWrite(
           {
             subject: 'subscription',
             op: 'create',
@@ -127,11 +129,13 @@ export const useSubscriptionWrites = () => {
             expected: sentSubscriptionFields(request.object),
             ...(organization ? { organization } : {}),
             draft,
+            resend: toJsonString(SubscriptionsCreateRequestSchema, sent),
           },
-          () => callUnaryMethod(transport, create, request),
-          // The backend may add a suffix to the requested id: its answer names the subscription.
+          () => callUnaryMethod(transport, create, sent),
+          // The backend adds a suffix to the requested id: its answer names the subscription.
           (response) => response.object?.id,
-        ),
+        );
+      },
       updateSubscription: (request: MessageInitShape<typeof SubscriptionsUpdateRequestSchema>, name: string) =>
         submitWrite(
           {

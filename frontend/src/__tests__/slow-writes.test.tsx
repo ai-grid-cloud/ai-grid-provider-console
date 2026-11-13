@@ -375,6 +375,69 @@ describe('subscriptions', () => {
     expect(await screen.findByRole('link', { name: 'Test team' })).toBeVisible();
   });
 
+  /** Fills the create form for Test team and submits it. */
+  const createTestTeam = async (service: MockConsoleService) => {
+    const user = userEvent.setup();
+    renderConsole('/subscriptions/create', service, waitOver);
+    await user.click(await screen.findByRole('combobox', { name: 'Organization' }));
+    await user.click(screen.getByRole('option', { name: 'acme-robotics' }));
+    await user.click(screen.getByTestId('subscription-name-desc-name'));
+    await user.paste('Test team');
+    await user.click(screen.getByRole('combobox', { name: 'Groups' }));
+    await user.paste('engineering');
+    const option = await screen.findByRole('option', { name: 'Add group "engineering"' });
+    await user.click(option.querySelector('button') ?? option);
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByTestId('add-models-button'));
+    await user.click(screen.getByTestId('toggle-model-granite-3-8b'));
+    await user.click(screen.getByTestId('confirm-add-models'));
+    await user.click(screen.getByTestId('add-token-limit-0'));
+    await user.click(screen.getByTestId('save-rate-limits'));
+    await user.click(screen.getByTestId('create-subscription-button'));
+  };
+
+  it('retries a create whose answer was lost with its request_token, and follows the subscription it created', async () => {
+    const service = new MockConsoleService();
+    const subscriptions = seedSubscriptionsOf(service);
+    subscriptions.idSuffix = '-x7k2pq';
+    // The backend creates it; the answer never reaches the browser.
+    subscriptions.before.create = async (request) => {
+      delete subscriptions.before.create;
+      await subscriptions
+        .backend()
+        .create(request as Parameters<ReturnType<typeof subscriptions.backend>['create']>[0], {} as never);
+      throw lostAnswer();
+    };
+    await createTestTeam(service);
+    expect(await toast('Subscription Test team saved to Git')).toBeVisible();
+    expect(screen.queryByText(/Unable to confirm/)).not.toBeInTheDocument();
+    const sent = subscriptions.sent('create');
+    // The first send, its retry, and the create the first one made: one token for all.
+    const tokens = new Set(sent.map((r) => r.requestToken));
+    expect(tokens.size).toBe(1);
+    expect([...tokens][0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(subscriptions.subscriptions.filter((s) => s.id.startsWith('test-team'))).toHaveLength(1);
+    expect(await screen.findByRole('link', { name: 'Test team' })).toHaveAttribute(
+      'href',
+      '/subscriptions/view/test-team-x7k2pq',
+    );
+  });
+
+  it("says a retried create's token went with something else when the backend answers AlreadyExists", async () => {
+    const service = new MockConsoleService();
+    const subscriptions = seedSubscriptionsOf(service);
+    subscriptions.before.create = () => {
+      subscriptions.before.create = () => {
+        throw new ConnectError('request_token was used for a different payload', Code.AlreadyExists);
+      };
+      throw lostAnswer();
+    };
+    await createTestTeam(service);
+    const alert = (await toast('Unable to confirm subscription Test team')).closest('.pf-v6-c-alert') as HTMLElement;
+    expect(alert).toHaveClass('pf-m-warning');
+    expect(screen.queryByText('Subscription Test team saved to Git')).not.toBeInTheDocument();
+  });
+
   it('reopens the create form with what was submitted when the backend refuses it after the wait', async () => {
     const service = new MockConsoleService();
     const subscriptions = seedSubscriptionsOf(service);

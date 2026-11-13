@@ -1,3 +1,4 @@
+import { Code, ConnectError } from '@connectrpc/connect';
 import type { ModelClusterView, ModelView } from '../pages/models/modelView';
 import { NotificationResponseStatus } from './useNotificationWatcher';
 import {
@@ -8,6 +9,7 @@ import {
   READY_MS,
   nextHistory,
   readBack,
+  retryCreate,
   statusOf,
   watchActive,
   watchChanges,
@@ -184,6 +186,50 @@ describe('readBack', () => {
       title: 'Unable to confirm model Widget',
       actions: [{ title: 'Go to Models', to: '/models' }],
     });
+  });
+});
+
+describe('retryCreate', () => {
+  const target = {
+    subject: 'subscription',
+    op: 'create',
+    id: 'test-team',
+    name: 'Test team',
+    resend: '{"requestToken":"t"}',
+  } as const;
+  const answers = (answer: string | Error) => async () => {
+    if (answer instanceof Error) throw answer;
+    return answer;
+  };
+
+  it('confirms the create under the id the retry answers with', async () => {
+    const resend = vi.fn(answers('test-team-x7k2pq'));
+    const { response, landed } = await retryCreate(target, SENT, resend, before);
+    expect(resend).toHaveBeenCalledWith('{"requestToken":"t"}');
+    expect(response.status).toBe(NotificationResponseStatus.SUCCESS);
+    expect(landed?.id).toBe('test-team-x7k2pq');
+  });
+
+  it('retries while the outcome stays unknown, then says it is unknown', async () => {
+    const lost = new ConnectError('lost', Code.Unavailable);
+    expect((await retryCreate(target, SENT, answers(lost), before)).response.status).toBe(
+      NotificationResponseStatus.REPOLL,
+    );
+    const { response, landed } = await retryCreate(target, SENT, answers(lost), after);
+    expect(response.status).toBe(NotificationResponseStatus.WARNING);
+    expect(response).toMatchObject({ title: 'Unable to confirm subscription Test team' });
+    expect(landed).toBeUndefined();
+  });
+
+  it("warns when the token went with another payload, and reports any other refusal as the create's", async () => {
+    const taken = new ConnectError('different payload', Code.AlreadyExists);
+    expect((await retryCreate(target, SENT, answers(taken), before)).response.status).toBe(
+      NotificationResponseStatus.WARNING,
+    );
+    const refused = new ConnectError('bad group', Code.InvalidArgument);
+    const { response } = await retryCreate(target, SENT, answers(refused), before);
+    expect(response.status).toBe(NotificationResponseStatus.ERROR);
+    expect(JSON.stringify(response)).toContain('bad group');
   });
 });
 

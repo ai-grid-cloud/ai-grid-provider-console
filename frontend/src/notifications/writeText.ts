@@ -47,6 +47,12 @@ export type WriteTarget = {
    * the location label.
    */
   role?: ClusterRole;
+  /**
+   * For a created subscription: the Subscriptions/Create request as sent, as JSON, with its
+   * request_token. A create whose answer was lost sends it again (retryCreate): the backend returns
+   * the subscription the first one created, under the name it gave it (backend PR 89).
+   */
+  resend?: string;
 };
 
 const clusterPath = (name: string) => `/clusters/${encodeURIComponent(name)}`;

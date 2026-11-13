@@ -17,7 +17,10 @@ import { Clusters } from '../gen/ai_grid/v1/clusters_service_pb';
 import { get as getCluster } from '../gen/ai_grid/v1/clusters_service-Clusters_connectquery';
 import { Models } from '../gen/ai_grid/v1/models_service_pb';
 import { get as getModel } from '../gen/ai_grid/v1/models_service-Models_connectquery';
-import { Subscriptions } from '../gen/ai_grid/v1/subscriptions_service_pb';
+import { fromJsonString } from '@bufbuild/protobuf';
+import { callUnaryMethod } from '@connectrpc/connect-query';
+import { Subscriptions, SubscriptionsCreateRequestSchema } from '../gen/ai_grid/v1/subscriptions_service_pb';
+import { create as createSubscription } from '../gen/ai_grid/v1/subscriptions_service-Subscriptions_connectquery';
 import { get as getSubscription } from '../gen/ai_grid/v1/subscriptions_service-Subscriptions_connectquery';
 import { noteUserAction } from '../pages/clusters/useClusters';
 import { toModelView } from '../pages/models/modelView';
@@ -38,6 +41,7 @@ import {
   READY_POLL_MS,
   nextHistory,
   readBack,
+  retryCreate,
   statusOf,
   watchActive,
   watchChanges,
@@ -46,6 +50,7 @@ import {
   watchSubscriptionChanges,
   type ReadAnswer,
   type ReadObject,
+  type ResendCreate,
   type StatusHistory,
   type Verdict,
 } from './writeWatches';
@@ -123,6 +128,7 @@ const targetOf = ({
   clusters,
   organization,
   role,
+  resend,
 }: WatchRecord): WriteTarget => ({
   subject,
   op,
@@ -133,6 +139,7 @@ const targetOf = ({
   ...(clusters ? { clusters } : {}),
   ...(organization ? { organization } : {}),
   ...(role ? { role } : {}),
+  ...(resend ? { resend } : {}),
 });
 
 const historyOf = (record: WatchRecord): StatusHistory => ({
@@ -158,6 +165,7 @@ const isRecord = (value: unknown): value is WatchRecord =>
   (value.notificationId === undefined || typeof value.notificationId === 'string') &&
   (value.status === undefined || typeof value.status === 'string') &&
   (value.organization === undefined || typeof value.organization === 'string') &&
+  (value.resend === undefined || typeof value.resend === 'string') &&
   (value.empties === undefined ||
     (typeof value.empties === 'number' && Number.isInteger(value.empties) && value.empties >= 0)) &&
   (value.lastVerdict === undefined ||
@@ -353,6 +361,14 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
     [queryClient, transport],
   );
 
+  // A lost create's retry with its request_token (retryCreate).
+  const resend = useCallback<ResendCreate>(
+    async (request) =>
+      (await callUnaryMethod(transport, createSubscription, fromJsonString(SubscriptionsCreateRequestSchema, request)))
+        .object?.id,
+    [transport],
+  );
+
   const { startWatch, landed } = useMemo(() => {
     /**
      * A watch registered with the watcher; a final answer drops its record, unless the console
@@ -393,6 +409,9 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
             return answer;
           };
           const before = lastStatus.current.get(key);
+          // A create retried with its request_token lands under the id the backend answers with.
+          let landedAs: WriteTarget = target;
+          const { resend: request } = target;
           const response = isCluster
             ? await watchCluster(target, since, observe, now, history)
             : stage === 'ready'
@@ -403,7 +422,12 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
                 ? isModel
                   ? await watchChanges(target, since, observe, now, before)
                   : await watchSubscriptionChanges(target, since, observe, now, history)
-                : await readBack(target, since, observe, now);
+                : request !== undefined && target.op === 'create'
+                  ? await retryCreate({ ...target, resend: request }, since, resend, now).then((r) => {
+                      if (r.landed) landedAs = r.landed;
+                      return r.response;
+                    })
+                  : await readBack(target, since, observe, now);
           if (signal.aborted) return response;
           const final = response.status !== NotificationResponseStatus.REPOLL;
           // A status watch that sees the object's status change (a model's phase or any cluster's,
@@ -477,7 +501,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
             }
             drop(key);
             if (response.status === NotificationResponseStatus.SUCCESS && !followsStatus) {
-              landedFn(target);
+              landedFn(landedAs);
             }
             return { status: NotificationResponseStatus.STOP };
           }
@@ -538,7 +562,7 @@ export const BackgroundWritesProvider: React.FC<Props> = ({
       void queryClient.invalidateQueries({ queryKey: createConnectQueryKey({ schema, cardinality: undefined }) });
     }
     return { startWatch: startWatchFn, landed: landedFn };
-  }, [keep, drop, read, now, notify, registerNotification, unregisterNotification, queryClient]);
+  }, [keep, drop, read, resend, now, notify, registerNotification, unregisterNotification, queryClient]);
 
   // Storage is read once per user: when the user is first known (a reload resumes that user's
   // watches) and when it changes (the previous user's watches stop and leave the tab). Every run,

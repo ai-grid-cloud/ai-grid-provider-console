@@ -179,6 +179,11 @@ export class FakeSubscriptions {
    * ("-" and six characters; backend PR 89); none answers the requested id, as today's backend does.
    */
   idSuffix = '';
+  /**
+   * The id each request_token created, as the backend keeps a hash of it (backend PR 89): a retried
+   * Create with the same token answers that subscription instead of creating another.
+   */
+  tokens = new Map<string, string>();
 
   constructor(private readonly fleet: FakeModels) {}
 
@@ -291,6 +296,12 @@ export class FakeSubscriptions {
         const models = await this.enter('create', request);
         const { object } = request;
         if (!object) throw new ConnectError('object is required', Code.InvalidArgument);
+        const earlier = request.requestToken && this.tokens.get(request.requestToken);
+        if (earlier) {
+          const created = this.find(earlier);
+          const policy = this.policies.find((p) => p.id === `${earlier}-policy`);
+          return { object: this.joined(created, models), authPolicy: policy };
+        }
         if (this.subscriptions.some((s) => s.id === object.id)) {
           throw new ConnectError(`Subscription "${object.id}" already exists`, Code.AlreadyExists);
         }
@@ -304,6 +315,7 @@ export class FakeSubscriptions {
         });
         subscription.status = undefined;
         this.subscriptions.push(subscription);
+        if (request.requestToken) this.tokens.set(request.requestToken, subscription.id);
         const policy = create(AuthPolicySchema, {
           id: `${subscription.id}-policy`,
           metadata: { name: `${subscription.id}-policy` },
