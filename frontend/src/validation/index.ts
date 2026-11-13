@@ -52,6 +52,9 @@ export const tenantDetailsSchema = z
             'Enter a valid domain, for example example.com.',
           ),
       )
+      // Keycloak finds a user's organization, and so its identity provider, by the domain of the
+      // email they sign in with, so an organization needs one (the backend's validateTenantDomains).
+      .min(1, 'Add at least one domain.')
       .max(64)
       .refine((domains) => new Set(domains).size === domains.length, 'Domains must be unique.'),
   })

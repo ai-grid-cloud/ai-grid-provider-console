@@ -28,7 +28,7 @@ test('creates, views, edits and deletes an organization', async ({ page }) => {
 
     // Step 1: details
     await page.getByRole('textbox', { name: /^Name/ }).fill(unique);
-    await page.getByRole('button', { name: 'Add domain' }).click();
+    // The form starts with a field for the domain an organization needs.
     await page.getByRole('textbox', { name: /^Domain 1/ }).fill(domain);
     await page.getByRole('button', { name: 'Next' }).click();
 

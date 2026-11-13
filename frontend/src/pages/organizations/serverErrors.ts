@@ -48,7 +48,8 @@ export const errorsUnder = (errors: Record<string, string>, prefix: string): Rec
 /** A new organization: no domains and an empty OIDC identity provider. */
 export const emptyOrganizationInput = (): Required<OrganizationInput> => ({
   name: '',
-  domains: [],
+  // An organization needs a domain, so the form starts with a field for one.
+  domains: [''],
   identityProvider: {
     title: '',
     description: '',

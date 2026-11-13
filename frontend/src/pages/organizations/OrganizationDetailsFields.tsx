@@ -53,20 +53,18 @@ export const OrganizationDetailsFields: React.FC<Props> = ({
   const error = (path: string) => serverErrors[path] ?? (touched.has(path) ? errors[path] : undefined);
   const setDomain = (index: number, text: string) =>
     onChange({ ...value, domains: value.domains.map((old, i) => (i === index ? text : old)) });
-  // The domain field (or "add", the Add domain button) to focus once the domains have rendered.
-  // "Add domain" moves focus to the field it adds.
-  const focusDomain = useRef<number | 'add' | undefined>(undefined);
+  // The domain field to focus once the domains have rendered. "Add domain" moves focus to the field
+  // it adds.
+  const focusDomain = useRef<number | undefined>(undefined);
   // "Remove domain" takes its button away, so focus moves to the previous domain (the next one for
-  // the first), or to "Add domain" when none is left, rather than to the page's body.
+  // the first) rather than to the page's body. The last domain can't be removed: an organization
+  // needs one.
   const removeDomain = (index: number) => {
-    focusDomain.current = value.domains.length > 1 ? Math.max(index - 1, 0) : 'add';
+    focusDomain.current = Math.max(index - 1, 0);
     onChange({ ...value, domains: value.domains.filter((_, i) => i !== index) });
   };
   useEffect(() => {
-    if (focusDomain.current === 'add') {
-      document.getElementById(ADD_DOMAIN_ID)?.focus();
-      focusDomain.current = undefined;
-    } else if (focusDomain.current !== undefined && focusDomain.current < value.domains.length) {
+    if (focusDomain.current !== undefined && focusDomain.current < value.domains.length) {
       document.getElementById(`organization-domain-${focusDomain.current}`)?.focus();
       focusDomain.current = undefined;
     }
@@ -118,7 +116,7 @@ export const OrganizationDetailsFields: React.FC<Props> = ({
                   variant="plain"
                   icon={<MinusCircleIcon />}
                   aria-label={`Remove domain ${index + 1}`}
-                  isDisabled={isDisabled}
+                  isDisabled={isDisabled || value.domains.length === 1}
                   onClick={() => removeDomain(index)}
                 />
               </InputGroupItem>

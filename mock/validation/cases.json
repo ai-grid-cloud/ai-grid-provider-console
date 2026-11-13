@@ -175,7 +175,9 @@
           }
         }
       },
-      "fieldErrors": {}
+      "fieldErrors": {
+        "domains": "Add at least one domain."
+      }
     },
     {
       "schema": "organization",

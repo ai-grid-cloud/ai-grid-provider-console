@@ -57,7 +57,8 @@ const initialValues = (initial?: OrganizationView): FormValues =>
   initial
     ? {
         name: initial.name,
-        domains: initial.domains,
+        // One created in Keycloak directly may have none: a field for the domain it needs.
+        domains: initial.domains.length ? initial.domains : [''],
         // Without one, a blank provider, which the edit can fill in to add one.
         identityProvider: initial.identityProvider ?? emptyOrganizationInput().identityProvider,
       }

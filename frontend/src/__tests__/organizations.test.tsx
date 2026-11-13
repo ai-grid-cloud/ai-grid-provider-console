@@ -15,7 +15,7 @@ import { fakeClients } from '../api/connect/testing';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { TenantSchema, type Tenant } from '../gen/ai_grid/v1/tenant_type_pb';
 import { tenantOf, toOrganizationView, type OrganizationInput } from '../pages/organizations/organizationView';
-import { ACME_ID, GLOBEX_ID, fieldViolations, tenantsOf } from './connectTenants';
+import { ACME_ID, GLOBEX_ID, INITECH_ID, fieldViolations, tenantsOf } from './connectTenants';
 import { deferred, renderAt, findVisible } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/organizations/OrganizationDetailsPage';
@@ -107,6 +107,14 @@ const fillRequiredIdp = async (user: ReturnType<typeof userEvent.setup>, values:
   }
 };
 
+/** Fills the create form's details: the name, and its one domain, which an organization needs. */
+const fillDetails = async (user: ReturnType<typeof userEvent.setup>, name: string, domain = `${name}.example.com`) => {
+  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
+  await user.paste(name);
+  await user.click(screen.getByRole('textbox', { name: 'Domain 1' }));
+  await user.paste(domain);
+};
+
 const requiredIdp: [string, string][] = [
   ['Client ID', 'client'],
   ['Client secret reference', 'secret'],
@@ -139,7 +147,8 @@ it('onboards organization details then IdP, saves only after review and orders n
   expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   await user.click(name);
   await user.paste('tenant1');
-  await user.click(screen.getByRole('button', { name: 'Add domain' }));
+  // An organization needs a domain: the form starts with a field for one, and Next waits for it.
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
   await user.click(screen.getByRole('textbox', { name: 'Domain 1' }));
   await user.paste('tenant1.example.com');
   await user.click(screen.getByRole('button', { name: 'Add domain' }));
@@ -252,8 +261,7 @@ it('keeps a refused create on the form, without a notification of its own', asyn
   addOrganization(service, input);
   const user = userEvent.setup();
   renderAt('/organizations/create', service);
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('tenant1');
+  await fillDetails(user, 'tenant1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
@@ -293,8 +301,7 @@ it('keeps onboarding input on conflicts and allows cancel without saving', async
   addOrganization(service, input);
   const user = userEvent.setup();
   renderAt('/organizations/create', service);
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('tenant1');
+  await fillDetails(user, 'tenant1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await fillRequiredIdp(user, requiredIdp);
   await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -371,8 +378,7 @@ it('create: Back keeps input, and Cancel asks before discarding it', async () =>
   const existing = snapshot(service);
   const user = userEvent.setup();
   renderAt('/organizations/create', service);
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('unsaved-tenant');
+  await fillDetails(user, 'unsaved-tenant');
   expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('textbox', { name: 'Identity provider name' }));
@@ -460,8 +466,7 @@ it('shows field errors from the server next to the field', async () => {
   };
   const user = userEvent.setup();
   renderAt('/organizations/create', service);
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('tenant1');
+  await fillDetails(user, 'tenant1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await fillRequiredIdp(user, requiredIdp);
   await user.click(screen.getByRole('button', { name: 'Next' }));
@@ -579,6 +584,25 @@ it('edit sends Tenants/Update with the domains, their mask and the version read,
   expect(update.object?.spec?.domains).toEqual(['acme.example.net', 'acme.example.org']);
   expect(update.object?.spec?.identityProvider).toBeUndefined();
   expect(update.object?.metadata?.name).toBe('');
+});
+
+it('edit: an organization without domains, as Keycloak allows, gets one before any save', async () => {
+  const service = new MockConsoleService();
+  const user = userEvent.setup();
+  renderAt(`/organizations/${INITECH_ID}/edit`, service);
+  // initech-labs has none: the form offers a field for the domain it needs, which can't be removed.
+  const domain = await screen.findByRole('textbox', { name: 'Domain 1' });
+  expect(domain).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'Remove domain 1' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  await user.click(domain);
+  await user.paste('initech.example.com');
+  await saveEdit(user);
+  expect(await screen.findByText('Changes to organization initech-labs saved')).toBeVisible();
+
+  const [update] = tenantsOf(service).sent('update');
+  expect(update.updateMask?.paths).toEqual(['spec.domains']);
+  expect(update.object?.spec?.domains).toEqual(['initech.example.com']);
 });
 
 it('edit: changes an identity provider in place, its issuer included, with its mask', async () => {
@@ -794,8 +818,7 @@ it('leaves the create form out of history once the organization is created, so B
       <TestApp service={new MockConsoleService()} />
     </MemoryRouter>,
   );
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('frontfix-1');
+  await fillDetails(user, 'frontfix-1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Create organization' }));
@@ -808,8 +831,7 @@ it('create without an identity provider sends none, and Review says so', async (
   const service = emptyService();
   const user = userEvent.setup();
   renderAt('/organizations/create', service);
-  await user.click(await screen.findByRole('textbox', { name: 'Name' }));
-  await user.paste('tenant1');
+  await fillDetails(user, 'tenant1');
   await user.click(screen.getByRole('button', { name: 'Next' }));
   await user.click(screen.getByRole('button', { name: 'Next' }));
   const review = screen.getByTestId('organization-configuration-details');
@@ -819,7 +841,7 @@ it('create without an identity provider sends none, and Review says so', async (
   expect(await screen.findByText('Organization tenant1 created')).toBeVisible();
   const [sent] = tenantsOf(service).sent('create');
   expect(sent.object?.metadata?.name).toBe('tenant1');
-  expect(sent.object?.spec?.domains).toEqual([]);
+  expect(sent.object?.spec?.domains).toEqual(['tenant1.example.com']);
   expect(sent.object?.spec?.identityProvider).toBeUndefined();
 });
 
@@ -1075,16 +1097,19 @@ it('keeps the delete dialog busy until the reloaded organization is in, and says
   expect(within(modal).getByRole('button', { name: 'Delete' })).toBeEnabled();
 });
 
-it('moves focus to the previous domain on Remove domain, or to Add domain when none is left', async () => {
+it('moves focus to the previous domain on Remove domain, and keeps the last domain', async () => {
   const user = userEvent.setup();
   renderAt('/organizations/create', new MockConsoleService());
-  const add = await screen.findByRole('button', { name: 'Add domain' });
-  await user.click(add);
-  await user.click(screen.getByRole('textbox', { name: /^Domain 1/ }));
+  // The form starts with one domain, which can't be removed: an organization needs one.
+  const first = await screen.findByRole('textbox', { name: /^Domain 1/ });
+  expect(screen.getByRole('button', { name: 'Remove domain 1' })).toBeDisabled();
+  await user.click(first);
   await user.paste('one.example.com');
+  const add = screen.getByRole('button', { name: 'Add domain' });
   await user.click(add);
   await user.click(screen.getByRole('textbox', { name: /^Domain 2/ }));
   await user.paste('two.example.com');
+  expect(screen.getByRole('button', { name: 'Remove domain 1' })).toBeEnabled();
   await user.click(add);
   await user.click(screen.getByRole('button', { name: 'Remove domain 3' }));
   expect(screen.getByRole('textbox', { name: /^Domain 2/ })).toHaveFocus();
@@ -1092,9 +1117,8 @@ it('moves focus to the previous domain on Remove domain, or to Add domain when n
   await user.click(screen.getByRole('button', { name: 'Remove domain 1' }));
   expect(screen.getByRole('textbox', { name: /^Domain 1/ })).toHaveFocus();
   expect(screen.getByRole('textbox', { name: /^Domain 1/ })).toHaveValue('two.example.com');
-  await user.click(screen.getByRole('button', { name: 'Remove domain 1' }));
-  expect(screen.queryByRole('textbox', { name: /^Domain/ })).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Add domain' })).toHaveFocus();
+  expect(screen.getByRole('button', { name: 'Remove domain 1' })).toBeDisabled();
+  expect(screen.queryByRole('textbox', { name: /^Domain 2/ })).not.toBeInTheDocument();
 });
 
 it('heads the wizard sections at h2, moves focus to an added domain, and names the delete field by its prompt', async () => {
