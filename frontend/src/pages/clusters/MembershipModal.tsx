@@ -14,8 +14,8 @@ import type { ClusterRole, GridMembership } from '../../api/clusters';
 import { ServiceError } from '../../api/ConsoleService';
 import { DeleteModal } from '../../components/DeleteModal';
 import { changedMessage, ClusterChangedError } from './ClusterChangedError';
-import { removeText } from './clusterInfo';
-import { isPositionNotSet, mapPositionOf, type ClusterView } from './clusterView';
+import { AI_GRID_SUMMARY, removeText } from './clusterInfo';
+import type { ClusterView } from './clusterView';
 import { locationError } from './gridSettings';
 import { LocationLabelField, ReadOnlyRoleField, RoleField } from './MembershipFields';
 import { roleOf } from './roles';
@@ -158,8 +158,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
         title={title}
         description={
           <>
-            Configure the <strong>{cluster.name}</strong> cluster for the AI grid. The AI grid manages model deployment
-            and request routing across multiple clusters.
+            Configure the <strong>{cluster.name}</strong> cluster for the AI grid. {AI_GRID_SUMMARY}
           </>
         }
       />
@@ -170,8 +169,7 @@ export const MembershipModal: React.FC<Props> = ({ cluster, join, onConfirm, onC
               value={location}
               error={shownLocationError}
               isDisabled={busy}
-              mapPosition={mapPositionOf(cluster)}
-              positionNotSet={isPositionNotSet(cluster)}
+              cluster={cluster}
               onChange={setLocation}
               onBlur={() => setTouched((t) => ({ ...t, location: true }))}
             />

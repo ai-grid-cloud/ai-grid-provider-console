@@ -16,7 +16,9 @@ import {
 import { createClient } from '@connectrpc/connect';
 import { Clusters } from '../api/connect/clients';
 import { notificationsKey, watchesKey } from '../notifications/storageKeys';
+import { AI_GRID_SUMMARY } from '../pages/clusters/clusterInfo';
 import { LOCATION_DOCS_URL } from '../pages/clusters/site';
+import { EMPTY_VALUE } from '../utilities/format';
 import { transportFor } from './connectClusters';
 import { renderAt } from './render';
 
@@ -296,9 +298,7 @@ it('asks for a location label and role before adding', async () => {
   // A form, titled as one, that names the cluster in its description and says a role stays.
   expect(screen.getByRole('dialog', { name: 'Add cluster to AI grid' })).toBe(modal);
   expect(within(modal).getByText('no-location', { selector: 'strong' })).toBeVisible();
-  expect(modal).toHaveTextContent(
-    'Configure the no-location cluster for the AI grid. The AI grid manages model deployment and request routing across multiple clusters.',
-  );
+  expect(modal).toHaveTextContent(`Configure the no-location cluster for the AI grid. ${AI_GRID_SUMMARY}`);
   // The role stays, said in a plain inline alert directly under the Role field's helper text.
   const roleFixed = within(modal).getByText(
     "A cluster's role cannot be changed once it has been added to the AI grid.",
@@ -320,9 +320,8 @@ it('asks for a location label and role before adding', async () => {
   expect(role).toHaveAttribute('aria-invalid', 'true');
   expect(location).toHaveAccessibleDescription(/^Required : error status;/);
   expect(within(modal).queryByText('For example, us-east.')).not.toBeInTheDocument();
-  expect(within(modal).getByText('37.7749, -122.4194')).toBeVisible();
-  await user.click(within(modal).getByRole('button', { name: 'Copy map position' }));
-  expect(await navigator.clipboard.readText()).toBe('37.7749, -122.4194');
+  // The position is in the field's help, not under the input.
+  expect(within(modal).queryByText('37.7749, -122.4194')).not.toBeInTheDocument();
   // The role keeps its helper, and the error follows it.
   expect(role).toHaveAccessibleDescription(
     /^Select the role this cluster will perform in the AI grid\. .* Required : error status;$/,
@@ -331,20 +330,38 @@ it('asks for a location label and role before adding', async () => {
   await user.paste('us east');
   expect(location).toHaveAccessibleDescription(/Must start and end with a letter or number/);
   expect(service.clusters[1].labels).toEqual({});
-  // What the label is, and where to take it from, is in the field's help.
+  // What the label is, and this cluster's position, site and cloud region, is in the field's help.
+  // An empty site or cloud region still has a row.
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
-  expect(await screen.findByRole('dialog', { name: 'Location label' })).toHaveTextContent(
-    'A label that describes where the cluster is located. Use the map position set by the hub administrator to inform the location label.',
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent(
+    "Optionally provide a text label that can help identify the cluster's location on the AI Grid map. This label does not impact the cluster's location on the map.",
   );
+  expect(help).toHaveTextContent(
+    "Use the cluster's position, site, and cloud region to inform the label. For example, a cluster with the position 43.65, -79.38 might have the location label Toronto.",
+  );
+  expect(within(help).getByText('Toronto').tagName).toBe('STRONG');
+  expect(within(help).getByRole('heading', { name: 'Cluster details' })).toBeVisible();
+  expect(within(help).queryByRole('heading', { name: 'Location label' })).not.toBeInTheDocument();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
+  expect(within(help).getByText('37.7749, -122.4194')).toBeVisible();
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
+  await user.click(within(help).getByRole('button', { name: 'Copy map position' }));
+  expect(await navigator.clipboard.readText()).toBe('37.7749, -122.4194');
   await user.click(within(modal).getByRole('button', { name: 'More info for the location label field' }));
   // The Role field's help explains each role.
   await user.click(within(modal).getByRole('button', { name: 'More info for the role field' }));
-  const help = await screen.findByRole('dialog', { name: 'Cluster roles' });
+  const roles = await screen.findByRole('dialog', { name: 'Cluster roles' });
   // No heading: what roles are, each role with its name in bold, then that a role is set once.
-  expect(within(help).queryByRole('heading')).not.toBeInTheDocument();
-  expect(within(help).getByText('Roles define what each cluster does in the AI grid.')).toBeVisible();
+  expect(within(roles).queryByRole('heading')).not.toBeInTheDocument();
+  expect(within(roles).getByText('Roles define what each cluster does in the AI grid.')).toBeVisible();
   expect(
-    within(help)
+    within(roles)
       .getAllByRole('listitem')
       .map((item) => item.textContent),
   ).toEqual([
@@ -352,24 +369,32 @@ it('asks for a location label and role before adding', async () => {
     'Inference clusters serve models via KServe and receive requests through an ingress cluster.',
     'Ingress and inference clusters receive requests via Models-as-a-Service and serve models via KServe.',
   ]);
-  expect(Array.from(help.querySelectorAll('li > strong')).map((name) => name.textContent)).toEqual([
+  expect(Array.from(roles.querySelectorAll('li > strong')).map((name) => name.textContent)).toEqual([
     'Ingress',
     'Inference',
     'Ingress and inference',
   ]);
   expect(
-    within(help).getByText('Roles are assigned when adding a cluster to the AI grid, and cannot be changed once set.'),
+    within(roles).getByText('Roles are assigned when adding a cluster to the AI grid, and cannot be changed once set.'),
   ).toBeVisible();
   await user.click(within(modal).getByRole('button', { name: 'Cancel' }));
   // The hub itself defaults to the combined role.
   await pick(user, 'local-cluster', 'Add to AI grid');
   const hub = await screen.findByTestId('cluster-membership-modal');
   expect(within(hub).getByRole('combobox', { name: 'Role' })).toHaveValue('Ingress and inference');
-  // No coordinates and no position problem: the same "not set" state the details page shows.
-  expect(within(hub).getByText(/Map position is not set\./)).toBeVisible();
-  const how = within(hub).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
+  // No position, site, or cloud region.
+  await user.click(within(hub).getByRole('button', { name: 'More info for the location label field' }));
+  const hubHelp = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(hubHelp).toHaveTextContent('No map position, site, or cloud region is available to inform the label.');
+  expect(within(hubHelp).queryByRole('term')).not.toBeInTheDocument();
+  expect(within(hubHelp).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  const how = within(hubHelp).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.closest('p')).toHaveTextContent(
+    'No map position, site, or cloud region is available to inform the label.',
+  );
+  expect(how.querySelector('svg')).toBeInTheDocument();
   expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  expect(within(hubHelp).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 
 it('keeps an unenrolled cluster on patch failure and allows a retry', async () => {
@@ -754,10 +779,13 @@ it('offers Edit, then Remove from AI grid, for a member, and an add button for a
   expect(await screen.findByRole('tooltip', { name: 'Add to AI grid' })).toHaveTextContent('Add to AI grid');
 });
 
-it('offers Add to AI grid only for ready, unavailable or unknown clusters', async () => {
+it('offers Add to AI grid for ready, unavailable, unknown, and clusters with no map position', async () => {
   const withState = (name: string, state: NonNullable<GridCluster['state']>): GridCluster => ({
     ...cluster(name, 'Unknown'),
     state,
+    // A position, so the import state still blocks Add. Without one, Add stays available.
+    latitude: 1,
+    longitude: 2,
   });
   renderAt(
     '/clusters',
@@ -770,11 +798,12 @@ it('offers Add to AI grid only for ready, unavailable or unknown clusters', asyn
       withState('is-notaccepted', 'Not accepted'),
       withState('is-pendingimport', 'Pending import'),
       withState('is-importing', 'Importing'),
+      { ...withState('is-unset', 'Pending import'), latitude: undefined, longitude: undefined },
     ]),
   );
   await screen.findByTestId('clusters-table');
   const user = userEvent.setup();
-  for (const name of ['is-ready', 'is-offline', 'is-unknown']) {
+  for (const name of ['is-ready', 'is-offline', 'is-unknown', 'is-unset']) {
     expect(addButton(name)).not.toHaveAttribute('aria-disabled', 'true');
   }
   // The others say why they can't be added yet.
@@ -863,9 +892,7 @@ it('explains the AI grid column group in a popover, as it does the GPUs group', 
   const help = await screen.findByRole('dialog', { name: 'AI grid' });
   // The body only, without a heading.
   expect(within(help).queryByRole('heading')).not.toBeInTheDocument();
-  expect(
-    within(help).getByText('The AI grid coordinates model deployment and request routing across multiple clusters.'),
-  ).toBeVisible();
+  expect(within(help).getByText(AI_GRID_SUMMARY).tagName).toBe('P');
 });
 
 it('groups the columns as the details page does, wraps them, and has Site and Region but no Hub column', async () => {

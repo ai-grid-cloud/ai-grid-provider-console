@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  Content,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
@@ -32,7 +33,7 @@ import { editText } from './editClusterText';
 import { MissingLabel } from '../../components/MissingLabel';
 import { ClusterSite } from './ClusterSite';
 import { AddClusterButton } from './AddClusterButton';
-import { gpuCount, membershipActions } from './clusterInfo';
+import { AI_GRID_SUMMARY, gpuCount, membershipActions } from './clusterInfo';
 import { ClusterStatusLabel } from './ClusterStatusLabel';
 import { capacityText, configurationText, gpuCountText, gpuSharing } from './gpuText';
 import { ClusterRolesList } from './ClusterRolesHelp';
@@ -124,7 +125,11 @@ const groups: { label: string; span: number; info?: ThProps['info'] }[] = [
     span: 3,
     info: {
       ariaLabel: 'About AI grid',
-      popover: 'The AI grid coordinates model deployment and request routing across multiple clusters.',
+      popover: (
+        <Content>
+          <Content component="p">{AI_GRID_SUMMARY}</Content>
+        </Content>
+      ),
       popoverProps: { 'aria-label': 'AI grid' },
     },
   },

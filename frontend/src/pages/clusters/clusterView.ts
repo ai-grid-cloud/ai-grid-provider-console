@@ -58,13 +58,6 @@ export type ClusterView = {
 export const mapPositionOf = (c: Pick<ClusterView, 'latitude' | 'longitude'>): string | undefined =>
   c.latitude !== undefined && c.longitude !== undefined ? `${c.latitude}, ${c.longitude}` : undefined;
 
-/**
- * The details page's "Not on the map: position not set": no coordinates, and no problem explaining
- * why the ones that were set don't place the cluster.
- */
-export const isPositionNotSet = (c: Pick<ClusterView, 'latitude' | 'longitude' | 'locationProblem'>): boolean =>
-  (c.latitude === undefined || c.longitude === undefined) && !c.locationProblem;
-
 // The keys read here. The labels are AI grid's own (the backend lets the console write the
 // ai-grid/* keys and the location label, ClustersUpdateRequest); the claims are the ones
 // ManagedClusterStatus.cluster_claims documents; openshiftVersion is the label ACM sets.

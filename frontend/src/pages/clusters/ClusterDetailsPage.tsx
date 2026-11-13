@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import {
+  Alert,
+  AlertActionLink,
   Breadcrumb,
   BreadcrumbItem,
   Button,
@@ -12,9 +14,10 @@ import {
   List,
   ListItem,
   Stack,
+  Tooltip,
 } from '@patternfly/react-core';
 import { SubtleText } from '../../components/SubtleText';
-import { ExternalLinkAltIcon } from '@patternfly/react-icons';
+import { ExternalLinkAltIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { Link, useParams } from 'react-router-dom';
 import type { GridMembership } from '../../api/clusters';
@@ -30,7 +33,7 @@ import { useConsoleSession } from '../../context/useConsoleSession';
 import { useBackgroundWrites } from '../../notifications/useBackgroundWrites';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { formatCores, formatGiB } from '../../utilities/quantity';
-import { gpuCount, membershipActions, unavailableText } from './clusterInfo';
+import { AI_GRID_SUMMARY, addText, cannotAddReason, gpuCount, membershipActions, unavailableText } from './clusterInfo';
 import {
   capacityText,
   configurationText,
@@ -52,11 +55,29 @@ import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
-import { isFromCloudRegion } from './site';
+import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
   capacity && allocatable && capacity !== allocatable ? `${capacity}, ${allocatable} allocatable` : capacity;
+
+/** Add to AI grid on the cluster page, with the list's plus icon. Disabled with the same reason as that button. */
+const AddToGridButton: React.FC<{ cluster: ClusterView; onAdd: () => void }> = ({ cluster, onAdd }) => {
+  const reason = cannotAddReason(cluster);
+  const button = (
+    <Button
+      variant="primary"
+      icon={<PlusCircleIcon />}
+      isAriaDisabled={!!reason}
+      onClick={() => {
+        if (!reason) onAdd();
+      }}
+    >
+      {addText.action}
+    </Button>
+  );
+  return reason ? <Tooltip content={reason}>{button}</Tooltip> : button;
+};
 
 const aiGridItems = (c: ClusterView) => {
   const role = roleOf(c.labels);
@@ -104,7 +125,7 @@ const clusterItems = (c: ClusterView) => [
     value: <StatusLabel isCompact status={c.status} reason={hubConnection(c)} />,
     'data-testid': 'cluster-status',
   },
-  { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" /> },
+  { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" showProblem={false} /> },
   { term: 'Region', value: c.region },
   { term: 'Map position', value: <MapPosition cluster={c} />, 'data-testid': 'cluster-map-position' },
   ...(c.openshiftVersion ? [{ term: 'OpenShift version', value: c.openshiftVersion }] : []),
@@ -116,15 +137,40 @@ const clusterItems = (c: ClusterView) => [
 
 /**
  * Where the map puts the cluster and from what: the hub admin's annotations, or the cloud region
- * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Without annotations it links to how a hub
- * admin sets them.
+ * ("<lat, lon> from the cloud region"). Annotations the hub can't use open a warning with the
+ * backend's problem. With no coordinates at all, the value says they are missing. Both link to how
+ * a hub admin sets them.
  */
 const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
+  if (c.locationProblem) {
+    return (
+      <Alert
+        isExpandable
+        isInline
+        variant="warning"
+        title="Not on the map due to invalid coordinates"
+        actionLinks={
+          <AlertActionLink
+            component="a"
+            href={LOCATION_DOCS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            icon={<ExternalLinkAltIcon />}
+            iconPosition="end"
+          >
+            How to set a cluster&apos;s position
+          </AlertActionLink>
+        }
+      >
+        <p>Message returned: {c.locationProblem}</p>
+      </Alert>
+    );
+  }
   const how = <PositionDocsLink />;
   if (c.latitude === undefined || c.longitude === undefined) {
     return (
       <Stack>
-        <span>{c.locationProblem ? `Not on the map: ${c.locationProblem}` : 'Not on the map: position not set'}</span>
+        <span>Not on the map due to missing coordinates</span>
         {how}
       </Stack>
     );
@@ -409,11 +455,19 @@ export const ClusterDetailsPage: React.FC = () => {
     return (
       <Grid hasGutter>
         <GridItem md={6}>
-          <Section
-            title="AI grid"
-            help="The AI grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations."
-          >
-            <DetailsList items={aiGridItems(cluster)} aria-label="AI grid membership" />
+          <Section title="AI grid" help={cluster.aiGridEnabled ? AI_GRID_SUMMARY : undefined}>
+            {cluster.aiGridEnabled ? (
+              <DetailsList items={aiGridItems(cluster)} aria-label="AI grid membership" />
+            ) : (
+              <Stack hasGutter>
+                <Content component="p">{AI_GRID_SUMMARY}</Content>
+                {user?.isProviderAdmin && (
+                  <div>
+                    <AddToGridButton cluster={cluster} onAdd={() => setChange({ cluster, join: true })} />
+                  </div>
+                )}
+              </Stack>
+            )}
           </Section>
         </GridItem>
         <GridItem md={6}>

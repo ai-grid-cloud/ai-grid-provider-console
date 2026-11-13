@@ -13,6 +13,8 @@ import { renderAt, findVisible } from './render';
 import { EMPTY_VALUE } from '../utilities/format';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/clusters/ClusterDetailsPage';
+import { AI_GRID_SUMMARY } from '../pages/clusters/clusterInfo';
+import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { TestApp } from './TestApp';
 
 /** A cluster as today's backend sends it: no claims, capacity or conditions. */
@@ -29,6 +31,13 @@ const bare = (): GridCluster => ({
   conditions: [],
   labels: { 'ai-grid/enabled': 'true', 'ai-grid/role': 'inference', location: 'us-east' },
 });
+
+/** A cluster outside AI grid: the summary and Add, and no membership list. */
+const expectNotOnGrid = () => {
+  expect(screen.getByText(AI_GRID_SUMMARY)).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Add to AI grid' }).querySelector('svg')).toBeInTheDocument();
+  expect(screen.queryByLabelText('AI grid membership')).not.toBeInTheDocument();
+};
 
 const details = (label: string) => screen.getByLabelText(label);
 
@@ -107,6 +116,7 @@ it('shows a member: AI grid, the cluster, its capacity and GPUs', async () => {
 
   // No hub conditions: raw API state that the provider admin doesn't need (UX review).
   expect(screen.queryByRole('heading', { name: 'Conditions' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Add to AI grid' })).not.toBeInTheDocument();
 
   // The cluster's own console opens in a new tab.
   const console = screen.getByRole('link', { name: 'OpenShift console' });
@@ -311,9 +321,24 @@ it('shows 0 GPUs when the hub reports capacity without any', async () => {
   renderAt('/clusters/site4', new MockConsoleService(undefined, clusters));
   expect(await screen.findByTestId('cluster-gpus')).toHaveTextContent('0');
   expect(screen.getByTestId('cluster-gpus-not-reported')).toHaveTextContent('The hub reports no GPUs on this cluster.');
-  expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Not added');
+  expectNotOnGrid();
   // A cluster outside AI grid has no role to miss.
   expect(screen.queryByTestId('missing-role')).not.toBeInTheDocument();
+});
+
+it('adds the cluster to AI grid from the AI grid card', async () => {
+  const user = userEvent.setup();
+  const service = new MockConsoleService();
+  renderAt('/clusters/site4', service);
+  await user.click(await screen.findByRole('button', { name: 'Add to AI grid' }));
+  const modal = await screen.findByTestId('cluster-membership-modal');
+  await user.click(within(modal).getByRole('combobox', { name: 'Role' }));
+  await user.click(await screen.findByRole('option', { name: /Inference/ }));
+  await user.click(within(modal).getByRole('button', { name: 'Add' }));
+  expect(await screen.findByText('Cluster site4 added to AI grid')).toBeVisible();
+  await waitFor(() => expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioning'));
+  expect(service.clusters.find((c) => c.name === 'site4')!.labels['ai-grid/role']).toBe('inference');
+  expect(screen.queryByRole('button', { name: 'Add to AI grid' })).not.toBeInTheDocument();
 });
 
 it('adds the cluster to AI grid from its Actions', async () => {
@@ -346,13 +371,14 @@ it('shows the added membership while the reload is still running', async () => {
   const service = new MockConsoleService();
   const getCluster = service.getCluster;
   renderAt('/clusters/site4', service);
-  expect(await screen.findByTestId('cluster-membership')).toHaveTextContent('Not added');
+  expect(await screen.findByText(AI_GRID_SUMMARY)).toBeVisible();
   // Every load from now on never answers.
   service.getCluster = () => new Promise(() => {});
   await addSite4(user);
   expect(await screen.findByText('Cluster site4 added to AI grid')).toBeVisible();
   expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Provisioning');
   expect(screen.getByLabelText('AI grid membership')).toHaveTextContent('Inference');
+  expect(screen.queryByRole('button', { name: 'Add to AI grid' })).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'Actions for site4' }));
   await findVisible('menuitem', 'Remove from AI grid');
   service.getCluster = getCluster;
@@ -381,7 +407,7 @@ it('keeps the added membership when the reload fails', async () => {
   const user = userEvent.setup();
   const service = new MockConsoleService();
   renderAt('/clusters/site4', service);
-  expect(await screen.findByTestId('cluster-membership')).toHaveTextContent('Not added');
+  expect(await screen.findByText(AI_GRID_SUMMARY)).toBeVisible();
   service.getCluster = () => Promise.reject(new ServiceError(503, 'the hub is unavailable'));
   await addSite4(user);
   expect(await screen.findByText('Showing the last loaded cluster')).toBeVisible();
@@ -398,7 +424,7 @@ it('removes the cluster from AI grid', async () => {
   await user.type(within(modal).getByRole('textbox', { name: 'Type site1 to confirm:' }), 'site1');
   await user.click(within(modal).getByRole('button', { name: 'Remove' }));
   expect(await screen.findByText('Cluster site1 removed from AI grid')).toBeVisible();
-  expect(screen.getByTestId('cluster-membership')).toHaveTextContent('Not added');
+  expectNotOnGrid();
   expect(service.clusters.find((c) => c.name === 'site1')!.labels['ai-grid/enabled']).toBeUndefined();
 });
 
@@ -530,7 +556,7 @@ it('says where the map puts the cluster, from its cloud region, with how to set 
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent('40.42, -82.91 from the cloud region');
   const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how.querySelector('svg')).toBeInTheDocument();
   expect(how).toHaveAttribute(
     'href',
     'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
@@ -541,6 +567,8 @@ it('says where the map puts the cluster, from its cloud region, with how to set 
 });
 
 it('says what to fix when the coordinate annotations are wrong', async () => {
+  const user = userEvent.setup();
+  const problem = 'ai-grid/latitude "39,96" is not a decimal number of degrees';
   const transport = fakeClients({
     clusters: {
       get: async () => ({
@@ -549,8 +577,9 @@ it('says what to fix when the coordinate annotations are wrong', async () => {
           metadata: { name: 'wrong' },
           status: {
             location: {
+              siteName: 'Berlin DC1',
               source: ManagedClusterLocationSource.NONE,
-              problem: 'ai-grid/latitude "39,96" is not a decimal number of degrees',
+              problem,
               region: 'us-east-2',
             },
           },
@@ -559,9 +588,21 @@ it('says what to fix when the coordinate annotations are wrong', async () => {
     },
   }).transport;
   renderAt('/clusters/wrong', new MockConsoleService(), transport);
-  expect(await screen.findByTestId('cluster-map-position')).toHaveTextContent(
-    'Not on the map: ai-grid/latitude "39,96" is not a decimal number of degrees',
-  );
+  const position = await screen.findByTestId('cluster-map-position');
+  expect(
+    within(position).getByRole('heading', { name: 'Warning alert: Not on the map due to invalid coordinates' }),
+  ).toBeVisible();
+  expect(position).not.toHaveTextContent(`Message returned: ${problem}`);
+  const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.querySelector('svg')).toBeInTheDocument();
+  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  await user.click(within(position).getByRole('button', { name: 'Warning alert details' }));
+  expect(position).toHaveTextContent(`Message returned: ${problem}`);
+  const site = screen.getByTestId('cluster-site');
+  expect(site).toHaveTextContent('Berlin DC1');
+  expect(site.querySelector('svg')).not.toBeInTheDocument();
+  await user.hover(site);
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 });
 
 it("says in the status tooltip what the hub reports about the cluster's connection", async () => {

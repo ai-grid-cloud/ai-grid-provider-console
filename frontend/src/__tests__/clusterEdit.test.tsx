@@ -18,6 +18,7 @@ import {
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/clusters/ClusterDetailsPage';
 import { LOCATION_DOCS_URL } from '../pages/clusters/site';
+import { EMPTY_VALUE } from '../utilities/format';
 import { deferred, findVisible, renderAt } from './render';
 
 /** A ready cluster, an AI grid member unless its labels say otherwise, at version 7. */
@@ -176,9 +177,9 @@ it('links an AI grid cluster without a position to how a hub admin sets it, not 
   const { transport } = clustersOf([noRole('bare-1')]);
   renderAt('/clusters/bare-1', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
-  expect(position).toHaveTextContent('Not on the map: position not set');
+  expect(position).toHaveTextContent('Not on the map due to missing coordinates');
   const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
+  expect(how.querySelector('svg')).toBeInTheDocument();
   expect(how).toHaveAttribute(
     'href',
     'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
@@ -201,10 +202,20 @@ it('shows the role of a cluster that has one read-only, with why, and only the l
   // Location, then role, as Add asks for them.
   expect(location.compareDocumentPosition(role) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(within(dialog).queryByText('For example, us-east.')).not.toBeInTheDocument();
-  expect(within(dialog).getByText('48.8566, 2.3522')).toBeVisible();
-  await user.click(within(dialog).getByRole('button', { name: 'Copy map position' }));
+  // The position and site are in the location-label help, not fields the dialog edits.
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(within(help).getByText('48.8566, 2.3522')).toBeVisible();
+  expect(within(help).getByText('Paris DC1')).toBeVisible();
+  expect(within(help).queryByText('from the cloud region')).not.toBeInTheDocument();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
+  expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
+  await user.click(within(help).getByRole('button', { name: 'Copy map position' }));
   expect(await navigator.clipboard.readText()).toBe('48.8566, 2.3522');
-  // No site name or position fields: they stay read-only in the console.
   expect(within(dialog).queryByRole('textbox', { name: /Site name|Latitude|Longitude/ })).not.toBeInTheDocument();
   expect(within(dialog).queryByTestId('cluster-role-change')).not.toBeInTheDocument();
   expect(save(dialog)).toBeDisabled();
@@ -359,15 +370,146 @@ it('announces what Save will install: the alert is a polite live region, and fol
   expect(change).toHaveTextContent('Saving sets the role to Inference.');
 });
 
-it('says the map position is not set when the details page would', async () => {
+it('says the map position is not available when the cluster has no position, site, or region', async () => {
   const user = userEvent.setup();
   renderList([noRole()]);
   const dialog = await openEdit(user, 'no-role');
-  expect(within(dialog).getByText(/Map position is not set\./)).toBeVisible();
-  const how = within(dialog).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.lastElementChild?.tagName).toBe('svg');
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent('No map position, site, or cloud region is available to inform the label.');
+  expect(within(help).queryByRole('term')).not.toBeInTheDocument();
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  const how = within(help).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.closest('p')).toHaveTextContent(
+    'No map position, site, or cloud region is available to inform the label.',
+  );
+  expect(how.querySelector('svg')).toBeInTheDocument();
   expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
-  expect(within(dialog).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
+  expect(within(help).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
+});
+
+it('says a cloud-region position is inherited, and shows an empty site as a dash', async () => {
+  const user = userEvent.setup();
+  const cluster = managedCluster('region-1', {
+    'ai-grid/enabled': 'true',
+    'ai-grid/role': 'ingress',
+    location: 'toronto',
+  });
+  const where = cluster.status!.location!;
+  where.siteName = '';
+  where.region = 'ca-central-1';
+  where.latitude = 43.7;
+  where.longitude = -79.4;
+  where.source = ManagedClusterLocationSource.CLOUD_REGION;
+  renderList([cluster]);
+  const dialog = await openEdit(user, 'region-1');
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(within(help).getByText('43.7, -79.4')).toBeVisible();
+  expect(help).toHaveTextContent(/43\.7, -79\.4\s+from the cloud region/);
+  expect(within(help).getByText('ca-central-1')).toBeVisible();
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
+  expect(within(help).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
+});
+
+it('uses the site or cloud region when the map position is not available', async () => {
+  const user = userEvent.setup();
+  const cluster = managedCluster('site-1', {
+    'ai-grid/enabled': 'true',
+    'ai-grid/role': 'ingress',
+    location: 'lyon',
+  });
+  const where = cluster.status!.location!;
+  where.siteName = 'Lyon DC2';
+  where.region = '';
+  where.source = ManagedClusterLocationSource.NONE;
+  renderList([cluster]);
+  const dialog = await openEdit(user, 'site-1');
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent(
+    'The map position is not available, but you can use the site or cloud region to inform the label.',
+  );
+  expect(within(help).queryByText('Paris')).not.toBeInTheDocument();
+  expect(within(help).getByText('Missing coordinates')).toBeVisible();
+  expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
+  expect(within(help).getByText('Lyon DC2')).toBeVisible();
+  const how = within(help).getByRole('link', { name: "How to set a cluster's position" });
+  expect(how.closest('p')).toBeNull();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
+});
+
+it("says why a map position can't be read, in the details page's words", async () => {
+  const user = userEvent.setup();
+  const problem = 'ai-grid/latitude "48,85" is not a decimal number of degrees';
+  const cluster = managedCluster('broken-1', {
+    'ai-grid/enabled': 'true',
+    'ai-grid/role': 'ingress',
+    location: 'paris',
+  });
+  const where = cluster.status!.location!;
+  where.siteName = 'Paris DC1';
+  where.region = '';
+  where.problem = problem;
+  where.source = ManagedClusterLocationSource.NONE;
+  renderList([cluster]);
+  const dialog = await openEdit(user, 'broken-1');
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent(
+    "The map position can't be read, but you can use the site or cloud region to inform the label.",
+  );
+  expect(within(help).queryByText('Paris')).not.toBeInTheDocument();
+  expect(within(help).getByText('Invalid coordinates').closest('span')?.querySelector('svg')).toBeInTheDocument();
+  const details = within(help).getByRole('link', { name: 'View cluster details' });
+  expect(details.closest('span')).toHaveTextContent('View cluster details for more information.');
+  expect(details.closest('span')).not.toHaveTextContent('Invalid coordinates');
+  expect(help).not.toHaveTextContent(problem);
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  expect(within(help).getByText('Paris DC1')).toBeVisible();
+  expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
+  expect(details).toHaveAttribute('href', '/clusters/broken-1');
+  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+});
+
+it('shows an unreadable map position even when the site and cloud region are empty', async () => {
+  const user = userEvent.setup();
+  const problem = 'ai-grid/longitude "2,35" is not a decimal number of degrees';
+  const cluster = managedCluster('broken-2', { 'ai-grid/enabled': 'true', 'ai-grid/role': 'ingress', location: 'x' });
+  const where = cluster.status!.location!;
+  where.siteName = '';
+  where.region = '';
+  where.problem = problem;
+  where.source = ManagedClusterLocationSource.NONE;
+  renderList([cluster]);
+  const dialog = await openEdit(user, 'broken-2');
+  await user.click(within(dialog).getByRole('button', { name: 'More info for the location label field' }));
+  const help = await screen.findByRole('dialog', { name: 'Location label' });
+  expect(help).toHaveTextContent("The map position can't be read, so it can't inform the label.");
+  expect(within(help).getByText('Invalid coordinates')).toBeVisible();
+  const details = within(help).getByRole('link', { name: 'View cluster details' });
+  expect(details.closest('span')).toHaveTextContent('View cluster details for more information.');
+  expect(details.closest('span')).not.toHaveTextContent('Invalid coordinates');
+  expect(help).not.toHaveTextContent(problem);
+  expect(details).toHaveAttribute('href', '/clusters/broken-2');
+  expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
+  expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
+  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+  expect(
+    within(help)
+      .getAllByRole('term')
+      .map((term) => term.textContent),
+  ).toEqual(['Map position', 'Site', 'Cloud region']);
 });
 
 it('asks for a role before saving a location label on a cluster without one', async () => {

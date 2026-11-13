@@ -1,4 +1,4 @@
-import type { ClusterView } from './clusterView';
+import { mapPositionOf, type ClusterView } from './clusterView';
 import { editText } from './editClusterText';
 import type { MembershipChange } from './MembershipModal';
 
@@ -18,8 +18,13 @@ export const unavailableText = `The cluster's API server cannot be reached. ${un
 export const hubMessage = (c: ClusterView) =>
   [c.state, c.statusMessage?.trim()].filter(Boolean).join(': ') || undefined;
 
-/** Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is detaching it. */
+/**
+ * Why a cluster can't be added: the hub hasn't accepted it, hasn't finished importing it, or is
+ * detaching it. A cluster with no map position and no coordinate problem stays addable, so the
+ * Add dialog can show that position is not set while the hub is still importing it.
+ */
 export const cannotAddReason = (c: ClusterView) => {
+  if (!mapPositionOf(c) && !c.locationProblem) return undefined;
   if (c.state === 'Not accepted') {
     return 'The hub has not accepted this cluster. To add it to the AI grid, first accept it in ACM.';
   }
@@ -66,6 +71,13 @@ export const removeText = {
 export const addText = {
   action: 'Add to AI grid',
 } as const;
+
+/**
+ * What AI grid is. The cluster page shows it in the AI grid card, the clusters table shows it in
+ * the AI grid column group's help, and Add to AI grid uses it as the rest of its description.
+ */
+export const AI_GRID_SUMMARY =
+  'The AI grid connects your OpenShift clusters into a unified network to serve models and route traffic across locations.';
 
 /**
  * The AI grid actions a provider admin has on a cluster: for a member, Edit, then Remove
