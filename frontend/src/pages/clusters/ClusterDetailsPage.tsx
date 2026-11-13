@@ -11,9 +11,7 @@ import {
   GridItem,
   List,
   ListItem,
-  Stack,
 } from '@patternfly/react-core';
-import { SubtleText } from '../../components/SubtleText';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { Link, useParams } from 'react-router-dom';
@@ -51,7 +49,7 @@ import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
-import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
+import { PositionHelp } from './PositionHelp';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
@@ -114,36 +112,15 @@ const clusterItems = (c: ClusterView) => [
 ];
 
 /**
- * Where the map puts the cluster and from what: the hub admin's annotations, or the cloud region
- * ("<lat, lon> from the cloud region"); otherwise why it isn't on the map. Without annotations it links to how a hub
- * admin sets them.
+ * Where the map puts the cluster: its coordinates, or the page's empty value when it has none. The
+ * help icon beside it says where they come from, or how a hub admin sets them.
  */
-const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
-  const how = (
-    <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
-      How to set a cluster&apos;s position
-    </a>
-  );
-  if (c.latitude === undefined || c.longitude === undefined) {
-    return (
-      <Stack>
-        <span>{c.locationProblem ? `Not on the map: ${c.locationProblem}` : 'Not on the map: position not set'}</span>
-        {how}
-      </Stack>
-    );
-  }
-  const at = `${c.latitude}, ${c.longitude}`;
-  return isFromCloudRegion(c) ? (
-    <Stack>
-      <span>
-        {at} <SubtleText>from the cloud region</SubtleText>
-      </span>
-      {how}
-    </Stack>
-  ) : (
-    <span>{at}</span>
-  );
-};
+const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => (
+  <span>
+    {c.latitude === undefined || c.longitude === undefined ? EMPTY_VALUE : `${c.latitude}, ${c.longitude}`}{' '}
+    <PositionHelp cluster={c} />
+  </span>
+);
 
 /** Each distinct value once, in order. */
 const distinct = (values: (string | undefined)[]) => [...new Set(values.filter((v): v is string => !!v))];

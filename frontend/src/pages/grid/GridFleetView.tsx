@@ -39,7 +39,6 @@ import { StatusLabel } from '../../components/StatusLabel';
 import { SubtleText } from '../../components/SubtleText';
 import { NoResultsState } from '../../components/states/NoResultsState';
 import { modelPath } from '../models/modelUtils';
-import { LOCATION_DOCS_URL } from '../clusters/site';
 import { GridFleetMap } from './GridFleetMap';
 import type { TileLayerConfig } from './tiles';
 import './grid-fleet.css';
@@ -359,7 +358,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
   const noResults = <NoResultsState body="Adjust your filters and try again." onClear={clearFilters} />;
 
   // Not on the map: no position (no annotations, no known cloud region), or annotations to fix. The
-  // drawer names each cluster's problem (Position error); the note only counts them.
+  // cards say "No map position" and the drawer names each cluster's problem; the note counts them.
   const notOnMap = clusters.filter((c) => !hasCoordinates(c));
 
   const list = (
@@ -398,6 +397,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
                   onOpen={() => open({ kind: 'cluster', name: c.name })}
                 >
                   {(whereOf(c) || c.location) && <span>{[whereOf(c), c.location].filter(Boolean).join(' · ')}</span>}
+                  {!hasCoordinates(c) && <span>No map position</span>}
                   <SubtleText>{at.length ? `Models: ${at.map(titleOf).join(', ')}` : 'No models'}</SubtleText>
                 </FleetCard>
               );
@@ -427,10 +427,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
           title={`${notOnMap.length} ${notOnMap.length === 1 ? 'cluster' : 'clusters'} not shown`}
           data-testid="clusters-not-on-map"
         >
-          Clusters are excluded from the map when their positions are missing or invalid.{' '}
-          <a href={LOCATION_DOCS_URL} target="_blank" rel="noreferrer">
-            How to set a cluster&apos;s position
-          </a>
+          Clusters are excluded from the map when their positions are missing or invalid.
         </Alert>
       )}
     </Stack>

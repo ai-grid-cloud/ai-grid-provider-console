@@ -13,7 +13,6 @@ import { ServiceError } from '../api/ConsoleService';
 import { fakeClients } from '../api/connect/testing';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { tileLayerConfig } from '../pages/grid/tiles';
-import { toManagedCluster } from './connectClusters';
 import { modelsOf } from './connectModels';
 import { renderAt } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
@@ -391,29 +390,19 @@ it("drops the Back trail when a link moves the drawer to something the trail was
   expect(screen.getByRole('button', { name: 'Clusters' })).toBeVisible();
 });
 
-it("counts the members that aren't on the map, whatever the reason, and links to how to place them", async () => {
+it('says "No map position" on the cards of clusters without one, and counts them in the not-shown alert', async () => {
   const service = new MockConsoleService();
-  const [first, second, third] = service.clusters;
-  service.clusters = [
-    first,
-    { ...second, latitude: undefined, longitude: undefined },
-    { ...third, latitude: undefined, longitude: undefined },
-  ];
-  // The mock's clusters carry no problem; one member's annotations are wrong.
-  const clusters = await service.listClusters();
-  const transport = fakeClients({
-    clusters: {
-      list: async () => {
-        const items = clusters.map(toManagedCluster);
-        items[2].status!.location!.problem = 'ai-grid/longitude "4,35" is not a decimal number of degrees';
-        return { items, size: items.length, total: items.length };
-      },
-    },
-  }).transport;
-  renderAt('/ai-grid', service, transport);
-  // One inline alert for both reasons: the drawer names each cluster's problem.
-  const note = await screen.findByTestId('clusters-not-on-map');
-  expect(within(note).getByRole('heading', { name: /2 clusters not shown/ })).toBeVisible();
+  const [first, second] = service.clusters;
+  service.clusters = [first, { ...second, latitude: undefined, longitude: undefined }];
+  renderAt('/ai-grid', service);
+  const unplaced = (await screen.findByRole('button', { name: `View ${second.name} details` })).closest(
+    '.pf-v6-c-card',
+  );
+  const placed = screen.getByRole('button', { name: `View ${first.name} details` }).closest('.pf-v6-c-card');
+  expect(unplaced).toHaveTextContent('No map position');
+  expect(placed).not.toHaveTextContent('No map position');
+  const note = screen.getByTestId('clusters-not-on-map');
+  expect(within(note).getByRole('heading', { name: /1 cluster not shown/ })).toBeVisible();
   expect(note).toHaveTextContent('Clusters are excluded from the map when their positions are missing or invalid.');
-  expect(within(note).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  expect(within(note).queryByRole('link')).not.toBeInTheDocument();
 });
