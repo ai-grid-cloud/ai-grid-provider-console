@@ -180,7 +180,7 @@ it('explains to a hub admin how to set the position of an AI grid cluster withou
   const position = await screen.findByTestId('cluster-map-position');
   expect(position).toHaveTextContent(/^—\s*$/);
   await user.click(within(position).getByRole('button', { name: "More about a cluster's map position" }));
-  expect(await screen.findByText(/^Not set\./)).toHaveTextContent('ai-grid/latitude');
+  expect(await screen.findByRole('dialog')).toHaveTextContent('No position available');
   // The help icon is the only control: Edit lives in the actions menu, not on the position.
   expect(within(position).getAllByRole('button')).toHaveLength(1);
 });

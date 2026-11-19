@@ -20,20 +20,26 @@ import {
   Flex,
   FlexItem,
   Grid,
+  GridItem,
+  Icon,
   Label,
+  List,
+  ListItem,
+  Popover,
   SearchInput,
   Stack,
   Title,
   ToggleGroup,
   ToggleGroupItem,
 } from '@patternfly/react-core';
-import { AngleLeftIcon } from '@patternfly/react-icons';
+import { AngleLeftIcon, InfoCircleIcon } from '@patternfly/react-icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import { titleOf, type ModelView } from '../models/modelView';
 import { ModelStatusLabel } from '../models/ModelStatus';
 import type { ClusterView } from '../clusters/clusterView';
 import { DetailsList } from '../../components/DetailsList';
 import { DetailsSection } from '../../components/DetailsSection';
+import { HelpPopover } from '../../components/HelpPopover';
 import { StatCard } from '../../components/StatCard';
 import { StatusLabel } from '../../components/StatusLabel';
 import { SubtleText } from '../../components/SubtleText';
@@ -43,6 +49,7 @@ import { GridFleetMap } from './GridFleetMap';
 import type { TileLayerConfig } from './tiles';
 import './grid-fleet.css';
 import { runtimeImageText } from '../models/modelHardware';
+import { MapPositionAbout } from '../clusters/PositionHelp';
 
 /** What the map and its drawer show of a cluster (clusterView.ts). */
 export type FleetCluster = Pick<
@@ -116,6 +123,78 @@ const FleetCard: React.FC<{
     </CardHeader>
     <CardBody>
       <Stack>{children}</Stack>
+    </CardBody>
+  </Card>
+);
+
+const NOT_SHOWN_REASON = 'Clusters are not shown on the map when their positions are missing or invalid.';
+
+const notShownTitle = (n: number) => `${n} ${n === 1 ? 'cluster' : 'clusters'} not shown`;
+
+/** One count in the Cluster details card: the number, its name under it, and an optional control. */
+const Count: React.FC<{ value: number; label: string; extra?: React.ReactNode }> = ({ value, label, extra }) => (
+  <Stack>
+    <span className="pf-v6-u-font-size-2xl pf-v6-u-font-weight-bold">{value}</span>
+    <span>
+      {label} {extra}
+    </span>
+  </Stack>
+);
+
+/**
+ * The clusters in the AI grid: how many, how many are Ready, and, when some have no usable map
+ * position, how many the map leaves out, with an info popover naming them and saying how a
+ * position is set (UXD's design for RHAI-20006).
+ */
+const ClusterCountsCard: React.FC<{ clusters: FleetCluster[]; notShown: FleetCluster[] }> = ({
+  clusters,
+  notShown,
+}) => (
+  <Card isCompact isFullHeight>
+    <CardTitle>
+      Cluster details{' '}
+      <HelpPopover topic="the cluster details count">
+        The total number of OpenShift clusters in the AI grid.
+      </HelpPopover>
+    </CardTitle>
+    <CardBody>
+      <Grid hasGutter span={4}>
+        <Count value={clusters.length} label="Total" />
+        <Count value={clusters.filter((c) => c.status === 'Ready').length} label="Ready" />
+        {notShown.length > 0 && (
+          <Count
+            value={notShown.length}
+            label="Not shown"
+            extra={
+              <Popover
+                alertSeverityVariant="info"
+                headerIcon={<InfoCircleIcon />}
+                headerContent={notShownTitle(notShown.length)}
+                bodyContent={
+                  <Stack hasGutter>
+                    <p>{NOT_SHOWN_REASON} The following clusters do not have a valid map position:</p>
+                    <List>
+                      {notShown.map((c) => (
+                        <ListItem key={c.name}>{c.name}</ListItem>
+                      ))}
+                    </List>
+                    <Title headingLevel="h3" size="md">
+                      How to set map position
+                    </Title>
+                    <MapPositionAbout />
+                  </Stack>
+                }
+              >
+                <Button variant="plain" hasNoPadding aria-label="More about the clusters not shown">
+                  <Icon status="info">
+                    <InfoCircleIcon />
+                  </Icon>
+                </Button>
+              </Popover>
+            }
+          />
+        )}
+      </Grid>
     </CardBody>
   </Card>
 );
@@ -420,14 +499,15 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
             })}
       </Stack>
       {mode === 'cluster' && notOnMap.length > 0 && (
-        <Alert
-          isInline
-          isPlain
-          variant="info"
-          title={`${notOnMap.length} ${notOnMap.length === 1 ? 'cluster' : 'clusters'} not shown`}
-          data-testid="clusters-not-on-map"
-        >
-          Clusters are excluded from the map when their positions are missing or invalid.
+        <Alert isInline isPlain variant="info" title={notShownTitle(notOnMap.length)} data-testid="clusters-not-on-map">
+          <Stack hasGutter>
+            <span>{NOT_SHOWN_REASON}</span>
+            <Popover bodyContent={<MapPositionAbout />}>
+              <Button variant="link" isInline>
+                How to set map position
+              </Button>
+            </Popover>
+          </Stack>
         </Alert>
       )}
     </Stack>
@@ -449,9 +529,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
     </DrawerPanelContent>
   );
 
-  const ready = clusters.filter((c) => c.status === 'Ready').length;
   const summary: [label: string, value: string, detail: string | undefined, help: string][] = [
-    ['Clusters', `${ready}/${clusters.length}`, 'Ready', 'The total number of OpenShift clusters in the AI grid.'],
     // A site is a site name, else the cloud region, else the ai-grid/site label: what the map names.
     [
       'Sites',
@@ -472,9 +550,14 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
 
   return (
     <Stack hasGutter>
-      <Grid hasGutter md={4} role="region" aria-label="AI grid summary">
+      <Grid hasGutter role="region" aria-label="AI grid summary">
+        <GridItem md={6}>
+          <ClusterCountsCard clusters={clusters} notShown={notOnMap} />
+        </GridItem>
         {summary.map(([label, value, detail, help]) => (
-          <StatCard key={label} label={label} value={value} detail={detail} help={help} />
+          <GridItem md={3} key={label}>
+            <StatCard label={label} value={value} detail={detail} help={help} />
+          </GridItem>
         ))}
       </Grid>
       <Card className="fleet-region" role="region" aria-label="AI grid map and drawer">

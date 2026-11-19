@@ -1,5 +1,5 @@
-// How a hub admin sets a cluster's map position. The details page and the location-label help
-// share it, with the external-link icon at the end of the label.
+// How a hub admin sets a cluster's map position, for the location-label help in the Add and Edit
+// dialogs, with the external-link icon at the end of the label.
 import { Button } from '@patternfly/react-core';
 import { ExternalLinkAltIcon } from '@patternfly/react-icons';
 import { LOCATION_DOCS_URL } from './site';
