@@ -19,7 +19,7 @@ RUN pnpm install --frozen-lockfile
 COPY --chown=1001:0 frontend/ ./
 RUN pnpm run build
 
-FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1794208304@sha256:0e3894cea4fc077084245e8aa2befc8a7d91a4f60fbf850f0b5b555cbe62ee26 AS bff-builder
+FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi9/go-toolset:1795042464@sha256:51eef2836e5223c41577757c30544fbfb3f0710f3436b70b82d2195e35fcb743 AS bff-builder
 ARG TARGETOS
 ARG TARGETARCH
 # Not VERSION: go-toolset sets ENV VERSION (its Go version), which would override the build arg.
