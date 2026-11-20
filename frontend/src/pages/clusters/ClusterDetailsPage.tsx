@@ -1,7 +1,5 @@
 import { useRef, useState } from 'react';
 import {
-  Alert,
-  AlertActionLink,
   Breadcrumb,
   BreadcrumbItem,
   Button,
@@ -16,7 +14,6 @@ import {
   Stack,
   Tooltip,
 } from '@patternfly/react-core';
-import { SubtleText } from '../../components/SubtleText';
 import { ExternalLinkAltIcon, PlusCircleIcon } from '@patternfly/react-icons';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { Link, useParams } from 'react-router-dom';
@@ -49,13 +46,12 @@ import { changeMembership, editCluster, editTarget, membershipTarget } from './c
 import { EditClusterModal } from './EditClusterModal';
 import { editText } from './editClusterText';
 import { MissingLabel } from '../../components/MissingLabel';
-import { PositionDocsLink } from './PositionDocsLink';
 import { ClusterRoleName } from './ClusterRolesHelp';
 import { roleOf } from './roles';
 import type { ClusterView } from './clusterView';
 import { useCluster, useMembershipWrites } from './useClusters';
 import { ClusterSite } from './ClusterSite';
-import { isFromCloudRegion, LOCATION_DOCS_URL } from './site';
+import { PositionHelp } from './PositionHelp';
 
 /** "68 cores, 65 allocatable", or only the capacity when the hub reports no allocatable value. */
 const withAllocatable = (capacity?: string, allocatable?: string) =>
@@ -125,7 +121,7 @@ const clusterItems = (c: ClusterView) => [
     value: <StatusLabel isCompact status={c.status} reason={hubConnection(c)} />,
     'data-testid': 'cluster-status',
   },
-  { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" showProblem={false} /> },
+  { term: 'Site', value: <ClusterSite cluster={c} testId="cluster-site" /> },
   { term: 'Region', value: c.region },
   { term: 'Map position', value: <MapPosition cluster={c} />, 'data-testid': 'cluster-map-position' },
   ...(c.openshiftVersion ? [{ term: 'OpenShift version', value: c.openshiftVersion }] : []),
@@ -136,57 +132,15 @@ const clusterItems = (c: ClusterView) => [
 ];
 
 /**
- * Where the map puts the cluster and from what: the hub admin's annotations, or the cloud region
- * ("<lat, lon> from the cloud region"). Annotations the hub can't use open a warning with the
- * backend's problem. With no coordinates at all, the value says they are missing. Both link to how
- * a hub admin sets them.
+ * Where the map puts the cluster: its coordinates, or the page's empty value when it has none. The
+ * help icon beside it says where they come from, or how a hub admin sets them.
  */
-const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => {
-  if (c.locationProblem) {
-    return (
-      <Alert
-        isExpandable
-        isInline
-        variant="warning"
-        title="Not on the map due to invalid coordinates"
-        actionLinks={
-          <AlertActionLink
-            component="a"
-            href={LOCATION_DOCS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            icon={<ExternalLinkAltIcon />}
-            iconPosition="end"
-          >
-            How to set a cluster&apos;s position
-          </AlertActionLink>
-        }
-      >
-        <p>Message returned: {c.locationProblem}</p>
-      </Alert>
-    );
-  }
-  const how = <PositionDocsLink />;
-  if (c.latitude === undefined || c.longitude === undefined) {
-    return (
-      <Stack>
-        <span>Not on the map due to missing coordinates</span>
-        {how}
-      </Stack>
-    );
-  }
-  const at = `${c.latitude}, ${c.longitude}`;
-  return isFromCloudRegion(c) ? (
-    <Stack>
-      <span>
-        {at} <SubtleText>from the cloud region</SubtleText>
-      </span>
-      {how}
-    </Stack>
-  ) : (
-    <span>{at}</span>
-  );
-};
+const MapPosition: React.FC<{ cluster: ClusterView }> = ({ cluster: c }) => (
+  <span>
+    {c.latitude === undefined || c.longitude === undefined ? EMPTY_VALUE : `${c.latitude}, ${c.longitude}`}{' '}
+    <PositionHelp cluster={c} />
+  </span>
+);
 
 /** Each distinct value once, in order. */
 const distinct = (values: (string | undefined)[]) => [...new Set(values.filter((v): v is string => !!v))];

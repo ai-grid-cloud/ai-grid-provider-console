@@ -39,6 +39,8 @@ test('shows the fixture pins on the bundled land outline, and a pin opens its de
   const origin = new URL(baseURL!).origin;
   expect(requests.filter((url) => /^https?:/.test(url) && new URL(url).origin !== origin)).toEqual([]);
 
+  // The map is cut off at the bottom of the window here; a click on a pin must still land
+  // (GridFleetMap focuses the map without scrolling the page).
   await hover(pins.first());
   await expect(tooltip).toBeVisible();
   await pins.first().click();

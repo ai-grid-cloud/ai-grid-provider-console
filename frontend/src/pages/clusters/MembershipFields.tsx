@@ -26,7 +26,7 @@ import { TypeaheadSelect } from '../../components/TypeaheadSelect';
 import { EMPTY_VALUE } from '../../utilities/format';
 import { ClusterRolesList } from './ClusterRolesHelp';
 import { mapPositionOf, type ClusterView } from './clusterView';
-import { PositionDocsLink } from './PositionDocsLink';
+import { MapPositionHowSet } from './PositionHelp';
 import { clusterRoles } from './roles';
 import { isFromCloudRegion } from './site';
 
@@ -50,7 +50,7 @@ type TextFieldProps = {
 const MISSING_COORDINATES = 'Missing coordinates';
 
 /**
- * The cluster's coordinates, to copy. A cloud-region position says so and links to how to set one.
+ * The cluster's coordinates, to copy. A cloud-region position says so and how a position is set.
  * Annotations the hub can't use point at the cluster page, which has the backend's message.
  */
 const MapPositionValue: React.FC<{ cluster: LocationCluster }> = ({ cluster }) => {
@@ -74,7 +74,9 @@ const MapPositionValue: React.FC<{ cluster: LocationCluster }> = ({ cluster }) =
     return (
       <Stack>
         <span>{MISSING_COORDINATES}</span>
-        <PositionDocsLink />
+        <span>
+          <MapPositionHowSet />
+        </span>
       </Stack>
     );
   }
@@ -87,7 +89,9 @@ const MapPositionValue: React.FC<{ cluster: LocationCluster }> = ({ cluster }) =
   return (
     <Stack>
       <span>{coordinates} from the cloud region</span>
-      <PositionDocsLink />
+      <span>
+        <MapPositionHowSet />
+      </span>
     </Stack>
   );
 };
@@ -120,7 +124,7 @@ const locationGuidance = (cluster: LocationCluster) => {
   }
   return (
     <>
-      No map position, site, or cloud region is available to inform the label. <PositionDocsLink />.
+      No map position, site, or cloud region is available to inform the label. <MapPositionHowSet />
     </>
   );
 };

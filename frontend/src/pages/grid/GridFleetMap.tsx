@@ -79,9 +79,19 @@ export const GridFleetMap: React.FC<Props> = ({ clusters, selected, onSelect, ti
     );
     map.current = instance;
     layer.current = L.layerGroup().addTo(instance);
+    // Leaflet's keyboard handler focuses the map on the first press, which scrolls the page to show
+    // the whole map, then undoes only a window scroll (leaflet 1.9.4 src/map/handler/Map.Keyboard.js).
+    // The console scrolls <main>, not the window, so the press moved a pin out from under the
+    // pointer and the click missed. Focus it first without scrolling; Leaflet then finds it focused.
+    const el = container.current;
+    const focusWithoutScroll = () => {
+      if (document.activeElement !== el) el.focus({ preventScroll: true });
+    };
+    el.addEventListener('mousedown', focusWithoutScroll, true);
     const observer = new ResizeObserver(() => instance.invalidateSize());
-    observer.observe(container.current);
+    observer.observe(el);
     return () => {
+      el.removeEventListener('mousedown', focusWithoutScroll, true);
       observer.disconnect();
       instance.remove();
       map.current = null;

@@ -17,7 +17,6 @@ import { createClient } from '@connectrpc/connect';
 import { Clusters } from '../api/connect/clients';
 import { notificationsKey, watchesKey } from '../notifications/storageKeys';
 import { AI_GRID_SUMMARY } from '../pages/clusters/clusterInfo';
-import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { EMPTY_VALUE } from '../utilities/format';
 import { transportFor } from './connectClusters';
 import { renderAt } from './render';
@@ -352,6 +351,8 @@ it('asks for a location label and role before adding', async () => {
       .map((term) => term.textContent),
   ).toEqual(['Map position', 'Site', 'Cloud region']);
   expect(within(help).getByText('37.7749, -122.4194')).toBeVisible();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
   expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
   await user.click(within(help).getByRole('button', { name: 'Copy map position' }));
@@ -391,12 +392,11 @@ it('asks for a location label and role before adding', async () => {
   expect(hubHelp).toHaveTextContent('No map position, site, or cloud region is available to inform the label.');
   expect(within(hubHelp).queryByRole('term')).not.toBeInTheDocument();
   expect(within(hubHelp).queryByText('Missing coordinates')).not.toBeInTheDocument();
-  const how = within(hubHelp).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.closest('p')).toHaveTextContent(
-    'No map position, site, or cloud region is available to inform the label.',
+  // UXD's sentence on how a position is set, in place of a link to the backend's README.
+  expect(hubHelp).toHaveTextContent(
+    'No map position, site, or cloud region is available to inform the label. Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
   );
-  expect(how.querySelector('svg')).toBeInTheDocument();
-  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  expect(within(hubHelp).queryByRole('link')).not.toBeInTheDocument();
   expect(within(hubHelp).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 

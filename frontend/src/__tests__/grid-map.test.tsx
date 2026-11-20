@@ -347,7 +347,7 @@ it("links to the selected cluster's details page, as the Clusters list does", as
 });
 
 it.each([
-  ['clusters', 'The total number of OpenShift clusters in the AI grid.'],
+  ['cluster details', 'The total number of OpenShift clusters in the AI grid.'],
   ['sites', 'The number of different sites or cloud regions where clusters in the AI grid are located.'],
   ['models', 'The total number of models in the AI grid.'],
 ])('says what the %s count counts in a help popover', async (card, help) => {
@@ -391,15 +391,39 @@ it("drops the Back trail when a link moves the drawer to something the trail was
   expect(screen.getByRole('button', { name: 'Clusters' })).toBeVisible();
 });
 
-it("counts the members that aren't on the map, whatever the reason, and links to how to place them", async () => {
+it('says "No map position" on the cards of clusters without one, and counts them in the not-shown alert', async () => {
+  const user = userEvent.setup();
+  const service = new MockConsoleService();
+  const [first, second] = service.clusters;
+  service.clusters = [first, { ...second, latitude: undefined, longitude: undefined }];
+  renderAt('/ai-grid', service);
+  const unplaced = (await screen.findByRole('button', { name: `View ${second.name} details` })).closest(
+    '.pf-v6-c-card',
+  );
+  const placed = screen.getByRole('button', { name: `View ${first.name} details` }).closest('.pf-v6-c-card');
+  expect(unplaced).toHaveTextContent('No map position');
+  expect(placed).not.toHaveTextContent('No map position');
+  const note = screen.getByTestId('clusters-not-on-map');
+  expect(within(note).getByRole('heading', { name: /1 cluster not shown/ })).toBeVisible();
+  expect(note).toHaveTextContent('Clusters are not shown on the map when their positions are missing or invalid.');
+  expect(within(note).queryByRole('link')).not.toBeInTheDocument();
+  await user.click(within(note).getByRole('button', { name: "How to set a cluster's position" }));
+  expect(await screen.findByRole('dialog')).toHaveTextContent(
+    'Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
+  );
+});
+
+it('counts the clusters in the summary, and names those the map leaves out, whatever the reason', async () => {
+  const user = userEvent.setup();
   const service = new MockConsoleService();
   const [first, second, third] = service.clusters;
   service.clusters = [
     first,
-    { ...second, latitude: undefined, longitude: undefined },
+    { ...second, latitude: undefined, longitude: undefined, status: 'Unavailable' },
     { ...third, latitude: undefined, longitude: undefined },
   ];
-  // The mock's clusters carry no problem; one member's annotations are wrong.
+  const ready = service.clusters.filter((c) => c.status === 'Ready').length;
+  // The mock's clusters carry no problem; the third member's annotations are wrong.
   const clusters = await service.listClusters();
   const transport = fakeClients({
     clusters: {
@@ -411,9 +435,28 @@ it("counts the members that aren't on the map, whatever the reason, and links to
     },
   }).transport;
   renderAt('/ai-grid', service, transport);
-  // One inline alert for both reasons: the drawer names each cluster's problem.
-  const note = await screen.findByTestId('clusters-not-on-map');
-  expect(within(note).getByRole('heading', { name: /2 clusters not shown/ })).toBeVisible();
-  expect(note).toHaveTextContent('Clusters are excluded from the map when their positions are missing or invalid.');
-  expect(within(note).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  const summary = await screen.findByRole('region', { name: 'AI grid summary' });
+  expect(within(summary).getByText('Cluster details')).toBeVisible();
+  // Each count is its number over its name.
+  const count = (label: string) => within(summary).getByText(label).closest('.pf-v6-l-stack')?.firstElementChild;
+  expect(count('Total')).toHaveTextContent(/^3$/);
+  expect(ready).toBe(2);
+  expect(count('Ready')).toHaveTextContent(/^2$/);
+  expect(count('Not shown')).toHaveTextContent(/^2$/);
+  await user.click(within(summary).getByRole('button', { name: 'More about the clusters not shown' }));
+  const popover = await screen.findByRole('dialog');
+  expect(popover).toHaveTextContent('2 clusters not shown');
+  expect(
+    within(popover)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent),
+  ).toEqual([second.name, third.name]);
+  expect(within(popover).getByRole('heading', { name: 'How to set map position' })).toBeVisible();
+});
+
+it('has no Not shown count when every cluster is on the map', async () => {
+  renderAt('/ai-grid', new MockConsoleService());
+  const summary = await screen.findByRole('region', { name: 'AI grid summary' });
+  expect(within(summary).getByText('Ready')).toBeVisible();
+  expect(within(summary).queryByText('Not shown')).not.toBeInTheDocument();
 });

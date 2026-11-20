@@ -17,7 +17,6 @@ import {
 } from '../gen/ai_grid/v1/managed_cluster_type_pb';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
 import '../pages/clusters/ClusterDetailsPage';
-import { LOCATION_DOCS_URL } from '../pages/clusters/site';
 import { EMPTY_VALUE } from '../utilities/format';
 import { deferred, findVisible, renderAt } from './render';
 
@@ -162,7 +161,7 @@ it('offers Edit for AI grid clusters on the cluster page, before Remove from AI 
   expect(within(dialog).getByText('paris-1', { selector: 'strong' })).toBeVisible();
 });
 
-it('offers no Edit for a cluster outside AI grid, and the page still links to how a hub admin places it', async () => {
+it('offers no Edit for a cluster outside AI grid, and the page still explains how a hub admin places it', async () => {
   const user = userEvent.setup();
   const { transport } = clustersOf([managedCluster('outside-1', { location: 'eu-west' })]);
   renderAt('/clusters/outside-1', new MockConsoleService(), transport);
@@ -170,21 +169,19 @@ it('offers no Edit for a cluster outside AI grid, and the page still links to ho
   expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Add to AI grid']);
   await user.keyboard('{Escape}');
   const position = screen.getByTestId('cluster-map-position');
-  expect(within(position).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  expect(within(position).getByRole('button', { name: "More about a cluster's map position" })).toBeVisible();
 });
 
-it('links an AI grid cluster without a position to how a hub admin sets it, not to Edit', async () => {
+it('explains to a hub admin how to set the position of an AI grid cluster without one, not offering Edit', async () => {
+  const user = userEvent.setup();
   const { transport } = clustersOf([noRole('bare-1')]);
   renderAt('/clusters/bare-1', new MockConsoleService(), transport);
   const position = await screen.findByTestId('cluster-map-position');
-  expect(position).toHaveTextContent('Not on the map due to missing coordinates');
-  const how = within(position).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.querySelector('svg')).toBeInTheDocument();
-  expect(how).toHaveAttribute(
-    'href',
-    'https://github.com/ai-grid-cloud/ai-grid-provider-backend/blob/main/README.md#cluster-locations',
-  );
-  expect(within(position).queryByRole('button')).not.toBeInTheDocument();
+  expect(position).toHaveTextContent(/^—\s*$/);
+  await user.click(within(position).getByRole('button', { name: "More about a cluster's map position" }));
+  expect(await screen.findByRole('dialog')).toHaveTextContent('No position available');
+  // The help icon is the only control: Edit lives in the actions menu, not on the position.
+  expect(within(position).getAllByRole('button')).toHaveLength(1);
 });
 
 it('shows the role of a cluster that has one read-only, with why, and only the location label to edit', async () => {
@@ -379,12 +376,11 @@ it('says the map position is not available when the cluster has no position, sit
   expect(help).toHaveTextContent('No map position, site, or cloud region is available to inform the label.');
   expect(within(help).queryByRole('term')).not.toBeInTheDocument();
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
-  const how = within(help).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.closest('p')).toHaveTextContent(
-    'No map position, site, or cloud region is available to inform the label.',
+  // UXD's sentence on how a position is set, in place of a link to the backend's README.
+  expect(help).toHaveTextContent(
+    'No map position, site, or cloud region is available to inform the label. Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
   );
-  expect(how.querySelector('svg')).toBeInTheDocument();
-  expect(how).toHaveAttribute('href', LOCATION_DOCS_URL);
+  expect(within(help).queryByRole('link')).not.toBeInTheDocument();
   expect(within(help).queryByRole('button', { name: 'Copy map position' })).not.toBeInTheDocument();
 });
 
@@ -410,7 +406,10 @@ it('says a cloud-region position is inherited, and shows an empty site as a dash
   expect(within(help).getByText('ca-central-1')).toBeVisible();
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
   expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
-  expect(within(help).getByRole('link', { name: "How to set a cluster's position" })).toBeVisible();
+  expect(help).toHaveTextContent(
+    'Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
+  );
+  expect(within(help).queryByRole('link')).not.toBeInTheDocument();
   expect(
     within(help)
       .getAllByRole('term')
@@ -440,8 +439,10 @@ it('uses the site or cloud region when the map position is not available', async
   expect(within(help).getByText('Missing coordinates')).toBeVisible();
   expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
   expect(within(help).getByText('Lyon DC2')).toBeVisible();
-  const how = within(help).getByRole('link', { name: "How to set a cluster's position" });
-  expect(how.closest('p')).toBeNull();
+  expect(help).toHaveTextContent(
+    'Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
+  );
+  expect(within(help).queryByRole('link')).not.toBeInTheDocument();
   expect(
     within(help)
       .getAllByRole('term')
@@ -479,7 +480,8 @@ it("says why a map position can't be read, in the details page's words", async (
   expect(within(help).getByText('Paris DC1')).toBeVisible();
   expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
   expect(details).toHaveAttribute('href', '/clusters/broken-1');
-  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
 });
 
 it('shows an unreadable map position even when the site and cloud region are empty', async () => {
@@ -504,7 +506,8 @@ it('shows an unreadable map position even when the site and cloud region are emp
   expect(details).toHaveAttribute('href', '/clusters/broken-2');
   expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
-  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
   expect(
     within(help)
       .getAllByRole('term')
