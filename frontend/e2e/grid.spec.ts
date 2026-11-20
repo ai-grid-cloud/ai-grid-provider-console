@@ -39,6 +39,10 @@ test('shows the fixture pins on the bundled land outline, and a pin opens its de
   const origin = new URL(baseURL!).origin;
   expect(requests.filter((url) => /^https?:/.test(url) && new URL(url).origin !== origin)).toEqual([]);
 
+  // Pressing on the map focuses it, and the browser scrolls a map that is cut off at the bottom of the
+  // page fully into view, moving the pin from under the pointer before it is released, so the click
+  // never lands. Show the whole map first, as a user whose window fits it does.
+  await map.scrollIntoViewIfNeeded();
   await hover(pins.first());
   await expect(tooltip).toBeVisible();
   await pins.first().click();
