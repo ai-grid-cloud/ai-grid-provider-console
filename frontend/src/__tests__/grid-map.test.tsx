@@ -13,6 +13,7 @@ import { ServiceError } from '../api/ConsoleService';
 import { fakeClients } from '../api/connect/testing';
 import { MockConsoleService } from '../api/MockConsoleService';
 import { tileLayerConfig } from '../pages/grid/tiles';
+import { toManagedCluster } from './connectClusters';
 import { modelsOf } from './connectModels';
 import { renderAt } from './render';
 // The routes load these pages lazily; loaded here, their import does not run inside a test's findBy.
@@ -412,20 +413,44 @@ it('says "No map position" on the cards of clusters without one, and counts them
   );
 });
 
-it('counts the clusters in the summary, and names those the map leaves out', async () => {
+it('counts the clusters in the summary, and names those the map leaves out, whatever the reason', async () => {
   const user = userEvent.setup();
   const service = new MockConsoleService();
-  const [first, second] = service.clusters;
-  service.clusters = [first, { ...second, latitude: undefined, longitude: undefined }];
-  renderAt('/ai-grid', service);
+  const [first, second, third] = service.clusters;
+  service.clusters = [
+    first,
+    { ...second, latitude: undefined, longitude: undefined, status: 'Unavailable' },
+    { ...third, latitude: undefined, longitude: undefined },
+  ];
+  const ready = service.clusters.filter((c) => c.status === 'Ready').length;
+  // The mock's clusters carry no problem; the third member's annotations are wrong.
+  const clusters = await service.listClusters();
+  const transport = fakeClients({
+    clusters: {
+      list: async () => {
+        const items = clusters.map(toManagedCluster);
+        items[2].status!.location!.problem = 'ai-grid/longitude "4,35" is not a decimal number of degrees';
+        return { items, size: items.length, total: items.length };
+      },
+    },
+  }).transport;
+  renderAt('/ai-grid', service, transport);
   const summary = await screen.findByRole('region', { name: 'AI grid summary' });
   expect(within(summary).getByText('Cluster details')).toBeVisible();
-  expect(within(summary).getByText('Total')).toBeVisible();
-  expect(within(summary).getByText('Not shown')).toBeVisible();
+  // Each count is its number over its name.
+  const count = (label: string) => within(summary).getByText(label).closest('.pf-v6-l-stack')?.firstElementChild;
+  expect(count('Total')).toHaveTextContent(/^3$/);
+  expect(ready).toBe(2);
+  expect(count('Ready')).toHaveTextContent(/^2$/);
+  expect(count('Not shown')).toHaveTextContent(/^2$/);
   await user.click(within(summary).getByRole('button', { name: 'More about the clusters not shown' }));
   const popover = await screen.findByRole('dialog');
-  expect(popover).toHaveTextContent('1 cluster not shown');
-  expect(within(popover).getByRole('listitem')).toHaveTextContent(second.name);
+  expect(popover).toHaveTextContent('2 clusters not shown');
+  expect(
+    within(popover)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent),
+  ).toEqual([second.name, third.name]);
   expect(within(popover).getByRole('heading', { name: 'How to set map position' })).toBeVisible();
 });
 
