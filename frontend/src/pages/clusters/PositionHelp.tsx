@@ -19,6 +19,11 @@ const KEYS = (
   </>
 );
 
+/** How a map position is set, in UXD's words; the location-label help says it in place of a docs link. */
+export const MapPositionHowSet: React.FC = () => (
+  <>Map position can be either set using annotations {KEYS} or inherited from the region.</>
+);
+
 /**
  * What a map position is and how a hub admin sets one, the same wherever the console explains it
  * (UXD's wording). The keys and the cloud-region fallback are the backend's
@@ -32,7 +37,7 @@ export const MapPositionAbout: React.FC<{ withoutEither?: boolean }> = ({ withou
       the AI grid map.
     </p>
     <p>
-      Map position can be either set using annotations {KEYS} or inherited from the region.
+      <MapPositionHowSet />
       {withoutEither && ' If neither option is available, the cluster will not appear on the map.'}
     </p>
   </Stack>

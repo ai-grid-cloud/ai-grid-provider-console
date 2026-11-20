@@ -504,7 +504,7 @@ export const GridFleetView: React.FC<Props> = ({ clusters, models, modelsError, 
             <span>{NOT_SHOWN_REASON}</span>
             <Popover bodyContent={<MapPositionAbout />}>
               <Button variant="link" isInline>
-                How to set map position
+                How to set a cluster&apos;s position
               </Button>
             </Popover>
           </Stack>

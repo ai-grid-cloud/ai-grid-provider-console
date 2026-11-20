@@ -406,7 +406,7 @@ it('says "No map position" on the cards of clusters without one, and counts them
   expect(within(note).getByRole('heading', { name: /1 cluster not shown/ })).toBeVisible();
   expect(note).toHaveTextContent('Clusters are not shown on the map when their positions are missing or invalid.');
   expect(within(note).queryByRole('link')).not.toBeInTheDocument();
-  await user.click(within(note).getByRole('button', { name: 'How to set map position' }));
+  await user.click(within(note).getByRole('button', { name: "How to set a cluster's position" }));
   expect(await screen.findByRole('dialog')).toHaveTextContent(
     'Map position can be either set using annotations (ai-grid/latitude and ai-grid/longitude) or inherited from the region.',
   );
