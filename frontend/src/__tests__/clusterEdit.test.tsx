@@ -480,7 +480,8 @@ it("says why a map position can't be read, in the details page's words", async (
   expect(within(help).getByText('Paris DC1')).toBeVisible();
   expect(within(help).getByText(EMPTY_VALUE)).toBeVisible();
   expect(details).toHaveAttribute('href', '/clusters/broken-1');
-  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
 });
 
 it('shows an unreadable map position even when the site and cloud region are empty', async () => {
@@ -505,7 +506,8 @@ it('shows an unreadable map position even when the site and cloud region are emp
   expect(details).toHaveAttribute('href', '/clusters/broken-2');
   expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
-  expect(within(help).queryByRole('link', { name: "How to set a cluster's position" })).not.toBeInTheDocument();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
   expect(
     within(help)
       .getAllByRole('term')

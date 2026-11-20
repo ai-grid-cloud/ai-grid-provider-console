@@ -351,6 +351,8 @@ it('asks for a location label and role before adding', async () => {
       .map((term) => term.textContent),
   ).toEqual(['Map position', 'Site', 'Cloud region']);
   expect(within(help).getByText('37.7749, -122.4194')).toBeVisible();
+  // A position the admin set, rightly or wrongly, gets no "how to set" sentence.
+  expect(help).not.toHaveTextContent('inherited from the region');
   expect(within(help).queryByText('Missing coordinates')).not.toBeInTheDocument();
   expect(within(help).getAllByText(EMPTY_VALUE)).toHaveLength(2);
   await user.click(within(help).getByRole('button', { name: 'Copy map position' }));
