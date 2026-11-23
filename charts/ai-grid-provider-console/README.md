@@ -10,9 +10,10 @@ OAuthClient and Secrets it expects; `docs/dev-setup.md`, "Deploy to a cluster", 
 The console is for provider admins only. Before it serves anything but `/api/v1/user` and
 `/api/v1/config`, the BFF asks the hub with the caller's own token whether they may `post` to the
 non-resource URL `/ai-grid/provider-console`. No server serves that path; the right exists only
-for this check. The chart creates ClusterRole `ai-grid-provider-admin` with exactly that rule and
-binds it to nobody. Any role with a `*` nonResourceURLs rule for `post` (or every verb) grants it
-too, such as cluster-admin, so cluster-admins already hold it. The
+for this check. The chart creates ClusterRole `ai-grid-provider-admin` with that rule, and the
+Monitoring page's reads described below, and binds it to nobody. Any role with a `*`
+nonResourceURLs rule for `post` (or every verb) grants it too, such as cluster-admin, so
+cluster-admins already hold it. The
 verb is `post` because OpenShift's `cluster-reader` may `get` every non-resource URL. Anyone else
 who signs in gets "Access permissions needed", and 403 from the API and the relays, until they
 are bound to the role.
@@ -45,14 +46,22 @@ the same question the BFF asks (`oc adm policy who-can` can't evaluate non-resou
 `helm uninstall` deletes the ClusterRole and the chart's binding. Bindings made with
 `oc adm policy` stay and take effect again when the chart is reinstalled.
 
-The role lets a provider admin into the console, and nothing more. The Monitoring page reads the
-hub's Perses through the BFF's Perses relay, which forwards the caller's own token: Perses
-authorizes the read of the PersesDashboards and PersesDatasources in the `console.perses.project`
-project and of the PersesGlobalDatasources, and each datasource's server (the hub's Thanos and
-Loki) authorizes the queries Perses sends it with that token. A provider admin who is not a
-cluster-admin needs those reads granted separately, such as read on those Perses resources and
-`cluster-monitoring-view` for metrics, or Monitoring shows their errors. The chart doesn't add
-them to `ai-grid-provider-admin`.
+The role lets a provider admin into the console and grants the reads its Monitoring page needs,
+and no writes. The Monitoring page reads the hub's Perses through the BFF's Perses relay, which
+forwards the caller's own token:
+
+- **Perses** asks the hub whether the caller may `get` the PersesDashboards and PersesDatasources
+  in the `console.perses.project` namespace and the PersesGlobalDatasources. The role grants `get`
+  on those three resources in every namespace, and `list` so a provider admin can `oc get` them.
+  It grants no Secrets.
+- **Metrics.** Perses sends the caller's token on to the datasource. ACM's `rbac-query-proxy`
+  returns metrics only for the managed clusters whose namespaces the caller can see, so the role
+  grants `get` and `list` on namespaces. A provider admin therefore sees the name of every
+  namespace on the hub and the metrics of every managed cluster. The proxy caches each token's
+  project list for a while, so an admin whose queries already reached it before the upgrade, with
+  Perses reads granted separately, might see no metrics until that cached list expires.
+- **Usage logs.** A datasource that authenticates with its own Secret, such as cluster-gitops'
+  `usage-logs-all`, needs nothing more from the caller.
 
 Before this check, the console asked whether the caller may `patch` ManagedClusters. On ACM hubs
 the `open-cluster-management:hypershift-addon:agent` ClusterRoleBinding grants that to

@@ -32,7 +32,8 @@ type NonResourceAttributes struct {
 // post to /ai-grid/provider-console, a non-resource URL that exists only to
 // say so. No server serves that path; RBAC grants it anyway, and `oc auth
 // can-i post /ai-grid/provider-console` asks the same question. The chart's
-// ai-grid-provider-admin ClusterRole holds exactly this rule; so does any role
+// ai-grid-provider-admin ClusterRole holds this rule (and the Monitoring
+// page's reads, which this check doesn't ask about); so does any role
 // with a `*` nonResourceURLs rule for post or every verb, such as
 // cluster-admin. The verb is post, not get: OpenShift's cluster-reader grants
 // get on every non-resource URL. It must be the console's own right, not one

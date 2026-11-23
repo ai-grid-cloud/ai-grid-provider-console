@@ -9,6 +9,9 @@
 # ManagedClusters, which ACM's open-cluster-management:hypershift-addon:agent ClusterRoleBinding
 # gives every authenticated user.
 #
+# It also grants the reads the Monitoring page needs (the rules' comments, README.md "Provider
+# admins"), and no writes.
+#
 # The chart binds nobody by default. Bind provider admins, OpenShift users or groups on the hub
 # (not an organization's identity provider groups), with the providerAdmins values or with
 # `oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group>` (README.md,
@@ -23,6 +26,21 @@ metadata:
 rules:
   - nonResourceURLs: ["/ai-grid/provider-console"]
     verbs: ["post"]
+  # The Monitoring page. The BFF's Perses relay forwards the caller's token, and Perses, run with
+  # Kubernetes authorization as the Cluster Observability Operator runs it, asks the hub whether
+  # the caller may `get` the PersesDashboards and PersesDatasources in the project's namespace
+  # (console.perses.project) and the PersesGlobalDatasources. Perses needs only `get`; `list` is
+  # here so a provider admin can `oc get` these resources. Read only: no secrets, which Perses
+  # checks only to proxy a datasource that isn't saved.
+  - apiGroups: ["perses.dev"]
+    resources: ["persesdashboards", "persesdatasources", "persesglobaldatasources"]
+    verbs: ["get", "list"]
+  # Metrics. Perses sends the caller's token on to the datasource; ACM's rbac-query-proxy answers
+  # only for the managed clusters whose namespaces the caller can see in its project list. Reading
+  # every namespace shows a provider admin every namespace's name and the whole fleet's metrics.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
 {{- with .Values.providerAdmins }}
 {{- if or .groups .users }}
 ---
