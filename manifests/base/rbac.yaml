@@ -51,7 +51,10 @@ subjects:
 # Who may use the console: the BFF asks the hub whether the caller may post to
 # the non-resource URL /ai-grid/provider-console. This ClusterRole grants it, and
 # so does any role with a `*` nonResourceURLs rule for `post` (or every verb),
-# such as cluster-admin. Nobody is bound here; bind provider admins with
+# such as cluster-admin. It also grants the Monitoring page's reads: Perses
+# dashboards and datasources, and namespaces for ACM's rbac-query-proxy, which
+# shows a provider admin every namespace's name and the whole fleet's metrics.
+# Nobody is bound here; bind provider admins with
 # `oc adm policy add-cluster-role-to-group ai-grid-provider-admin <group>`, and
 # check one with `oc auth can-i post /ai-grid/provider-console --as=<user>`. The
 # chart's templates/provider-admin.yaml says more.
@@ -62,3 +65,9 @@ metadata:
 rules:
   - nonResourceURLs: ["/ai-grid/provider-console"]
     verbs: ["post"]
+  - apiGroups: ["perses.dev"]
+    resources: ["persesdashboards", "persesdatasources", "persesglobaldatasources"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]

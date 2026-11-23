@@ -59,8 +59,9 @@ route:
   timeout: 70s
 
 # Who may use the console (README.md, "Provider admins"). The chart always creates ClusterRole
-# ai-grid-provider-admin, the console's own right (`post` on /ai-grid/provider-console); the BFF
-# answers 403 to anyone the hub doesn't grant it, cluster-admins excepted, who hold every right.
+# ai-grid-provider-admin, the console's own right (`post` on /ai-grid/provider-console) plus the
+# Monitoring page's reads of Perses resources and namespaces; the BFF answers 403 to anyone the hub
+# doesn't grant the right, cluster-admins excepted, who hold every right.
 # Non-empty lists bind the role to these OpenShift groups and users of the hub in ClusterRoleBinding
 # ai-grid-provider-admins; empty lists (the default) bind nobody. Provider admins sign in with their
 # OpenShift account: an organization's identity provider groups have nothing to do with this. You

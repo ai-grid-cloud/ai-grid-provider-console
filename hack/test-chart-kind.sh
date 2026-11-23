@@ -9,7 +9,8 @@
 #   2. helm install: the pod is ready, the proxy refuses a caller without a token, accepts a
 #      ServiceAccount token (TokenReview) and drops the identity headers a caller forges, the BFF answers isProviderAdmin from the cluster's access
 #      review (patch on ManagedClusters and a cluster reader's get on every non-resource URL are
-#      not enough, ClusterRole ai-grid-provider-admin is),
+#      not enough, ClusterRole ai-grid-provider-admin is, and it may also read Perses dashboards
+#      and datasources and namespaces for the Monitoring page, and write nothing),
 #      and Clusters/List over the relay lists ManagedClusters through the backend; no
 #      response, the proxy's own included, carries the caller's token; the
 #      backend may get and list the catalog's Argo CD Applications in openshift-gitops and no
@@ -356,6 +357,39 @@ expect 403 "a cluster reader's Connect calls stop at the BFF" "${auth[@]}" "${co
 k create clusterrolebinding tester-provider-admin --clusterrole=ai-grid-provider-admin \
   --serviceaccount=default:tester --dry-run=client -o yaml | k apply -f - >/dev/null
 tester_can yes post /ai-grid/provider-console || fail "bound to ai-grid-provider-admin, the tester may not post to /ai-grid/provider-console"
+# The Monitoring page's reads, as Perses asks them with the caller's token (get on its resources in
+# the project's namespace, and on the global datasources), and as ACM's rbac-query-proxy needs them
+# (the namespaces the caller can see). Reads only: no Secrets and no writes. Asked with a
+# SubjectAccessReview, as Perses asks (global datasources in namespace "*"): kind has no Perses
+# CRDs, and without them `kubectl auth can-i` can't resolve the resource, so it doesn't ask about
+# group perses.dev.
+tester_may() { # tester_may <yes|no> <verb> <group> <resource> [namespace]
+  local want=$1 verb=$2 group=$3 resource=$4 ns=${5:-} got
+  got="$(k create -o jsonpath='{.status.allowed}' -f - <<JSON 2>/dev/null || true
+{"apiVersion": "authorization.k8s.io/v1", "kind": "SubjectAccessReview",
+ "spec": {"user": "${TESTER}", "groups": ["system:serviceaccounts", "system:serviceaccounts:default", "system:authenticated"],
+  "resourceAttributes": {"verb": "${verb}", "group": "${group}", "resource": "${resource}", "namespace": "${ns}"}}}
+JSON
+)"
+  case "${got}" in
+    true) got=yes ;;
+    false) got=no ;;
+    *) fail "the SubjectAccessReview for ${verb} ${resource}.${group} in '${ns}' failed" ;;
+  esac
+  [[ "${got}" == "${want}" ]] || fail "bound to ai-grid-provider-admin, may ${verb} ${resource}.${group} in '${ns}': ${got}, want ${want}"
+}
+for resource in persesdashboards persesdatasources; do
+  for verb in get list; do tester_may yes "${verb}" perses.dev "${resource}" redhat-ods-monitoring; done
+  for verb in create patch delete; do tester_may no "${verb}" perses.dev "${resource}" redhat-ods-monitoring; done
+done
+for verb in get list; do
+  tester_may yes "${verb}" perses.dev persesglobaldatasources "*"
+  tester_may yes "${verb}" "" namespaces
+done
+tester_may no patch perses.dev persesglobaldatasources "*"
+tester_may no create "" namespaces
+tester_may no get "" secrets redhat-ods-monitoring
+pass "ai-grid-provider-admin may read Perses dashboards and datasources and namespaces, and no more"
 k apply -f - >/dev/null <<'YAML'
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
