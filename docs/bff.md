@@ -355,6 +355,44 @@ curl -s -H 'x-forwarded-access-token: dev-token' -H 'x-forwarded-user: dev-user'
   http://127.0.0.1:8080/ai_grid.v1.Clusters/List
 ```
 
+## The OSAC UI proxy
+
+OSAC's UI embeds the AI grid as one grid among several: its own proxy
+(`osac-ui/proxy/grid` in the osac monorepo) exchanges the browser's OSAC session
+for a hub OpenShift token per grid and forwards the browser's per-grid API calls
+here. That integration needs no change in this repository; this section is the
+contract it depends on, so a change here that breaks it is seen as one.
+
+- **Paths.** The OSAC proxy forwards everything after its `/api/grids/<grid-id>`
+  prefix verbatim, so the BFF's own paths (`/api/v1/...`, `/perses/api/...`,
+  `/ai_grid.v1.*`) arrive unchanged, the Perses relay's double-`api` quirk
+  included. Nothing here may start caring about the prefix.
+- **The caller's identity.** The OSAC proxy sends `Authorization: Bearer` with
+  the hub token it exchanged, and no cookies. kube-auth-proxy's
+  `--enable-k8s-token-validation` validates that bearer token with a
+  TokenReview (the `system:auth-delegator` binding in the chart's `rbac.yaml`)
+  and sets the identity headers itself; a caller's own `X-Forwarded-*` headers
+  are stripped first (`--skip-auth-strip-headers`), so the OSAC proxy must not
+  set them, and does not. The kind test (`hack/test-chart-kind.sh`) codifies the
+  path: a bearer token signs in, and forged identity headers a caller sends are
+  dropped.
+- **Tokens.** OpenShift user tokens are opaque (`sha256~...`), live about 24
+  hours, and have no refresh grant. When one expires, the OSAC proxy
+  re-authenticates the browser silently and retries; the 401 it answers with in
+  the meantime carries its own `X-Grid-Login-URL` header and comes from the OSAC
+  proxy, not from here. An expired token presented here reaches kube-auth-proxy,
+  which sends the caller to sign in.
+- **Authorization.** The BFF's checks are unchanged: a caller whose token is not
+  a provider admin's gets 403 from `/api/v1` beyond the reads, the Connect relay
+  and the Perses relay, and the OSAC proxy passes that 403 through unchanged —
+  a grid the user cannot access is reported in the OSAC UI, not hidden by this
+  console.
+- **Framing.** The console's pages are sent `frame-ancestors 'none'` and
+  `X-Frame-Options: DENY` (see "Headers, caching and compression"), so the OSAC
+  UI must not embed the console in an iframe. The integration is at the API
+  level — the OSAC proxy in front and OSAC's own UI in place of this frontend —
+  not this console's pages inside OSAC's.
+
 ## Errors
 
 The BFF maps no backend error to a status of its own: its one gRPC call, the readiness probe,
@@ -392,4 +430,5 @@ through.
   `/api/v1/config` is a plain external link that stays empty until a page exists.
 - No metering. Praxis AI's `external_metering` filter emits CloudEvents to a metering
   service; nothing on the dev hub receives them yet.
-- No OSAC integration in this round; the backend is the OSAC-like layer.
+- No OSAC integration of this console's own UI; the backend is the OSAC-like layer,
+  and the OSAC UI proxy integration (above) is API-level only.
