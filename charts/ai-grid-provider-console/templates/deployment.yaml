@@ -74,6 +74,10 @@ spec:
             # let a caller name itself; hack/test-chart-kind.sh sends forged ones.
             - --skip-auth-strip-headers=true
             - --skip-jwt-bearer-tokens=true
+            # Bearer tokens in the Authorization header are validated with TokenReviews, so a
+            # caller with a hub token — the OSAC UI proxy forwarding a per-grid call with the
+            # token it exchanged (docs/bff.md, "The OSAC UI proxy") — signs in without the
+            # browser cookie. hack/test-chart-kind.sh checks that path.
             - --enable-k8s-token-validation=true
             - --use-system-trust-store=true
             - --cookie-name={{ required "oauth.cookieName is required" .Values.oauth.cookieName }}
